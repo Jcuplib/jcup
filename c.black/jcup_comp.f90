@@ -299,18 +299,17 @@ subroutine set_component_info()
 end subroutine set_component_info
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-
-subroutine init_model_process(isCallInit)
+! 2014/08/27 [MOD] delete argument isCallInit
+subroutine init_model_process()
   use jcup_mpi_lib, only : jml_init, jml_GetCommSizeGlobal, jml_GetMyrankGlobal, jml_create_communicator
   use jcup_utils, only : error
   use jcup_time, only : init_all_time
   implicit none
-  logical,intent(IN) :: isCallInit
   integer, allocatable :: my_comp_id(:)
   character(len=NAME_LEN), pointer :: total_comp_name(:)
   integer :: p
 
-  call jml_init(isCallInit)
+  call jml_init() 
   my_rank_global = jml_GetMyRankGlobal() 
   num_of_total_pe = jml_GetCommSizeGlobal()
 

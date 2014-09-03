@@ -60,10 +60,10 @@ module jcup_mpi_lib
   public :: jml_send_waitall
   public :: jml_recv_waitall
 
-  public :: jml_set_send_recv_buffer ! subroutine (buffer_size)
+  !public :: jml_set_send_recv_buffer ! subroutine (buffer_size)
 
-  public :: jml_send_local_test
-  public :: jml_recv_local_test
+  !public :: jml_send_local_test
+  !public :: jml_recv_local_test
 
 !--------------------------------   private  ---------------------------------!
 
@@ -247,13 +247,15 @@ module jcup_mpi_lib
 contains
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-
-subroutine jml_init(isCallInit)
+! 2014/08/27 [MOD] add MPI_Initialized 
+subroutine jml_init()
     implicit none
-    logical,intent(IN) :: isCallInit
-
+    logical :: is_initialized
     ! MPI Initialize
-    if (isCallInit) call MPI_INIT(ierror)
+    
+    call MPI_initialized(is_initialized, ierror) ! 2014/08/27 [ADD]
+    if (.not.is_initialized) call MPI_INIT(ierror)
+
     call MPI_COMM_GROUP(MPI_COMM_WORLD,global%group,ierror)
     call MPI_COMM_SIZE(MPI_COMM_WORLD,global%num_of_pe,ierror)
     call MPI_COMM_RANK(MPI_COMM_WORLD,global%my_rank,ierror)
@@ -568,17 +570,23 @@ subroutine write_comm_info(unit, comm)
 end subroutine write_comm_info
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-
-subroutine jml_finalize()
+! 2014/08/27 [MOD] add MPI_finalized
+subroutine jml_finalize(is_call_finalize)
     implicit none
+    logical, intent(IN) :: is_call_finalize
+    logical :: is_finalized
 
     call mpi_buffer_detach(local_buffer, 8*size(local_buffer), ierror)
 
-    !!if (allocated(local_buffer)) deallocate(local_buffer)
+    if (associated(local_buffer)) deallocate(local_buffer)
+
+    if (.not.is_call_finalize) return
 
     if (isInitialized) then
-      call MPI_FINALIZE(ierror)
+      call MPI_finalized(is_finalized, ierror)
+      if (.not.is_finalized) call MPI_FINALIZE(ierror)
     end if
+
 end subroutine jml_finalize
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
@@ -1220,55 +1228,55 @@ end subroutine jml_recv_int_1d_local
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine jml_send_local_test(comp, data,is,ie,dest)
-  implicit none
-  integer, intent(IN) :: comp
-  integer, intent(IN) :: data(:)
-  integer, intent(IN) :: is, ie
-  integer, intent(IN) :: dest
+!subroutine jml_send_local_test(comp, data,is,ie,dest)
+!  implicit none
+!  integer, intent(IN) :: comp
+!  integer, intent(IN) :: data(:)
+!  integer, intent(IN) :: is, ie
+!  integer, intent(IN) :: dest
 
-  integer :: buffer(is:ie)
-  integer :: request
-  integer :: status(MPI_STATUS_SIZE)
+!  integer :: buffer(is:ie)
+!  integer :: request
+!  integer :: status(MPI_STATUS_SIZE)
 
-  if (dest == local(comp)%my_rank) then
-    call check_buffer_size(ie-is+1)
-    buffer(is:ie) = data(is:ie)
-    call MPI_BSEND(buffer,ie-is+1,MPI_INTEGER,dest,MPI_MY_TAG,local(comp)%mpi_comm,ierror)
+!  if (dest == local(comp)%my_rank) then
+!    call check_buffer_size(ie-is+1)
+!    buffer(is:ie) = data(is:ie)
+!    call MPI_BSEND(buffer,ie-is+1,MPI_INTEGER,dest,MPI_MY_TAG,local(comp)%mpi_comm,ierror)
     !call MPI_WAIT(send_request,status,ierror)
     !local_buffer_int(1:ie-is+1) = data(is:ie)
-  else
-    buffer(is:ie) = data(is:ie)
-    call MPI_ISEND(buffer,ie-is+1,MPI_INTEGER,dest,MPI_MY_TAG,local(comp)%mpi_comm,request,ierror)
-    call MPI_WAIT(request,status,ierror)
-  end if
+!  else
+!    buffer(is:ie) = data(is:ie)
+!    call MPI_ISEND(buffer,ie-is+1,MPI_INTEGER,dest,MPI_MY_TAG,local(comp)%mpi_comm,request,ierror)
+!    call MPI_WAIT(request,status,ierror)
+!  end if
 
-end subroutine jml_send_local_test
+!end subroutine jml_send_local_test
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine jml_recv_local_test(comp, data,is,ie,source)
-  implicit none
-  integer, intent(IN) :: comp
-  integer, intent(INOUT) :: data(:)
-  integer, intent(IN)  :: is, ie
-  integer, intent(IN)  :: source
+!subroutine jml_recv_local_test(comp, data,is,ie,source)
+!  implicit none
+!  integer, intent(IN) :: comp
+!  integer, intent(INOUT) :: data(:)
+!  integer, intent(IN)  :: is, ie
+!  integer, intent(IN)  :: source
   
-  integer :: buffer(is:ie)
-  integer :: request
-  integer :: status(MPI_STATUS_SIZE)
+!  integer :: buffer(is:ie)
+!  integer :: request
+!  integer :: status(MPI_STATUS_SIZE)
 
-  if (source == local(comp)%my_rank) then
-    call MPI_IRECV(buffer,ie-is+1,MPI_INTEGER,source,MPI_MY_TAG,local(comp)%mpi_comm,request,ierror)
-    call MPI_WAIT(request,status,ierror)
-    data(is:ie) = buffer(is:ie)
-  else
-    call MPI_IRECV(buffer,ie-is+1,MPI_INTEGER,source,MPI_MY_TAG,local(comp)%mpi_comm,request,ierror)
-    call MPI_WAIT(request,status,ierror)
-    data(is:ie) = buffer(is:ie)
-  end if
+!  if (source == local(comp)%my_rank) then
+!    call MPI_IRECV(buffer,ie-is+1,MPI_INTEGER,source,MPI_MY_TAG,local(comp)%mpi_comm,request,ierror)
+!    call MPI_WAIT(request,status,ierror)
+!    data(is:ie) = buffer(is:ie)
+!  else
+!    call MPI_IRECV(buffer,ie-is+1,MPI_INTEGER,source,MPI_MY_TAG,local(comp)%mpi_comm,request,ierror)
+!    call MPI_WAIT(request,status,ierror)
+!    data(is:ie) = buffer(is:ie)
+!  end if
 
-end subroutine jml_recv_local_test
+!end subroutine jml_recv_local_test
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
@@ -2587,7 +2595,7 @@ subroutine jml_isend_double_1d_model(comp, data,is,ie,dest_model,dest_pe, exchan
   data_size = ie-is+1
 
   if (dest_rank == jml_GetMyrankModel(comp, dest_model)) then !local(comp)%my_rank) then
-    write(0,*) "mpi_IBsend called ", comp, dest_model, dest_pe, exchange_tag
+    !write(0,*) "mpi_IBsend called ", comp, dest_model, dest_pe, exchange_tag
     call check_buffer_size(data_size)
     call MPI_BSEND(data,data_size,MPI_DOUBLE_PRECISION,dest_rank,tag,local(comp)%inter_comm(dest_model)%mpi_comm,ierror)
   else
@@ -2651,14 +2659,14 @@ subroutine jml_recv_waitall()
 end subroutine jml_recv_waitall
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-
-subroutine jml_set_send_recv_buffer(bsize)
-  implicit none
-  integer, intent(IN) :: bsize
+! 
+!subroutine jml_set_send_recv_buffer(bsize)
+!  implicit none
+!  integer, intent(IN) :: bsize
   
-  call check_buffer_size(bsize)
+!  call check_buffer_size(bsize)
 
-end subroutine jml_set_send_recv_buffer
+!end subroutine jml_set_send_recv_buffer
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 

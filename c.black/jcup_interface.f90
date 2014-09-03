@@ -179,7 +179,8 @@ end subroutine jcup_set_new_comp
 !> @param[in] model_name model name
 !> @param[in] inCallInit flag call MPI_Init or not
 ! 2014/07/11 [MOD] add default_time_unit
-subroutine jcup_initialize(model_name, isCallInit, default_time_unit, log_level, log_stderr)
+! 2014/08/27 [MOD] delete argument isCallInit
+subroutine jcup_initialize(model_name, default_time_unit, log_level, log_stderr)
   use jcup_config, only : init_conf
   use jcup_comp, only : init_model_process, get_num_of_total_component, is_my_component, get_component_name
   use jcup_utils, only : set_log_level, init_log, put_log
@@ -190,7 +191,6 @@ subroutine jcup_initialize(model_name, isCallInit, default_time_unit, log_level,
   use jcup_mpi_lib, only : jml_abort, jml_AllreduceMin, jml_AllreduceMax
   implicit none
   character(len=*),intent(IN) :: model_name ! main component name of my task 
-  logical,optional,intent(IN) :: isCallInit
   character(len=3), optional, intent(IN) :: default_time_unit ! 2014/07/03 [ADD]
   integer, optional, intent(IN) :: log_level ! 0, 1, 2
   logical, optional, intent(IN) :: log_stderr 
@@ -211,12 +211,7 @@ subroutine jcup_initialize(model_name, isCallInit, default_time_unit, log_level,
   is_init_conf = .false.
   is_restart   = .false. ! 2014/07/15 [ADD]
  
-  if (present(isCallInit)) then
-    call init_model_process(isCallInit)
-  else
-    call init_model_process(.true.)
-  end if
-
+  call init_model_process() ! 2014/08/27 [MOD]
 
   ! set time unit
   if (present(default_time_unit)) then
@@ -327,6 +322,7 @@ end subroutine jcup_initialize
 !> @param[in] time_array end time
 !> @param[in] inCallFinalize flag call MPI_Finalize or not
 ! 2014/07/08 [MOD] time_array(6) -> time_array(:)
+! 2014/08/27 [MOD] delete argument isCallFinalize
 subroutine jcup_coupling_end(time_array, isCallFinalize)
   use jcup_constant, only : ADVANCE_SEND_RECV
   use jcup_config, only : get_comp_exchange_type, set_current_conf
@@ -337,8 +333,9 @@ subroutine jcup_coupling_end(time_array, isCallFinalize)
   use jcup_comp, only : get_num_of_total_component, get_component_name, is_my_component
   implicit none
   integer, intent(IN) :: time_array(:) ! 2014/07/08
-  logical,optional,intent(IN) :: isCallFinalize
+  logical, optional, intent(IN) :: isCallFinalize
   character(len=NAME_LEN) :: component_name
+  logical :: is_call_finalize
   integer :: i, j
 
   call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
@@ -379,11 +376,13 @@ subroutine jcup_coupling_end(time_array, isCallFinalize)
   if (associated(send_mapping_tag)) deallocate(send_mapping_tag)
   if (associated(recv_mapping_tag)) deallocate(recv_mapping_tag)
 
-  if (.not.present(isCallFinalize)) then
-    call jml_finalize()
-  else 
-    if (isCallFinalize) call jml_finalize()
+  if (present(isCallFinalize)) then
+    is_call_finalize = isCallFinalize
+  else
+    is_call_finalize = .true.
   end if
+
+  call jml_finalize(is_call_finalize)
 
 end subroutine jcup_coupling_end
 
@@ -545,9 +544,8 @@ end subroutine jcup_def_grid
 subroutine jcup_end_grid_def()
   use jcup_mpi_lib, only : jml_AllreduceMax
   use jcup_utils, only : put_log, IntToStr
-  use jcup_grid, only : GetNumOfMyGrid, end_def
+  use jcup_grid, only : end_def
   implicit none
-  integer :: num_of_grid
   integer :: sis, sie, sjs, sje
   integer :: grd
   integer :: max_i, max_j, max_k
@@ -556,7 +554,6 @@ subroutine jcup_end_grid_def()
   if (.not.is_Initialized) then
     call jcup_abnormal_end("jcup_SetGrid","jcup_Initialize not called")
   end if
-  num_of_grid = GetNumOfMyGrid()
 
   int_buffer(1) = max_num_of_exchange_data
 
@@ -786,6 +783,7 @@ end subroutine jcup_end_var_def
 !> initialize coupling time
 !> @param[in] time_array array of initial time
 ! 2014/07/15 [MOD] skip when is_restart == .true.
+! 2014/09/02 [MOD] delete call write_grid_mapping_info
 subroutine jcup_init_time_int(time_array)
   use jcup_utils, only : put_log, IntToStr
   use jcup_time, only : set_start_time, set_current_time
@@ -807,7 +805,7 @@ subroutine jcup_init_time_int(time_array)
 
   !!!!!!!call check_mapping_table_setting()
 
-  call write_grid_mapping_info()
+  !!!!!!call write_grid_mapping_info()
 
 
   if (is_restart) then ! 2014/07/15 [ADD]

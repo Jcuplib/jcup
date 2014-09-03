@@ -520,6 +520,47 @@ Routines
 Detail
  引数からデータ数(num_of_data)を削除。
 
+-----------------------------------------------------------------
+
+Version:3.060000
+Date:2014/08/27
+File:jcup_interface.f90, jcup_comp.f90, jcup_mpi_lib.f90
+
+Routines
+ jcup_initialize : mod
+ init_model_process : mod
+ jml_init : mod
+
+Detail
+ MPI_INITをコールするかどうかを引数で与えるのではなく、
+ MPI_initialzedの結果から判定するように変更。
+
+-----------------------------------------------------------------
+
+Version:3.070000
+Date:2014/08/27
+File:jcup_interface.f90, jcup_mpi_lib.f90
+
+Routines
+ jcup_coupling_end : mod
+ jml_finalize : mod
+
+Detail
+ MPI_Finalizeをコールするかどうかを引数で与えるのではなく、
+ MPI_finalizedの結果から判定するように変更。
+
+-----------------------------------------------------------------
+
+Version:3.070100
+Date:2014/09/02
+File:jcup_interface.f90
+
+Routines
+ jcup_init_time_int : mod
+
+Detail
+ call write_grid_mapping_infoをコメントアウト。
+
 
 
 

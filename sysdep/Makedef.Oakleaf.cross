@@ -1,11 +1,11 @@
 JCUPLIBDIR    = ${JCUPDIR}/lib
 JCUPINCDIR    = ${JCUPDIR}/include
 
-MPIDIR = /usr/local/mpich2-1.4.1p1
-MPILIBDIR = ${MPIDIR}/lib
-MPIINCDIR = ${MPIDIR}/include
-MPIBINDIR = ${MPIDIR}/bin
-MPILINK   = 
+# MPIDIR = /usr/local/mpich2-1.4.1p1
+# MPILIBDIR = ${MPIDIR}/lib
+# MPIINCDIR = ${MPIDIR}/include
+# MPIBINDIR = ${MPIDIR}/bin
+# MPILINK   = 
 
 FC              = mpifrtpx
 CC		= mpiFCCpx
@@ -20,10 +20,10 @@ DEFINES =
 #OPTIONS = -g -cpp -C -ladebug
 #OPTIONS = -check all
 #OPTIONS = -Cpp -Ccpp  -Haefosux
-OPTIONS = -Cpp -Ccpp
+OPTIONS = -Cpp -Ccpp -O3
 #OPTIONS = -cpp -g -O
 
-INCDIRS = -I${MPIINCDIR} -I${JCUPSRCDIR}
+INCDIRS = 
 
 FFLAGS = ${DEFINES} ${INCDIRS} ${OPTIONS}
 

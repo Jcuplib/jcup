@@ -22,7 +22,7 @@ DEFINES =
 OPTIONS = -cpp  -mcmodel medium -shared-intel  -check all -g
 #OPTIONS = -cpp -g -O
 
-INCDIRS = -I${MPIINCDIR} -I${JCUPSRCDIR}
+INCDIRS = -I${MPIINCDIR}
 
 FFLAGS = ${DEFINES} ${INCDIRS} ${OPTIONS}
 

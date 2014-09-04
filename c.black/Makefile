@@ -13,7 +13,7 @@ $(LIBJCUP): $(COBJS)
 
 
 clean:
-	$(RM) *.mod *.o $(LIBJCUP)
+	$(RM) $(TRASH) $(LIBJCUP)
 
 
 install : $(JCUPLIBDIR) $(JCUPINCDIR) ${LIBJCUP}

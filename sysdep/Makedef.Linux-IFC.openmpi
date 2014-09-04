@@ -26,14 +26,15 @@ INCDIRS = -I${MPIINCDIR} -I${JCUPSRCDIR}
 
 FFLAGS = ${DEFINES} ${INCDIRS} ${OPTIONS}
 
+TRASH  = *~ *.mod *.o
 
 RM		= rm -f
 AR 		= ar
 ARFLAGS         = rv
 RANLIB		= ranlib
 #RANLIB 	= true
-CP		= cp -f
-
+INSTALL		= cp -f
+MKDIR           = mkdir -p
 
 .SUFFIXES	:
 .SUFFIXES	:.o .f90 .a

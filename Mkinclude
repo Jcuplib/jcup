@@ -1,17 +1,21 @@
+#
+# Set TOPDIR here or as a environmental variable.
+# 
+# TOPDIR = $(HOME)/Jcup
+TOPDIR = $(JCUPDIR)
 
-JCUPDIR = $(HOME)/Jcup
 
 ############# 1. System Specification #################################
 ### select one of following by un-comment it, or create new one.
 ########################################################################
 ###SYSTEM         = ES
 #SYSTEM               = Oakleaf.cross
-SYSTEM          = Linux-IFC.mpich
+#SYSTEM          = Linux-IFC.mpich
 #SYSTEM          = Linux-IFC.openmpi
+#SYSTEM          = Linux-GNU.openmpi
 
 ################ Directory Specification ###############
 
-TOPDIR		= $(JCUPDIR)
 
 ######## Other directories
 SRCDIR		= $(TOPDIR)

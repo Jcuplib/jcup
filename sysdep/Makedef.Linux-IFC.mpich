@@ -20,18 +20,19 @@ OPTIONS = -cpp  -mcmodel medium -shared-intel  -debug all -check all -g
 #OPTIONS = -cpp  -mcmodel medium -shared-intel 
 #OPTIONS = -cpp -g -O
 
-INCDIRS = -I${MPIINCDIR} -I${JCUPSRCDIR}
+INCDIRS = -I${MPIINCDIR}
 
 FFLAGS = ${DEFINES} ${INCDIRS} ${OPTIONS}
 
+TRASH  = *~ *.mod *.o
 
 RM		= rm -f
 AR 		= ar
 ARFLAGS         = rv
 RANLIB		= ranlib
 #RANLIB 	= true
-CP		= cp -f
-
+INSTALL		= cp -f
+MKDIR           = mkdir -p
 
 .SUFFIXES	:
 .SUFFIXES	:.o .f90 .a

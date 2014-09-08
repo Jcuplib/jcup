@@ -6,16 +6,20 @@ CMODS = $(COBJS:.o=.mod)
 
 LIBJCUP = libjcup.a
 
-all : ${LIBJCUP} install
+all : $(LIBJCUP) install
 
-${LIBJCUP}: ${COBJS}
-	${AR} ${ARFLAGS} $@ $^ && ${RANLIB} $@
-
-
-clean		:
-		${RM} *.mod *.o ${LIBJCUP}
+$(LIBJCUP): $(COBJS)
+	$(AR) $(ARFLAGS) $@ $^ && $(RANLIB) $@
 
 
-install : ${LIBJCUP}
-	${CP} ${LIBJCUP} ${JCUPLIBDIR}
-	${CP} ${CMODS} ${JCUPINCDIR}
+clean:
+	$(RM) $(TRASH) $(LIBJCUP)
+
+
+install : $(JCUPLIBDIR) $(JCUPINCDIR) ${LIBJCUP}
+	$(INSTALL) $(LIBJCUP) $(JCUPLIBDIR)
+	$(INSTALL) $(CMODS) $(JCUPINCDIR)
+
+$(JCUPLIBDIR) $(JCUPINCDIR): 
+	$(MKDIR) $@
+

@@ -1,16 +1,16 @@
 JCUPLIBDIR    = ${JCUPDIR}/lib
 JCUPINCDIR    = ${JCUPDIR}/include
 
-# MPIDIR = /usr/local/mpich2-1.4.1p1
+MPIDIR = 
 # MPILIBDIR = ${MPIDIR}/lib
 # MPIINCDIR = ${MPIDIR}/include
 # MPIBINDIR = ${MPIDIR}/bin
 # MPILINK   = 
 
-FC              = mpifrtpx
-CC		= mpiFCCpx
+FC              = mpif90
+CC		= mpicc
 
-DEFMPI = MPI2
+##DEFMPI = MPI2
 ##DEFINES = -DNEW_MPI -D$(DEFMPI) -DNO_OUTPUT_LOG -DNO_OUTPUT_STDERR -DNOPUTPUT_STDOUT
 ##DEFINES = -F -DNO_OUTPUT_LOG -DNO_OUTPUT_STDERR -DNO_OUTPUT_STDOUT 
 ##DEFINES =  -DNO_OUTPUT_LOG -DNO_OUTPUT_STDERR
@@ -19,15 +19,15 @@ DEFINES =
 #OPTIONS = -cpp  -mcmodel medium -shared-intel -check all -g
 #OPTIONS = -g -cpp -C -ladebug
 #OPTIONS = -check all
-#OPTIONS = -Cpp -Ccpp  -Haefosux
-OPTIONS = -Cpp -Ccpp -O3
+#OPTIONS = -cpp  -mcmodel medium -shared-intel  -check all -g
 #OPTIONS = -cpp -g -O
+OPTIONS = -cpp -O3 -ffree-line-length-none
 
 INCDIRS = 
 
 FFLAGS = ${DEFINES} ${INCDIRS} ${OPTIONS}
 
-TRASH  = *~ *.mod *.o *.lst
+TRASH  = *~ *.mod *.o
 
 RM		= rm -f
 AR 		= ar
@@ -41,12 +41,3 @@ MKDIR           = mkdir -p
 .SUFFIXES	:.o .f90 .a
 .f90.o	:
 	${COMPILE.F} $<
-
-
-
-
-
-
-
-
-

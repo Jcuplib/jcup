@@ -124,6 +124,7 @@ module jcup_mpi_lib
   interface jml_BcastLocal
     module procedure jml_bcast_string_local
     module procedure jml_bcast_int_1d_local, jml_bcast_real_1d_local, jml_bcast_double_1d_local
+    module procedure jml_bcast_long_1d_local ! 2014/11/05 [ADD]
   end interface
 
   interface jml_GatherLocal
@@ -987,7 +988,6 @@ subroutine jml_allreduce_max_int_1d_local(comp, d, res)
 
 end subroutine jml_allreduce_max_int_1d_local
 
-
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! 2014/07/16 [ADD]
 subroutine jml_allreduce_sum_int_1d_local(comp, d, res)
@@ -1041,6 +1041,27 @@ subroutine jml_bcast_int_1d_local(comp, data,is,ie,source)
   call MPI_Bcast(data(is:),ie-is+1,MPI_INTEGER,source_rank,local(comp)%mpi_comm,ierror)
 
 end subroutine jml_bcast_int_1d_local
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! 2014/11/05 [NEW]
+subroutine jml_bcast_long_1d_local(comp, data,is,ie,source)
+  implicit none
+  integer, intent(IN)    :: comp
+  integer(kind=8), intent(INOUT) :: data(:)
+  integer, intent(IN) :: is, ie
+  integer, intent(IN), optional :: source
+
+  integer :: source_rank
+
+  if (present(source)) then
+    source_rank = source
+  else
+    source_rank = local(comp)%root_rank
+  end if
+
+  call MPI_Bcast(data(is:), (ie-is+1)*2, MPI_INTEGER, source_rank, local(comp)%mpi_comm, ierror)
+
+end subroutine jml_bcast_long_1d_local
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 

@@ -64,6 +64,7 @@ module jcup_config
   public :: is_exchange_step ! logical function (my_comp_id, target_comp_id, current_time)
   public :: is_put_step_data
   public :: is_send_step_data
+  public :: is_get_step_data
   public :: is_recv_step_data
   public :: get_comp_id_from_comp_name ! integer function (componend_name)
   public :: get_comp_name_from_comp_id ! character(len=NAME_LEN) function (componend_id)
@@ -1760,9 +1761,9 @@ logical function is_exchange_step_send_recv_model(my_comp_id, target_comp_id, c_
 end function is_exchange_step_send_recv_model
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-
+! 2014/10/22 [MOD] is_next_exchange_step -> is_exchange_step
 logical function is_put_step_data(data_name)
-  use jcup_time, only : is_next_exchange_step
+  use jcup_time, only : is_exchange_step
   implicit none
   character(len=*), intent(IN) :: data_name
   integer :: i, j
@@ -1770,7 +1771,7 @@ logical function is_put_step_data(data_name)
   do i = 1, current_conf%num_of_send_data
     if (trim(data_name)==trim(current_conf%sd(i)%name)) then
       do j = 1, current_conf%sd(i)%num_of_my_recv_data
-        if (is_next_exchange_step(current_conf_id, 1, current_conf%sd(i)%my_recv_conf(j)%interval)) then
+        if (is_exchange_step(current_conf_id, 1, current_conf%sd(i)%my_recv_conf(j)%interval)) then
           is_put_step_data = .true.
           return
         end if
@@ -1809,7 +1810,27 @@ logical function is_send_step_data(dest_model_id, data_name)
 end function is_send_step_data
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
+! 2014/10/22 [NEW] 
+logical function is_get_step_data(data_name)
+  use jcup_time, only : is_before_exchange_step
+  implicit none
+  character(len=*), intent(IN) :: data_name
+  integer :: i, j
 
+  do i = 1, current_conf%num_of_recv_data
+    if (trim(data_name)==trim(current_conf%rd(i)%name)) then
+        if (is_before_exchange_step(current_conf_id, 1, current_conf%rd(i)%interval)) then
+          is_get_step_data = .true.
+          return
+        end if
+    end if
+  end do
+
+  is_get_step_data = .false.
+
+end function is_get_step_data
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
 logical function is_recv_step_data(data_name)
   use jcup_time, only : is_exchange_step
   implicit none

@@ -193,6 +193,7 @@ end subroutine set_3d_to_1d
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine add_1d_to_1d(dtin, weight, dt1d)
+  use jcup_mpi_lib, only : jml_GetMyrankGlobal
   implicit none
   real(kind=8), intent(IN) :: dtin(:)
   real(kind=8), intent(IN) :: weight
@@ -325,7 +326,7 @@ subroutine put_data_double_1d(dt, component_id, data_id, name, db_start, is_mean
         db_current%double_d(:) = 0.0
         call put_log("allocate data buffer double 1d : name = "//trim(name)//&
                     ", Size:"//trim(IntToStr(size(dt,1))))
-        end if
+      end if
       if (is_mean) then
         call add_1d_to_1d(dt, weight, db_current%double_d)
       else
@@ -337,7 +338,7 @@ subroutine put_data_double_1d(dt, component_id, data_id, name, db_start, is_mean
       db_current%is_using = .true.
       db_current%data_type = DOUBLE_DATA
       db_current%data_dim  = DATA_1D
-      call put_log("reuse data buffer double 1d : name = "//trim(name)//", data id = "//trim(IntToStr(data_id)))  
+      call put_log("reuse data buffer double 1d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//", data id = "//trim(IntToStr(data_id)))  
       return
     end if
     if (associated(db_current%next_ptr, db_start)) exit
@@ -360,7 +361,7 @@ subroutine put_data_double_1d(dt, component_id, data_id, name, db_start, is_mean
   db_current%data_type = DOUBLE_DATA
   db_current%data_dim  = DATA_1D
 
-  call put_log("allocate new data buffer double 1d : name = "//trim(name)//", data id = "//trim(IntToStr(data_id))// &
+  call put_log("allocate new data buffer double 1d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//", data id = "//trim(IntToStr(data_id))// &
                     ", Size:"//trim(IntToStr(size(dt,1))))
 
 end subroutine put_data_double_1d
@@ -405,7 +406,7 @@ subroutine put_data_double_2d(dt, component_id, data_id, name, db_start, is_mean
       db_current%is_using = .true.
       db_current%data_type = DOUBLE_DATA
       db_current%data_dim  = DATA_2D
-      call put_log("reuse data buffer double 2d : name = "//trim(name)//", data id = "//trim(IntToStr(data_id)))  
+      call put_log("reuse data buffer double 2d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//", data id = "//trim(IntToStr(data_id)))  
       return
     end if
     if (associated(db_current%next_ptr, db_start)) exit
@@ -428,7 +429,7 @@ subroutine put_data_double_2d(dt, component_id, data_id, name, db_start, is_mean
   db_current%data_type = DOUBLE_DATA
   db_current%data_dim  = DATA_2D
 
-  call put_log("allocate new data buffer double 2d : name = "//trim(name)//", data id = "//trim(IntToStr(data_id))// &
+  call put_log("allocate new data buffer double 2d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//", data id = "//trim(IntToStr(data_id))// &
                     ", Size:"//trim(IntToStr(size(dt,1)))//"x"//trim(IntToStr(size(dt,2))))  
 
 end subroutine put_data_double_2d
@@ -825,16 +826,19 @@ subroutine write_data_buffer_info(db)
   type(data_buffer), pointer :: db
   character(len=STRING_LEN) :: log_str
 
-  write(log_str,'("  Data buffer info : ",A22,L2,I5)') db%name, db%is_using, size(db%double_d,1)
+  write(log_str,'("  Data buffer info : ",A,L2,I8)') trim(db%name)//", ", db%is_using, size(db%double_d,1)
+
   call put_log(trim(log_str),2)
+
 end subroutine write_data_buffer_info
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! 2014/07/14 [MOD] data_time(6) -> data_time(8)
+! 2014/11/04 [MOD] integer :: data_time -> integer(kind=8) :: data_time
 subroutine write_data_buffer(data_time, db, fid, comp_id, write_flag, data_name, data_ptr)
   use jcup_mpi_lib, only : jml_isLocalLeader
   implicit none
-  integer, intent(IN) :: data_time(8)
+  integer(kind=8), intent(IN) :: data_time(8)
   type(data_buffer), pointer :: db
   integer, intent(IN) :: fid
   integer, intent(IN) :: comp_id
@@ -1444,7 +1448,7 @@ subroutine put_send_data_double_1d(dt, time, component_id, data_id, name, is_mea
 
   !write(weight_str, '(F)') weight
   call put_log("Put data, data name = "//trim(name)//", data id = "//trim(IntToStr(data_id)), 1) !//", weight= "//trim(weight_str),1)
-  call put_log("put_send_data_double_1d : put data : name = "//trim(name)//", data id = "//trim(IntToStr(data_id)))
+  call put_log("put_send_data_double_1d : put data : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//", data id = "//trim(IntToStr(data_id)))
   call search_time_buffer(send_buffer, time)
   call put_data(dt, component_id, data_id, name, get_start_data_ptr(send_buffer), is_mean, weight)
   call inc_num_of_data(send_buffer)
@@ -1466,7 +1470,7 @@ subroutine put_send_data_double_2d(dt, time, component_id, data_id, name, is_mea
   real(kind=8), intent(IN) :: weight ! weight for data average (delta_t/interval)
 
   call put_log("Put data, data name = "//trim(name)//", data id = "//trim(IntToStr(data_id)),1)
-  call put_log("put_send_data_double_2d : put data : name = "//trim(name)//", data id = "//trim(IntToStr(data_id)))
+  call put_log("put_send_data_double_2d : put data : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//", data id = "//trim(IntToStr(data_id)))
   call search_time_buffer(send_buffer, time)
   call put_data(dt, component_id, data_id, name, get_start_data_ptr(send_buffer), is_mean, weight)
   call inc_num_of_data(send_buffer)
@@ -1592,7 +1596,7 @@ subroutine remove_past_send_data(current_time, component_id)
   type(time_type), intent(IN) :: current_time
   integer, intent(IN) :: component_id
 
-  !call put_log("remove past send data")
+  call put_log("remove past send data")
   call reset_past_time_buffer(send_buffer, current_time, component_id)
 
 end subroutine remove_past_send_data
@@ -1605,7 +1609,7 @@ subroutine remove_past_recv_data(current_time, component_id)
   type(time_type), intent(IN) :: current_time
   integer, intent(IN) :: component_id
 
-  !call put_log("remove past send data")
+  call put_log("remove past recv data")
   call reset_past_time_buffer(recv_buffer, current_time, component_id)
 
 end subroutine remove_past_recv_data

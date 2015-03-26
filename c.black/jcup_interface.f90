@@ -75,6 +75,9 @@ module jcup_interface
   public :: jcup_set_mapping_table ! subroutine (my_comp_name, send_comp_name, send_grid_name, recv_comp_name, recv_grid_name, 
                                    !             mapping_tag, send_grid_index, recv_grid_index)
   public :: jcup_inc_time          ! subroutine (component_name, time_array)
+  public :: jcup_inc_calendar      ! subroutine (time_array, delta_t) 2014/11/13 [ADD]
+  public :: jcup_put_value         ! subroutine (data_type, data) 2015/02/23 [ADD]
+  public :: jcup_get_value         ! subroutine (data_type, data) 2015/02/23 [ADD]
   public :: jcup_put_data          ! subroutien (data_type, data, num_of_data)
   public :: jcup_get_data          ! subroutine (data_type, data, num_of_data, is_recv_ok)
 
@@ -120,6 +123,9 @@ module jcup_interface
   logical, private :: is_EndVarDef
   logical, private :: is_init_conf 
   logical, private :: is_restart  ! 2014/07/15 [ADD]
+  logical, private :: is_final_send ! 2014/12/08 [ADD]
+  logical, private :: is_first_serial_step ! 2014/12/09 [ADD]
+  integer, private :: before_comp_id
 
   interface jcup_init_time
     module procedure jcup_init_time_int
@@ -148,7 +154,7 @@ module jcup_interface
   real(kind=8), pointer, private :: buffer_double25d(:,:) ! nx, num_of_2d_array
 
   logical, pointer, private :: recv_flag(:) ! recv flag for data recv
-  logical, pointer, private :: is_initial_step(:) ! first step flag. valid for serial exchange only 
+  logical, pointer, private :: is_initial_step(:) ! first step flag. used for serial exchange only 
 
   integer, private :: rec_counter 
 
@@ -180,6 +186,7 @@ end subroutine jcup_set_new_comp
 !> @param[in] inCallInit flag call MPI_Init or not
 ! 2014/07/11 [MOD] add default_time_unit
 ! 2014/08/27 [MOD] delete argument isCallInit
+! 2014/12/10 [MOD] add component allocation check
 subroutine jcup_initialize(model_name, default_time_unit, log_level, log_stderr)
   use jcup_config, only : init_conf
   use jcup_comp, only : init_model_process, get_num_of_total_component, is_my_component, get_component_name
@@ -188,7 +195,7 @@ subroutine jcup_initialize(model_name, default_time_unit, log_level, log_stderr)
   use jcup_time, only : time_type, init_all_time, init_each_time, set_time_data, TU_SEC, TU_MIL, TU_MCR, set_time_unit, get_time_unit
   use jcup_data, only : init_data_def
   use jcup_grid, only : init_grid
-  use jcup_mpi_lib, only : jml_abort, jml_AllreduceMin, jml_AllreduceMax
+  use jcup_mpi_lib, only : jml_abort, jml_AllreduceMin, jml_AllreduceMax, jml_AllreduceMaxLocal
   implicit none
   character(len=*),intent(IN) :: model_name ! main component name of my task 
   character(len=3), optional, intent(IN) :: default_time_unit ! 2014/07/03 [ADD]
@@ -200,6 +207,8 @@ subroutine jcup_initialize(model_name, default_time_unit, log_level, log_stderr)
   integer :: opt_log_level
   logical :: opt_log_stderr
   integer :: my_time_unit, tu_min, tu_max
+  integer :: my_comp, max_comp
+  integer :: i
 
   is_InitTime = .false.
   is_SetGrid = .false.
@@ -210,9 +219,28 @@ subroutine jcup_initialize(model_name, default_time_unit, log_level, log_stderr)
   is_EndVarDef = .false.
   is_init_conf = .false.
   is_restart   = .false. ! 2014/07/15 [ADD]
+  is_final_send = .true. ! 2014/12/08 [ADD]
+  is_first_serial_step = .true. ! 2014/12/09 [ADD]
  
   call init_model_process() ! 2014/08/27 [MOD]
 
+  ! 2014/12/10 [ADD] component allocation check
+  !my_comp = 0
+  !do i = 1, get_num_of_total_component()
+  !  if (is_my_component(i)) my_comp = my_comp + 1
+  !end do
+  !do i = 1, get_num_of_total_component()
+  !  if (is_my_component(i)) then
+  !    call jml_AllReduceMaxLocal(i, my_comp, max_comp)
+  !    if (my_comp /= max_comp) then
+  !      write(0, *) "jcup_initialize, component allocation error, component id = ", i, "num of comp, max comp = ", my_comp, max_comp
+  !      call mpi_finalize(i)
+  !      stop
+  !    end if
+  !  end if
+  !end do
+
+ 
   ! set time unit
   if (present(default_time_unit)) then
     select case(default_time_unit)
@@ -323,42 +351,23 @@ end subroutine jcup_initialize
 !> @param[in] inCallFinalize flag call MPI_Finalize or not
 ! 2014/07/08 [MOD] time_array(6) -> time_array(:)
 ! 2014/08/27 [MOD] delete argument isCallFinalize
+! 2014/11/14 [MOD] call jcup_set_time -> current_comp_id = i
+! 2014/12/08 [MOD] add if (.not.is_my_component) 
 subroutine jcup_coupling_end(time_array, isCallFinalize)
-  use jcup_constant, only : ADVANCE_SEND_RECV
-  use jcup_config, only : get_comp_exchange_type, set_current_conf
   use jcup_mpi_lib, only : jml_finalize!, jml_Send1D_m2c, jml_destruct_window
   use jcup_time, only : destruct_all_time
   use jcup_utils, only : finalize_log, put_log
   use jcup_buffer, only : buffer_check_write, destruct_buffer
-  use jcup_comp, only : get_num_of_total_component, get_component_name, is_my_component
   implicit none
   integer, intent(IN) :: time_array(:) ! 2014/07/08
   logical, optional, intent(IN) :: isCallFinalize
-  character(len=NAME_LEN) :: component_name
   logical :: is_call_finalize
-  integer :: i, j
 
   call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
   call put_log("!!!!!!!!!!!!!!!!   COUPLER FINALIZE  !!!!!!!!!!!!!!! ", 1)
   call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
 
-
-  call put_log("check  extra data send", 1)
-  do i = 1, get_num_of_total_component()
-    if (is_my_component(i)) then
-      call set_current_conf(i)
-      component_name = get_component_name(i)
-      call jcup_set_time(component_name, time_array, 0, IS_EXCHANGE=.false.)
-      do j = 1, get_num_of_total_component()
-        if (get_comp_exchange_type(i,j) == ADVANCE_SEND_RECV) then
-          call put_log("!!!!!!!!!!!!!! extra data send start !!!!!!!!!!!!!", 1)
-          call jcup_exchange_data_send(i, j, .true.)  ! send final step data, if recv model time lag == 1
-        end if
-      end do
-    end if
-  end do
-
-  !!!!call buffer_check_write()
+  call jcup_send_final_step_data()
 
   call destruct_buffer()
   call destruct_all_time()
@@ -367,7 +376,9 @@ subroutine jcup_coupling_end(time_array, isCallFinalize)
   call put_log("!!!!!!!!!!!!!!!!  COUPLING COMPLETED !!!!!!!!!!!!!!! ", 1)
   call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
 
-  call finalize_log()
+  if (is_final_send) then
+    call finalize_log()
+  end if
 
   if (associated(buffer_double1d)) deallocate(buffer_double1d)
   if (associated(buffer_double25d)) deallocate(buffer_double25d)
@@ -385,6 +396,40 @@ subroutine jcup_coupling_end(time_array, isCallFinalize)
   call jml_finalize(is_call_finalize)
 
 end subroutine jcup_coupling_end
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+!> @breaf
+!> send final step data when SERIAL EXCHANGE and ADVANCE_SEND_RECV
+! 2014/12/08 [ADD]   
+subroutine jcup_send_final_step_data()
+  use jcup_constant, only : ADVANCE_SEND_RECV
+  use jcup_config, only : get_comp_exchange_type, set_current_conf
+  use jcup_utils, only : put_log
+  use jcup_comp, only : get_num_of_total_component, get_component_name, is_my_component
+  implicit none
+  character(len=NAME_LEN) :: component_name
+  integer :: i, j
+
+  do i = 1, get_num_of_total_component()
+    if (is_my_component(i)) then
+      call set_current_conf(i)
+      component_name = get_component_name(i)
+      !!!call jcup_set_time(component_name, time_array, 0, IS_EXCHANGE=.false.) ! 2014/11/14 [DELETE]
+      current_comp_id = i ! 2014/11/14 [ADD]
+      do j = 1, get_num_of_total_component()
+        if (get_comp_exchange_type(i,j) == ADVANCE_SEND_RECV) then
+          if (.not.is_my_component(j)) then ! 2014/12/08 [ADD]
+            call put_log("!!!!!!!!!!!!!! extra data send start !!!!!!!!!!!!!", 1)
+            call jcup_exchange_data_send(i, j, .true.)  ! send final step data, if recv model time lag == 1
+          end if
+        end if
+      end do
+    end if
+  end do
+
+  !!!!call buffer_check_write()
+
+end subroutine jcup_send_final_step_data
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 !> @breaf
@@ -784,15 +829,17 @@ end subroutine jcup_end_var_def
 !> @param[in] time_array array of initial time
 ! 2014/07/15 [MOD] skip when is_restart == .true.
 ! 2014/09/02 [MOD] delete call write_grid_mapping_info
+! 2014/10/17 [MOD] set_start_time, set_current_time 
 subroutine jcup_init_time_int(time_array)
   use jcup_utils, only : put_log, IntToStr
-  use jcup_time, only : set_start_time, set_current_time
+  use jcup_time, only : set_start_time, set_current_time, set_time_data
   use jcup_comp, only : get_num_of_total_component, is_my_component
   use jcup_grid, only : write_grid_mapping_info
 
   implicit none
   integer, intent(IN) :: time_array(6)
-  integer :: yyyy, mo, dd, hh, mm, ss
+  integer :: yyyy, mo, dd, hh, mm
+  integer(kind=8) :: ss
   integer :: i
 
   if (.not.is_Initialized) then
@@ -818,10 +865,14 @@ subroutine jcup_init_time_int(time_array)
 
   do i = 1, get_num_of_total_component()
     !if (is_my_component(i)) then
-      call set_start_time(i, 1, yyyy, mo, dd, hh, mm, ss)
-      call set_current_time(i, 1, yyyy, mo, dd, hh, mm, ss)
+      !call set_start_time(i, 1, yyyy, mo, dd, hh, mm, ss)
+      !call set_current_time(i, 1, yyyy, mo, dd, hh, mm, ss)
+      ss = 0
+      call set_start_time(i, 1, 0, 0, 0, 0, 0, ss)
+      call set_current_time(i, 1, 0, 0, 0, 0, 0, ss)
     !end if
   end do
+  call set_time_data(current_time, 0, 0, 0, 0, 0, -1)
 
   is_InitTime = .true.
 
@@ -1092,7 +1143,6 @@ subroutine set_mapping_table(mapping_table_checker, model_num, grid_num)
   end if
  
   if (mapping_table_checker(model_num)/=grid_num-1) then
-     write(0,*) mapping_table_checker(:)
      call jcup_abnormal_end("set_mapping_table", "mapping table check err, model:" &
                             //trim(IntToStr(model_num))//", index:"//trim(IntToStr(grid_num)))
   end if
@@ -1241,11 +1291,15 @@ end subroutine check_mapping_table_setting
 !> @param[in] delta_t delta t
 !> @param[in] 
 ! 2014/07/03 [MOD] time_array(6) -> time_array(:)
+! 2014/10/22 [MOD]
+! 2014/10/30 [MOD] integer :: ss -> integer(kind=8) :: ss
+! 2014/11/19 [MOD] if (current_time == time) ->  if (current_time >= time)
+! 2014/12/08 [ADD] is_exchange_data
 subroutine jcup_set_date_time_int(component_name, time_array, delta_t, is_exchange)
   use jcup_constant, only : ADVANCE_SEND_RECV, BEHIND_SEND_RECV
   use jcup_utils, only : put_log, LongIntToStr, IntToStr
   use jcup_time, only : set_current_time, get_current_time, get_before_time, time_type, set_time_data, operator(==), &
-                        TU_SEC, TU_MIL, TU_MCR, get_time_unit
+                        TU_SEC, TU_MIL, TU_MCR, get_time_unit, inc_time, operator(<), operator(>=)
   use jcup_buffer, only : remove_past_send_data, remove_past_recv_data
   use jcup_comp, only : get_comp_id_from_name, get_num_of_total_component, is_my_component, get_component_name
   use jcup_config, only : set_current_conf, get_comp_exchange_type
@@ -1255,11 +1309,17 @@ subroutine jcup_set_date_time_int(component_name, time_array, delta_t, is_exchan
   integer, intent(IN) :: time_array(:) ! 2014/07/03 [MOD]
   integer, intent(IN) :: delta_t
   logical, optional :: is_exchange
-  integer :: yyyy, mo, dd, hh, mm, ss, milli_sec, micro_sec
+  integer :: yyyy, mo, dd, hh, mm
+  integer(kind=8) :: ss
+  integer :: milli_sec, micro_sec
   type(time_type) :: time
+  logical :: is_exchange_data
   integer :: comp_id
   integer :: comp
 
+  call put_log("------------------------------------------------------------------------------------")
+  call put_log("--------------------------------- jcup_set_time ------------------------------------")
+  call put_log("------------------------------------------------------------------------------------")
 
   ! check time array and time unit
   if ((get_time_unit() == TU_SEC).and.(size(time_array) < 6)) then
@@ -1300,38 +1360,32 @@ subroutine jcup_set_date_time_int(component_name, time_array, delta_t, is_exchan
                // ", Delta T (micro sec) : "//trim(IntToStr(delta_t))//", component : "//trim(component_name))
   end select
     
-
   comp_id = get_comp_id_from_name(component_name)
-
-  do comp = 1, get_num_of_total_component() ! set current time to all my component
-    if (comp_id == comp) cycle ! skip to set my component time to avoid double setting
-    if (is_my_component(comp)) then
-      if (jcup_is_set_time(comp, time_array)) then ! 
-        call put_log("set current time : "//trim(IntToStr(yyyy))//"/"//trim(IntToStr(mo))//"/"//trim(IntToStr(dd)) &
-                     //"/"//trim(IntToStr(hh))//"/"//trim(IntToStr(mm))//"/"//trim(IntToStr(ss)) &
-                     //", component : "//trim(get_component_name(comp)))
-        call set_current_time(comp, 1, yyyy, mo, dd, hh, mm, ss, milli_sec, micro_sec)
-      end if
-    end if
-  end do
 
   call set_current_conf(comp_id) 
   current_comp_id = comp_id
-
-  call set_current_time(comp_id, 1, yyyy,mo,dd,hh,mm,ss, milli_sec, micro_sec, delta_t=delta_t) ! set time and delta t of current component
   call get_current_time(comp_id, 1, time)
 
+  ! time comparizon
+  call put_log("------------------------------- time comparizon -------------------------------")
+  call put_log("Component Time : "//trim(IntToStr(time%yyyy))//"/"//trim(IntToStr(time%mo))//"/"//trim(IntToStr(time%dd)) &
+               //"/"//trim(IntToStr(time%hh))//"/"//trim(IntToStr(time%mm))//"/"//trim(IntToStr(time%ss)) &
+               // ", Delta T : "//trim(IntToStr(delta_t))//", component : "//trim(component_name))
+  call put_log("Current   Time : "//trim(IntToStr(current_time%yyyy))//"/"//trim(IntToStr(current_time%mo))//"/"//trim(IntToStr(current_time%dd)) &
+               //"/"//trim(IntToStr(current_time%hh))//"/"//trim(IntToStr(current_time%mm))//"/"//trim(IntToStr(current_time%ss)))
+  call put_log("-------------------------------------------------------------------------------")
 
-  if (current_time == time) then
+
+  is_exchange_data = .true.
+  if (present(is_exchange)) is_exchange_data = is_exchange
+
+
+  if (current_time >= time) then ! 2014/11/19 [MOD]
     call put_log("Same Time : "//trim(IntToStr(yyyy))//"/"//trim(IntToStr(mo))//"/"//trim(IntToStr(dd)) &
              //"/"//trim(IntToStr(hh))//"/"//trim(IntToStr(mm))//"/"//trim(IntToStr(ss)) &
              // " has been set. PARALLEL SEND RECV skipped")
   else
-    if (present(is_exchange)) then
-      if (is_exchange) then
-        call jcup_exchange_data_parallel()
-      end if
-    else
+    if (is_exchange_data) then
       call jcup_exchange_data_parallel()
     end if
   end if
@@ -1339,22 +1393,14 @@ subroutine jcup_set_date_time_int(component_name, time_array, delta_t, is_exchan
   call set_current_conf(comp_id) 
   current_comp_id = comp_id
 
-  if (present(is_exchange)) then
-    if (is_exchange) then
-      do comp = 1, get_num_of_total_component()
-        if (comp_id == comp) cycle
-        if ((get_comp_exchange_type(comp_id, comp) == ADVANCE_SEND_RECV).or. &
-            (get_comp_exchange_type(comp_id, comp) == BEHIND_SEND_RECV)) then
-          call jcup_exchange_data_serial(comp_id, comp)
-        end if
-      end do
-    end if
-  else
+  if (is_exchange_data) then 
     do comp = 1, get_num_of_total_component()
       if (comp_id == comp) cycle
       if ((get_comp_exchange_type(comp_id, comp) == ADVANCE_SEND_RECV).or. &
           (get_comp_exchange_type(comp_id, comp) == BEHIND_SEND_RECV)) then
-        call jcup_exchange_data_serial(comp_id, comp)
+        !!!call jcup_exchange_data_serial_old(comp_id, comp)
+        call jcup_exchange_data_serial(comp_id) ! whien my model has serial exchange component 
+        exit ! exit do loop
       end if
     end do
   end if
@@ -1363,47 +1409,74 @@ subroutine jcup_set_date_time_int(component_name, time_array, delta_t, is_exchan
   call get_before_time(comp_id, 1, time)
   call remove_past_send_data(time, comp_id)
 
-  call set_time_data(current_time, yyyy, mo, dd, hh, mm, ss, milli_sec, micro_sec)
+  ! 2014/10/17 [ADD]
+  call get_current_time(comp_id, 1, time)
+
+  if (current_time < time) then
+    call set_time_data(current_time, time%yyyy, time%mo, time%dd, time%hh, time%mm, time%ss, time%milli_sec, time%micro_sec)
+  end if
+
+  call inc_time(time, delta_t)
+
+  yyyy = time%yyyy ; mo = time%mo ; dd = time%dd
+  hh   = time%hh   ; mm = time%mm ; ss = time%ss
+  milli_sec = time%milli_sec ; micro_sec = time%micro_sec
+  ! 2014/10/17
+
+  !do comp = 1, get_num_of_total_component() ! set current time to all my component
+  !  if (comp_id == comp) cycle ! skip to set my component time to avoid double setting
+  !  if (is_my_component(comp)) then
+  !    if (jcup_is_set_time(comp, time_array)) then ! 
+  !      call put_log("set current time : "//trim(IntToStr(yyyy))//"/"//trim(IntToStr(mo))//"/"//trim(IntToStr(dd)) &
+  !                   //"/"//trim(IntToStr(hh))//"/"//trim(IntToStr(mm))//"/"//trim(IntToStr(ss)) &
+  !                   //", component : "//trim(get_component_name(comp)))
+  !      call set_current_time(comp, 1, yyyy, mo, dd, hh, mm, ss, milli_sec, micro_sec)
+  !    end if
+  !  end if
+  !end do
+
+  call set_current_time(comp_id, 1, yyyy,mo,dd,hh,mm,ss, milli_sec, micro_sec, delta_t=delta_t) ! set time and delta t of current component
 
 end subroutine jcup_set_date_time_int
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! calculate whether current_time + delta_t == itime
 ! 2014/06/03 [MOD] itime(6) -> itime(:)
-logical function jcup_is_set_time(comp_id, itime)
-  use jcup_mpi_lib, only : jml_GetMyrankGlobal
-  use jcup_time, only : operator(==), time_type, set_time_data, get_current_time, get_delta_t, inc_time, TU_SEC, TU_MIL, TU_MCR, get_time_unit 
-  implicit none
-  integer, intent(IN) :: comp_id
-  integer, intent(IN) :: itime(:)
-  type(time_type) :: c_time
-  integer         :: delta_t
-  type(time_type) :: n_time
-  integer :: milli_sec, micro_sec  
-  integer(kind=8) :: c_time_sec, n_time_sec
-  integer :: c_time_milli_sec, n_time_milli_sec
-
-  call get_current_time(comp_id, 1, c_time)
-  call get_delta_t(comp_id, 1, delta_t)
-
-  select case (get_time_unit())
-  case(TU_SEC)
-    call inc_time(c_time, delta_t)
-    call set_time_data(n_time, itime(1), itime(2), itime(3), itime(4), itime(5), itime(6))
-    jcup_is_set_time = ( c_time == n_time)
-  case(TU_MIL)
-    call inc_time(c_time, delta_t)
-    call set_time_data(n_time, itime(1), itime(2), itime(3), itime(4), itime(5), itime(6), itime(7))
-    jcup_is_set_time = ( c_time == n_time)
-  case(TU_MCR)
-    call inc_time(c_time, delta_t)
-    call set_time_data(n_time, itime(1), itime(2), itime(3), itime(4), itime(5), itime(6), itime(7), itime(8))
-    jcup_is_set_time = ( c_time == n_time)
-  case default
-    call jcup_error("jcup_is_set_tiem", "time unit parameter error")
-  end select
-
-end function jcup_is_set_time
+! 2014/10/30 [MOD] comment out this subroutine
+!!logical function jcup_is_set_time(comp_id, itime)
+!!  use jcup_mpi_lib, only : jml_GetMyrankGlobal
+!  use jcup_time, only : operator(==), time_type, set_time_data, get_current_time, get_delta_t, inc_time, TU_SEC, TU_MIL, TU_MCR, get_time_unit 
+!  implicit none
+!  integer, intent(IN) :: comp_id
+!  integer, intent(IN) :: itime(:)
+!  type(time_type) :: c_time
+!  integer         :: delta_t
+!  type(time_type) :: n_time
+!  integer :: milli_sec, micro_sec  
+!  integer(kind=8) :: c_time_sec, n_time_sec
+!  integer :: c_time_milli_sec, n_time_milli_sec
+!
+!  call get_current_time(comp_id, 1, c_time)
+!  call get_delta_t(comp_id, 1, delta_t)
+!
+!  select case (get_time_unit())
+!  case(TU_SEC)
+!    call inc_time(c_time, delta_t)
+!    call set_time_data(n_time, itime(1), itime(2), itime(3), itime(4), itime(5), itime(6))
+!    jcup_is_set_time = ( c_time == n_time)
+!  case(TU_MIL)
+!    call inc_time(c_time, delta_t)
+!    call set_time_data(n_time, itime(1), itime(2), itime(3), itime(4), itime(5), itime(6), itime(7))
+!    jcup_is_set_time = ( c_time == n_time)
+!  case(TU_MCR)
+!    call inc_time(c_time, delta_t)
+!    call set_time_data(n_time, itime(1), itime(2), itime(3), itime(4), itime(5), itime(6), itime(7), itime(8))
+!    jcup_is_set_time = ( c_time == n_time)
+!  case default
+!    call jcup_error("jcup_is_set_tiem", "time unit parameter error")
+!  end select
+!
+!end function jcup_is_set_time
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 !> @breaf
@@ -1411,6 +1484,7 @@ end function jcup_is_set_time
 !> @param[in] component_name name of component
 !> @param[in] itime increment time
 ! 2014/07/09 [MOD] itime(6) -> itime(:)
+! 2014/10/22 [MOD] delte call inc_time
 subroutine jcup_inc_time(component_name, itime)
   use jcup_time, only : get_current_time, time_type, get_delta_t, &
                         inc_time, get_time_unit, TU_SEC, TU_MIL, TU_MCR
@@ -1431,7 +1505,7 @@ subroutine jcup_inc_time(component_name, itime)
 
   !write(0,*) "jcup_inc_time 1 "//trim(component_name)//", ",itime
 
-  call inc_time(time, del_t)
+  !call inc_time(time, del_t)
 
   itime(1) = time%yyyy
   itime(2) = time%mo
@@ -1458,13 +1532,77 @@ subroutine jcup_inc_time(component_name, itime)
 end subroutine jcup_inc_time
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
+!> @breaf
+!> increment calendar time
+!> @param[inout] itime increment time
+!! @param[in] delta_t delta t
+! 2014/11/13 [MOD] (component_name, itime) -> (itime, delta_t)
+subroutine jcup_inc_calendar(itime, del_t)
+  use jcup_time, only : get_current_time, time_type, get_delta_t, &
+                        inc_calendar, get_time_unit, TU_SEC, TU_MIL, TU_MCR
+  use jcup_comp, only : get_comp_id_from_name
+  use jcup_utils, only : error
+  implicit none
+  integer, intent(INOUT) :: itime(:)
+  integer, intent(IN) :: del_t
+  type(time_type) :: time
+  integer(kind=8) :: time_sec
+
+  !write(0,*) "jcup_inc_time 1 "//trim(component_name)//", ",itime
+  time%yyyy = itime(1)
+  time%mo   = itime(2)
+  time%dd   = itime(3)
+  time%hh   = itime(4)
+  time%mm   = itime(5)
+  time%ss   = itime(6)
+  
+  select case(get_time_unit())
+  case(TU_SEC)
+  case(TU_MIL)
+    if (size(itime) < 7) call error("jcup_inc_time", "array size of itime must be >= 7")
+    time%milli_sec = itime(7)
+  case(TU_MCR)
+    if (size(itime) < 8) call error("jcup_inc_time", "array size of itime must be >= 8")
+    time%milli_sec = itime(7)
+    time%micro_sec = itime(8)
+  case default
+    call error("jcup_inc_time", "time unit parameter error")
+  end select
+
+  call inc_calendar(time, del_t)
+
+  itime(1) = time%yyyy
+  itime(2) = time%mo
+  itime(3) = time%dd
+  itime(4) = time%hh
+  itime(5) = time%mm
+  itime(6) = time%ss
+
+  select case(get_time_unit())
+  case(TU_SEC)
+  case(TU_MIL)
+    if (size(itime) < 7) call error("jcup_inc_time", "array size of itime must be >= 7")
+    itime(7) = time%milli_sec
+  case(TU_MCR)
+    if (size(itime) < 8) call error("jcup_inc_time", "array size of itime must be >= 8")
+    itime(7) = time%milli_sec
+    itime(8) = time%micro_sec
+  case default
+    call error("jcup_inc_time", "time unit parameter error")
+  end select
+
+  !write(0,*) "jcup_inc_time 2 "//trim(component_name)//", ",itime
+
+end subroutine jcup_inc_calendar
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine jcup_abnormal_end(routine_name, message)
   use jcup_utils, only : error, put_log
   implicit none
   character(len=*),intent(IN) :: routine_name, message
 
-  call put_log("!!! abnorman termination, jc_AbnormalEnd called", 1)
+  call put_log("!!! abnormal termination, jc_AbnormalEnd called", 1)
 
   call error(trim(routine_name),trim(message))
 
@@ -1640,7 +1778,7 @@ subroutine jcup_exchange_data_parallel()
     call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
     call put_log("exchange time      : "//trim(time_str))
     call put_log("exchange component : "//trim(get_comp_name_from_comp_id(current_comp_id)))
- 
+    
     ! local data exchange
     do i = 1, get_num_of_total_component()
       do j = i+1, get_num_of_total_component()
@@ -1683,8 +1821,198 @@ subroutine jcup_exchange_data_parallel()
 end subroutine jcup_exchange_data_parallel
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
+! 2014/11/19 [MOD] 
+! 2014/12/08 [MOD] 
+subroutine jcup_exchange_data_serial(my_comp_id)
+  use jcup_constant, only : DATA_2D, DATA_3D, CONCURRENT_SEND_RECV, NO_SEND_RECV, &
+                            ADVANCE_SEND_RECV, BEHIND_SEND_RECV, IMMEDIATE_SEND_RECV
+  use jcup_utils, only : put_log, IntToStr
+  use jcup_config, only : get_num_of_recv_data, is_my_exchange_step, &
+                          get_comp_exchange_type, get_current_comp_id, get_num_of_recv_data, &
+                          set_current_conf, get_comp_name_from_comp_id, &
+                          get_comp_exchange_type
+  use jcup_comp, only : get_num_of_total_component, is_my_component
+  use jcup_time, only : get_current_time
 
-subroutine jcup_exchange_data_serial(my_comp_id, target_comp_id)
+  implicit none
+  integer, intent(IN) :: my_comp_id
+  integer :: target_comp_id
+  integer :: i,j,mdl
+  integer :: my_model
+  integer :: num_of_data
+  character(len=20) :: time_str
+  type(time_type) :: c_time
+  integer :: max_flag_size
+  integer :: send_comp_id, recv_comp_id
+  integer :: temp_current_comp, temp_target_comp
+  integer :: exchange_type
+  !integer :: before_comp_id
+
+  !!!!write(0,*) "jcup_exchange_data_serial 1 ", my_comp_id, target_comp_id, current_comp_id
+
+  call get_current_time(get_current_comp_id(), 1, time_str)
+  call get_current_time(get_current_comp_id(), 1, c_time)
+  !write(110+jml_GetMyrankGlobal(),*) "exchange data 2 3 ", get_current_comp_id()
+
+  if (is_first_step) then
+    max_flag_size = 0
+    do i = 1, get_num_of_total_component()
+      max_flag_size = max(max_flag_size, get_num_of_recv_data(i))
+    end do
+    allocate(recv_flag(max_flag_size))
+  end if
+
+    call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
+    call put_log("!!!!!!!!!!!!!!!! DATA EXCHANGE START !!!!!!!!!!!!!!! ", 1)
+    call put_log("!!!!!!!!!!!!!!!!   SERIAL  EXCHANGE  !!!!!!!!!!!!!!! ", 1)
+    call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
+    call put_log("exchange time      : "//trim(time_str))
+    !call put_log("exchange component : "//trim(get_comp_name_from_comp_id(my_comp_id))//", "// &
+    !                                      trim(get_comp_name_from_comp_id(target_comp_id)))
+
+  if (is_first_serial_step) then
+    ! send all my serial component data to the ADVANCE components
+    do i = 1, get_num_of_total_component()
+      if (is_my_component(i)) then
+        do j = 1, get_num_of_total_component()
+          if (i == j) cycle
+          if (get_comp_exchange_type(i, j) == BEHIND_SEND_RECV) then
+            !if (.not.is_my_component(j)) then
+
+              send_comp_id = i
+              recv_comp_id = j
+
+              call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE START  FIRST STEP SEND !!!!!!!!!!!!!! ", 1)
+              call put_log("excahnge component id : "//trim(IntToStr(send_comp_id))//":"//trim(IntToStr(recv_comp_id)))
+              call jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, .false.)
+              call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE FINISH FIRST STEP SEND !!!!!!!!!!!!!! ", 1)
+
+            !end if
+          end if
+        end do
+      end if
+    end do
+
+    do i = 1, get_num_of_total_component()
+      if ((get_comp_exchange_type(my_comp_id, i) == ADVANCE_SEND_RECV) .or. &
+          (get_comp_exchange_type(my_comp_id, i) == BEHIND_SEND_RECV)) then
+             if (i == j) cycle
+             if (is_my_component(i)) cycle
+              send_comp_id = i
+              recv_comp_id = my_comp_id
+
+              call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE START  FIRST STEP RECV !!!!!!!!!!!!!! ", 1)
+              call put_log("excahnge component id : "//trim(IntToStr(send_comp_id))//":"//trim(IntToStr(recv_comp_id)))
+              call jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, .false.)
+              call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE FINISH FIRST STEP RECV !!!!!!!!!!!!!! ", 1)
+
+      end if
+    end do
+
+    is_first_serial_step = .false.
+    before_comp_id = my_comp_id
+
+    return
+  end if
+
+  
+  !before_comp_id = my_comp_id
+
+  !do i = my_comp_id - 1, 1, -1
+  !  if (.not.is_my_component(i)) cycle 
+  !  do j = 1, get_num_of_total_component()
+  !    if ((get_comp_exchange_type(i, j) == ADVANCE_SEND_RECV) .or. &
+  !        (get_comp_exchange_type(i, j) == BEHIND_SEND_RECV)) then
+  !      before_comp_id = i
+  !      goto 2000
+  !    end if            
+  !  end do
+  !end do
+
+  !do i = get_num_of_total_component(), my_comp_id + 1, -1
+  !  if (.not.is_my_component(i)) cycle
+  !  do j = 1, get_num_of_total_component()
+  !    if ((get_comp_exchange_type(i, j) == ADVANCE_SEND_RECV) .or. &
+  !        (get_comp_exchange_type(i, j) == BEHIND_SEND_RECV)) then
+  !      before_comp_id = i
+  !      goto 2000
+  !    end if            
+  !  end do
+  !end do
+
+  !2000 continue
+
+  do i = 1, get_num_of_total_component()
+    if (i == before_comp_id) cycle
+    if ((get_comp_exchange_type(before_comp_id, i) == ADVANCE_SEND_RECV) .or. &
+        (get_comp_exchange_type(before_comp_id, i) == BEHIND_SEND_RECV)) then
+        send_comp_id = before_comp_id
+        recv_comp_id = i
+        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE START  SEND !!!!!!!!!!!!!! ", 1)
+        call put_log("excahnge component id : "//trim(IntToStr(send_comp_id))//":"//trim(IntToStr(recv_comp_id)))
+        call jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, .false.)
+        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE FINISH SEND !!!!!!!!!!!!!! ", 1)
+    end if
+  end do
+    
+
+  !if (is_initial_step(my_comp_id)) then
+  !  do i = 1, get_num_of_total_component()
+  !    if (i == my_comp_id) cycle
+  !    if (i == before_comp_id) cycle      
+  !    if ((get_comp_exchange_type(my_comp_id, i) == BEHIND_SEND_RECV)) then
+  !        send_comp_id = i
+  !        recv_comp_id = my_comp_id
+  !        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE START  SEND !!!!!!!!!!!!!! ", 1)
+  !        call put_log("excahnge component id : "//trim(IntToStr(send_comp_id))//":"//trim(IntToStr(recv_comp_id)))
+  !        call jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, .false.)
+  !        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE FINISH SEND !!!!!!!!!!!!!! ", 1)
+  !    end if
+  !    if ((get_comp_exchange_type(my_comp_id, i) == ADVANCE_SEND_RECV).and.(.not.is_my_component(i))) then
+  !        send_comp_id = i
+  !        recv_comp_id = my_comp_id
+  !        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE START  SEND !!!!!!!!!!!!!! ", 1)
+  !        call put_log("excahnge component id : "//trim(IntToStr(send_comp_id))//":"//trim(IntToStr(recv_comp_id)))
+  !        call jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, .false.)
+  !        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE FINISH SEND !!!!!!!!!!!!!! ", 1)
+  !    end if
+  !  end do
+  !  is_initial_step(my_comp_id)  = .false.
+
+  !else
+
+    recv_comp_id = my_comp_id
+    do i = 1, get_num_of_total_component()
+      if (i == before_comp_id) cycle
+      if (i == my_comp_id) cycle
+      if ((get_comp_exchange_type(recv_comp_id, i) == ADVANCE_SEND_RECV) .or. &
+          (get_comp_exchange_type(recv_comp_id, i) == BEHIND_SEND_RECV)) then
+          send_comp_id = i
+          !if (is_my_component(i)) cycle
+          call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE START  RECV !!!!!!!!!!!!!! ", 1)
+          call put_log("excahnge component id : "//trim(IntToStr(send_comp_id))//":"//trim(IntToStr(recv_comp_id)))
+          call jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, .false.)
+          call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE FINISH RECV !!!!!!!!!!!!!! ", 1)
+      end if
+    end do
+  !end if
+
+  call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
+  call put_log("!!!!!!!!!!!!!!!   SERIAL  EXCHANGE   !!!!!!!!!!!!!!! ", 1)
+  call put_log("!!!!!!!!!!!!!!! DATA EXCHANGE FINISH !!!!!!!!!!!!!!! ", 1)
+  call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
+
+
+  if (is_first_step) is_first_step = .false.
+
+  before_comp_id = my_comp_id
+
+end subroutine jcup_exchange_data_serial
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! 2014/11/19 [MOD] 
+! 2014/12/08 [MOD] 
+subroutine jcup_exchange_data_serial_old(my_comp_id, target_comp_id)
   use jcup_constant, only : DATA_2D, DATA_3D, CONCURRENT_SEND_RECV, NO_SEND_RECV, &
                             ADVANCE_SEND_RECV, BEHIND_SEND_RECV, IMMEDIATE_SEND_RECV
   use jcup_utils, only : put_log, IntToStr
@@ -1727,85 +2055,146 @@ subroutine jcup_exchange_data_serial(my_comp_id, target_comp_id)
     call put_log("!!!!!!!!!!!!!!!!   SERIAL  EXCHANGE  !!!!!!!!!!!!!!! ", 1)
     call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
     call put_log("exchange time      : "//trim(time_str))
-    call put_log("exchange component : "//trim(get_comp_name_from_comp_id(target_comp_id)))
+    call put_log("exchange component : "//trim(get_comp_name_from_comp_id(my_comp_id))//", "// &
+                                          trim(get_comp_name_from_comp_id(target_comp_id)))
 
     ! local data exchange
-    if (is_my_component(target_comp_id)) then
-      if (is_initial_step(my_comp_id)) then
-        is_initial_step(my_comp_id) = .false.
-        return
-      end if
-      send_comp_id = target_comp_id
-      recv_comp_id = my_comp_id
-      call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE START  !!!!!!!!!!!!!! ", 1)
-      call put_log("excahnge component id : "//trim(IntToStr(send_comp_id))//":"//trim(IntToStr(recv_comp_id)))
-      call jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, .false.)
-      call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE FINISH !!!!!!!!!!!!!! ", 1)
-    end if
+    !if (is_my_component(target_comp_id)) then
+    !  if (is_initial_step(my_comp_id)) then
+    !    is_initial_step(my_comp_id) = .false.
+    !    send_comp_id = target_comp_id
+    !    recv_comp_id = my_comp_id
+        !!!!return ! 2014/11/19 [MOD]
+    !  end if
+    !  if ((get_comp_exchange_type(my_comp_id, target_comp_id) == ADVANCE_SEND_RECV)) then
+    !    call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE 1 START  !!!!!!!!!!!!!! ", 1)
+    !    call put_log("excahnge component id : "//trim(IntToStr(send_comp_id))//":"//trim(IntToStr(recv_comp_id)))
+    !    call jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, .false.)
+    !    call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE 1 FINISH !!!!!!!!!!!!!! ", 1)
+    !  end if
+    !end if
 
-  !!!!!write(0,*) "jcup_exchange_data_serial 2 "
-
-    if ((get_comp_exchange_type(my_comp_id, target_comp_id) == ADVANCE_SEND_RECV)) then
-      if (is_initial_step(my_comp_id)) then
-        is_initial_step(my_comp_id) = .false.
+  if (is_my_component(target_comp_id)) then
+      
         send_comp_id = target_comp_id
         recv_comp_id = my_comp_id
 
   !!!!write(0,*) "jcup_exchange_data_serial 3 ", my_comp_id, send_comp_id, recv_comp_id
 
-        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE START  !!!!!!!!!!!!!! ", 1)
+        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE START  (SAME COMPONENT) !!!!!!!!!!!!!! ", 1)
         call put_log("excahnge component id : "//trim(IntToStr(send_comp_id))//":"//trim(IntToStr(recv_comp_id)))
         call jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, .false.)
-        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE FINISH !!!!!!!!!!!!!! ", 1)
-      else
-        send_comp_id = my_comp_id
-        recv_comp_id = target_comp_id
+        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE FINISH (SAME COMPONENT) !!!!!!!!!!!!!! ", 1)
 
-  !!!!!write(0,*) "jcup_exchange_data_serial 4 ", my_comp_id, send_comp_id, recv_comp_id
 
-        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE START  !!!!!!!!!!!!!! ", 1)
-        call put_log("excahnge component id : "//trim(IntToStr(send_comp_id))//":"//trim(IntToStr(recv_comp_id)))
-        call jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, .false.)
-        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE FINISH !!!!!!!!!!!!!! ", 1)
+  else ! not same component
+
+    if ((get_comp_exchange_type(my_comp_id, target_comp_id) == ADVANCE_SEND_RECV)) then
+
+      if (is_initial_step(my_comp_id)) then ! initial step
+
+        is_initial_step(my_comp_id) = .false.
+
+        ! BSAR
         send_comp_id = target_comp_id
         recv_comp_id = my_comp_id
 
-  !!!!!write(0,*) "jcup_exchange_data_serial 4.5 ", my_comp_id, send_comp_id, recv_comp_id
+  !!!!write(0,*) "jcup_exchange_data_serial 3 ", my_comp_id, send_comp_id, recv_comp_id
 
-        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE START  !!!!!!!!!!!!!! ", 1)
+        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE START  ADVANCE, INITIAL !!!!!!!!!!!!!! ", 1)
         call put_log("excahnge component id : "//trim(IntToStr(send_comp_id))//":"//trim(IntToStr(recv_comp_id)))
         call jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, .false.)
-        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE FINISH !!!!!!!!!!!!!! ", 1)
+        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE FINISH ADVANCE, INITIAL !!!!!!!!!!!!!! ", 1)
+
+      else ! not initial step
+
+  !!!!!write(0,*) "jcup_exchange_data_serial 4 ", my_comp_id, send_comp_id, recv_comp_id
+        ! ASBR
+        send_comp_id = my_comp_id
+        recv_comp_id = target_comp_id
+
+        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE START  ADVANCE, ASBR !!!!!!!!!!!!!! ", 1)
+        call put_log("excahnge component id : "//trim(IntToStr(send_comp_id))//":"//trim(IntToStr(recv_comp_id)))
+        call jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, .false.)
+        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE FINISH ADVANCE, ASBR !!!!!!!!!!!!!! ", 1)
+
+  !!!!!write(0,*) "jcup_exchange_data_serial 4.5 ", my_comp_id, send_comp_id, recv_comp_id
+        ! 
+
+        ! BSAR
+        send_comp_id = target_comp_id
+        recv_comp_id = my_comp_id
+
+        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE START  ADVANCE, BSAR !!!!!!!!!!!!!! ", 1)
+        call put_log("excahnge component id : "//trim(IntToStr(send_comp_id))//":"//trim(IntToStr(recv_comp_id)))
+        call jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, .false.)
+        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE FINISH ADVANCE, BSAR !!!!!!!!!!!!!! ", 1)
        end if
+
     else ! BEHIND_SEND_RECV
-      send_comp_id = my_comp_id
-      recv_comp_id = target_comp_id
+
+      if (is_initial_step(my_comp_id)) then
+        is_initial_step(my_comp_id) = .false.
+
+        ! BSAR
+        send_comp_id = my_comp_id
+        recv_comp_id = target_comp_id
+
+  !!!!write(0,*) "jcup_exchange_data_serial 3 ", my_comp_id, send_comp_id, recv_comp_id
+
+        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE START  BEHIND, BSAR !!!!!!!!!!!!!! ", 1)
+        call put_log("excahnge component id : "//trim(IntToStr(send_comp_id))//":"//trim(IntToStr(recv_comp_id)))
+        call jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, .false.)
+        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE FINISH BEHIND, BSAR !!!!!!!!!!!!!! ", 1)
+
+        ! ASBR
+        send_comp_id = target_comp_id
+        recv_comp_id = my_comp_id
+
+  !!!!write(0,*) "jcup_exchange_data_serial 3 ", my_comp_id, send_comp_id, recv_comp_id
+
+        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE START  BEHIND, ASBR !!!!!!!!!!!!!! ", 1)
+        call put_log("excahnge component id : "//trim(IntToStr(send_comp_id))//":"//trim(IntToStr(recv_comp_id)))
+        call jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, .false.)
+        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE FINISH BEHIND, ASBR !!!!!!!!!!!!!! ", 1)
+
+      else ! not initial step
 
   !!!!write(0,*) "jcup_exchange_data_serial 5 ", my_comp_id, send_comp_id, recv_comp_id
+        ! BSAR
+        send_comp_id = my_comp_id
+        recv_comp_id = target_comp_id
 
-      call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE START  !!!!!!!!!!!!!! ", 1)
-      call put_log("excahnge component id : "//trim(IntToStr(send_comp_id))//":"//trim(IntToStr(recv_comp_id)))
-      call jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, .false.)
-      call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE FINISH !!!!!!!!!!!!!! ", 1)
-      send_comp_id = target_comp_id
-      recv_comp_id = my_comp_id
-      call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE START  !!!!!!!!!!!!!! ", 1)
-      call put_log("excahnge component id : "//trim(IntToStr(send_comp_id))//":"//trim(IntToStr(recv_comp_id)))
-      call jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, .false.)
-      call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE FINISH !!!!!!!!!!!!!! ", 1)
+        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE START  BEHIND, BSAR !!!!!!!!!!!!!! ", 1)
+        call put_log("excahnge component id : "//trim(IntToStr(send_comp_id))//":"//trim(IntToStr(recv_comp_id)))
+        call jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, .false.)
+        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE FINISH BEHIND, BSAR !!!!!!!!!!!!!! ", 1)
+
+        ! ASBR
+        send_comp_id = target_comp_id
+        recv_comp_id = my_comp_id
+
+        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE START  BEHIND, ASBR !!!!!!!!!!!!!! ", 1)
+        call put_log("excahnge component id : "//trim(IntToStr(send_comp_id))//":"//trim(IntToStr(recv_comp_id)))
+        call jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, .false.)
+        call put_log("!!!!!!!!!!!!!!!! LOCAL EXCHANGE FINISH BEHIND, ASBR !!!!!!!!!!!!!! ", 1)
+      end if
     end if
 
-    call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
-    call put_log("!!!!!!!!!!!!!!!   SERIAL  EXCHANGE   !!!!!!!!!!!!!!! ", 1)
-    call put_log("!!!!!!!!!!!!!!! DATA EXCHANGE FINISH !!!!!!!!!!!!!!! ", 1)
-    call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
+  end if ! not same component if end
+
+  call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
+  call put_log("!!!!!!!!!!!!!!!   SERIAL  EXCHANGE   !!!!!!!!!!!!!!! ", 1)
+  call put_log("!!!!!!!!!!!!!!! DATA EXCHANGE FINISH !!!!!!!!!!!!!!! ", 1)
+  call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
 
 
   if (is_first_step) is_first_step = .false.
 
   !write(0,*) "exchange data finish, ", my_model, jml_GetMyrank()
 
-end subroutine jcup_exchange_data_serial
+end subroutine jcup_exchange_data_serial_old
+
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
@@ -1895,6 +2284,7 @@ subroutine jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, is_final
             exchange_data_id = rd%data_id
 
             data_dimension = 9999
+
             if (is_my_component(send_comp_id)) then
               data_dimension = get_send_data_dimension(send_comp_id, rd%send_data)
             end if
@@ -2145,14 +2535,14 @@ subroutine jcup_exchange_data_25d_double(dest_model_name, data_name, average_dat
 end subroutine jcup_exchange_data_25d_double
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-
-subroutine jcup_interpolate_data_1d_double(source_model_name, data_name, num_of_data, exchange_data_id)
+! 2014/10/31 [MOD] add is_immediate_recv
+subroutine jcup_interpolate_data_1d_double(source_model_name, data_name, num_of_data, exchange_data_id, is_immediate_recv)
   use jcup_utils, only : error, put_log
   use jcup_mpi_lib, only : jml_GetMyrankGlobal
   use jcup_grid_base, only : get_my_local_area
   use jcup_grid, only : interpolate_data_1d, get_data, recv_data
   use jcup_comp, only : get_comp_id_from_name, get_component_name
-  use jcup_time, only : time_type, get_current_time
+  use jcup_time, only : time_type, get_current_time, get_before_time
   use jcup_buffer, only : put_recv_data
   use jcup_config, only : GetRecvMappingTag, GetExchangeTag, get_recv_data_id_from_data_name
   implicit none
@@ -2160,6 +2550,7 @@ subroutine jcup_interpolate_data_1d_double(source_model_name, data_name, num_of_
   character(len=NAME_LEN), intent(IN) :: data_name(:)
   integer, intent(IN) :: num_of_data
   integer, intent(IN) :: exchange_data_id
+  logical, optional, intent(IN) :: is_immediate_recv
 
   integer :: exchange_tag(NUM_OF_EXCHANGE_DATA)
   type(time_type) :: time
@@ -2189,6 +2580,10 @@ subroutine jcup_interpolate_data_1d_double(source_model_name, data_name, num_of_
   end do
 
   call get_current_time(current_comp_id, 1, time)
+  
+  if (present(is_immediate_recv)) then
+   if (is_immediate_recv) call get_before_time(current_comp_id, 1, time)
+  end if
 
   call interpolate_data_1d(current_comp_id, source_comp_id, recv_mapping_tag(current_comp_id, source_comp_id), &
                            DOUBLE_DATA, num_of_data, exchange_tag)
@@ -2213,13 +2608,13 @@ subroutine jcup_interpolate_data_1d_double(source_model_name, data_name, num_of_
 end subroutine jcup_interpolate_data_1d_double
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-
-subroutine jcup_interpolate_data_25d_double(source_model_name, data_name, num_of_data, exchange_data_id)
+! 2014/10/31 [MOD] add is_immediate_recv
+subroutine jcup_interpolate_data_25d_double(source_model_name, data_name, num_of_data, exchange_data_id, is_immediate_recv)
   use jcup_utils, only : error, put_log
   use jcup_grid_base, only : get_my_local_area
   use jcup_grid, only : interpolate_data_1d, get_data, recv_data
   use jcup_comp, only : get_comp_id_from_name, get_component_name
-  use jcup_time, only : time_type, get_current_time
+  use jcup_time, only : time_type, get_current_time, get_before_time
   use jcup_buffer, only : put_recv_data
   use jcup_config, only : GetRecvMappingTag, GetExchangeTag, get_recv_data_id_from_data_name
   implicit none
@@ -2227,6 +2622,7 @@ subroutine jcup_interpolate_data_25d_double(source_model_name, data_name, num_of
   character(len=NAME_LEN), intent(IN) :: data_name
   integer, intent(IN) :: num_of_data
   integer, intent(IN) :: exchange_data_id
+  logical, optional, intent(IN) :: is_immediate_recv
 
   integer :: exchange_tag(NUM_OF_EXCHANGE_DATA)
   type(time_type) :: time
@@ -2249,6 +2645,10 @@ subroutine jcup_interpolate_data_25d_double(source_model_name, data_name, num_of
   exchange_tag(1) = GetExchangeTag(data_name)
 
   call get_current_time(current_comp_id, 1, time)
+
+  if (present(is_immediate_recv)) then ! 2014/10/31 [ADD]
+   if (is_immediate_recv) call get_before_time(current_comp_id, 1, time)
+  end if
 
   call interpolate_data_1d(current_comp_id, source_comp_id, recv_mapping_tag(current_comp_id, source_comp_id), &
                            DOUBLE_DATA, num_of_data, exchange_tag)
@@ -2300,6 +2700,7 @@ end subroutine jcup_check_recv_error
 !> @param[in] send_comp_name name of send component
 !> @param[in] recv_comp_name name of recv component
 !> @param[in] time_lag time_lag setting
+! 2014/10/31 [MOD] get_current_time -> get_before_time
 subroutine jcup_send_data_immediately(send_comp_name, recv_comp_name, time_lag) !dest_task, c_time, is_final_step)
   use jcup_constant, only : STRING_LEN
   use jcup_utils, only : put_log, IntToStr, error, NO_OUTPUT_LOG, get_log_level
@@ -2308,7 +2709,7 @@ subroutine jcup_send_data_immediately(send_comp_name, recv_comp_name, time_lag) 
                           is_my_exchange_step, is_send_step_data
   use jcup_comp, only : get_comp_id_from_name
   use jcup_data, only : get_send_data_dimension, get_num_of_exchange_send_data
-  use jcup_time, only : get_current_time
+  use jcup_time, only : get_before_time
   implicit none
   character(len=*), intent(IN) :: send_comp_name ! name of my component
   character(len=*), intent(IN) :: recv_comp_name ! name of destination component
@@ -2329,7 +2730,7 @@ subroutine jcup_send_data_immediately(send_comp_name, recv_comp_name, time_lag) 
   integer :: my_comp, my_comp_id
   logical :: is_first_step_temp
 
-  call get_current_time(get_current_comp_id(), 1, time_str)
+  call get_before_time(get_current_comp_id(), 1, time_str)
 
     call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
     call put_log("!!!!!!!!!!!!!!!!   IMMEDIATE SEND    !!!!!!!!!!!!!!! ", 1)
@@ -2412,7 +2813,7 @@ subroutine jcup_send_data_immediately(send_comp_name, recv_comp_name, time_lag) 
 
             if (time_lag==0) then
               is_first_step_temp = is_first_step
-              is_first_step = .true. ! set is_first_step .true. for immediate data exchange
+              !!!is_first_step = .true. ! set is_first_step .true. for immediate data exchange
             end if
 
             select case(get_send_data_dimension(send_comp_id, rd%send_data))
@@ -2450,6 +2851,7 @@ end subroutine jcup_send_data_immediately
 !> @param[in] send_comp_name name of send component
 !> @param[in] recv_comp_name name of recv component
 ! 2014/07/08 [MOD] len=14 -> len=20
+! 2014/10/31 [MOD] get_current_time -> get_before_time
 subroutine jcup_recv_data_immediately(send_comp_name, recv_comp_name)
   use jcup_constant, only : STRING_LEN
   use jcup_utils, only : put_log, IntToStr, error, NO_OUTPUT_LOG, get_log_level
@@ -2458,7 +2860,7 @@ subroutine jcup_recv_data_immediately(send_comp_name, recv_comp_name)
                           is_my_exchange_step, is_send_step_data, is_recv_step_data, get_num_of_recv_data
   use jcup_comp, only : get_comp_id_from_name, is_model_running, is_my_component
   use jcup_data, only : get_recv_data_dimension, get_num_of_exchange_recv_data
-  use jcup_time, only : get_current_time
+  use jcup_time, only : get_before_time
   implicit none
   character(len=*), intent(IN) :: send_comp_name
   character(len=*), intent(IN) :: recv_comp_name ! my_comp_name
@@ -2478,8 +2880,9 @@ subroutine jcup_recv_data_immediately(send_comp_name, recv_comp_name)
   integer :: exchange_data_id
   integer :: target_comp, target_comp_id
   integer :: my_comp, my_comp_id
+  logical :: is_first_step_temp
 
-  call get_current_time(get_current_comp_id(), 1, time_str)
+  call get_before_time(get_current_comp_id(), 1, time_str)
 
     call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
     call put_log("!!!!!!!!!!!!!!!!   IMMEDIATE RECV    !!!!!!!!!!!!!!! ", 1)
@@ -2556,6 +2959,10 @@ subroutine jcup_recv_data_immediately(send_comp_name, recv_comp_name)
               call put_log(trim(log_str),1)
             end if
 
+
+            is_first_step_temp = is_first_step
+            is_first_step = .false. ! set is_first_step .false. for immediate data exchange
+
             select case(get_recv_data_dimension(recv_comp_id, rd%name))
             case (DATA_1D)
               current_comp_id = send_comp_id
@@ -2566,7 +2973,7 @@ subroutine jcup_recv_data_immediately(send_comp_name, recv_comp_name)
               call set_current_conf(recv_comp_id)
               current_comp_id = recv_comp_id
               if (is_my_component(recv_comp_id)) then
-                call jcup_interpolate_data_1d_double(trim(rd%send_model), recv_data_name, num_of_data, exchange_data_id)
+                call jcup_interpolate_data_1d_double(trim(rd%send_model), recv_data_name, num_of_data, exchange_data_id, .true.) ! 2014/10/31 
               end if
             case (DATA_25D)
               current_comp_id = send_comp_id
@@ -2577,12 +2984,14 @@ subroutine jcup_recv_data_immediately(send_comp_name, recv_comp_name)
               call set_current_conf(recv_comp_id)
               current_comp_id = recv_comp_id
               if (is_my_component(recv_comp_id)) then
-                call jcup_interpolate_data_25d_double(trim(rd%send_model), recv_data_name(1), num_of_2d_array, exchange_data_id)
+                call jcup_interpolate_data_25d_double(trim(rd%send_model), recv_data_name(1), num_of_2d_array, exchange_data_id, .true.)
               end if
             case default
               call error("jcup_recv_data_immediately", "data dimension error")
             end select
             call put_log("RECV DATA FINISH! source model, "//trim(rd%send_model), 1)
+
+            is_first_step = is_first_step_temp
 
           !!!end if
         end if
@@ -2620,7 +3029,6 @@ logical function jcup_isSendOK(name)
 end function jcup_isSendOK
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-
 logical function jcup_isRecvOK(name)
   use jcup_config, only : is_my_recv_data, isRecvData, is_recv_step_data
   use jcup_utils, only  :  put_log
@@ -2709,6 +3117,29 @@ integer function get_send_data_id(recv_comp_id, data_name, is_average)
 end function get_send_data_id
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
+!> put 1d or 2d or 3d value
+!> @param[in] data_type send data type
+!> @param[in] data array of send data
+! 2015/02/23 [ADD]
+subroutine jcup_put_value(data_type, data)
+  use jcup_data, only : varp_type, get_varp_data_dim, get_varp_num_of_data
+  implicit none
+  type(varp_type), pointer :: data_type
+  real(kind=8), target, intent(IN) :: data(*)
+  real(kind=8), pointer :: ptr1d(:), ptr2d(:,:)
+
+  if (get_varp_data_dim(data_type) == DATA_25D) then
+    ptr2d(1:data_type%my_grid%num_of_point, 1:get_varp_num_of_data(data_type)) => &
+                                        data(1:data_type%my_grid%num_of_point*get_varp_num_of_data(data_type))
+    call jcup_put_data_25d_double(data_type, ptr2d)
+  else
+    ptr1d => data(1:data_type%my_grid%num_of_point)
+    call jcup_put_data_1d_double(data_type, ptr1d)
+  end if
+
+end subroutine jcup_put_value
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
 
 logical function jcup_isPutOK(data_type, time)
   use jcup_config, only : isSendData, get_send_comp_id_from_data_name, is_mean_data, is_put_step_data
@@ -2756,13 +3187,15 @@ end function jcup_isPutOK
 !> put 1d data
 !> @param[in] data_type send data type
 !> @param[in] data array of send data
+! 2014/10/22 [MOD] get_current_time -> get_before_time
+! 2014/10/28 [MOD] time%delta_t -> call get_delta_t(delta_t)
 subroutine jcup_put_data_1d_double(data_type, data)
   use jcup_constant, only : IMMEDIATE_SEND_RECV
-  use jcup_utils, only  : IntToStr, error
+  use jcup_utils, only  : IntToStr, error, put_log
   use jcup_buffer, only : put_send_data
   use jcup_config, only : is_mean_data, send_data_conf_type, get_send_data_conf_ptr, is_put_step_data, &
                           get_send_comp_id_from_data_name, set_current_conf, get_comp_exchange_type
-  use jcup_time, only : time_type, get_current_time, cal_next_exchange_time
+  use jcup_time, only : time_type, get_before_time, cal_next_exchange_time, get_delta_t
   use jcup_data, only : varp_type, get_comp_id, &
                         get_data_name, &
                         is_data_defined
@@ -2774,10 +3207,13 @@ subroutine jcup_put_data_1d_double(data_type, data)
   character(NAME_LEN) :: average_data_name
   type(send_data_conf_type), pointer :: sd
   real(kind=8) :: averaging_weight
+  integer :: delta_t
   integer :: my_comp_id
   integer :: i
   character(len=NAME_LEN) :: data_name
   logical :: is_average
+
+  call put_log("--------------------------------- jcup_put_data ------------------------------------")
 
   if (.not.associated(data_type)) call error("jcup_put_data_1d_double", "data_type is not associated")
 
@@ -2787,7 +3223,7 @@ subroutine jcup_put_data_1d_double(data_type, data)
 
   call set_current_conf(my_comp_id)
 
-  call get_current_time(my_comp_id, 1, time)
+  call get_before_time(my_comp_id, 1, time)
 
   data_name = get_data_name(data_type)
 
@@ -2815,7 +3251,9 @@ subroutine jcup_put_data_1d_double(data_type, data)
       if (sd%my_recv_conf(i)%is_average) then
         if (.not.is_first_step) then ! average data
           average_data_name = trim(get_average_data_name(data_name,sd%my_recv_conf(i)%model_id,sd%my_recv_conf(i)%name))
-          averaging_weight = dble(time%delta_t)/dble(sd%my_recv_conf(i)%interval)
+          call get_delta_t(my_comp_id, 1, delta_t) ! 2014/10/28 [ADD]
+          !averaging_weight = dble(time%delta_t)/dble(sd%my_recv_conf(i)%interval)
+          averaging_weight = dble(delta_t)/dble(sd%my_recv_conf(i)%interval) ! 2014/10/28 [MOD]
           call cal_next_exchange_time(my_comp_id, 1, sd%my_recv_conf(i)%interval, next_time)
           call put_send_data(data, next_time, my_comp_id, &
                              get_send_data_id(sd%my_recv_conf(i)%model_id, data_name, is_average), &
@@ -2850,13 +3288,15 @@ end subroutine jcup_put_data_1d_double
 !> @param[in] data_type send data type
 !> @param[in] data array of send data
 ! 2014/07/17 [MOD] delete num_of_data > @param[in] num_of_data number of 2.5D data
+! 2014/10/22 [MOD] get_current_time -> get_before_time
+! 2014/10/28 [MOD] time%delta_t -> call get_delta_t(delta_t)
 subroutine jcup_put_data_25d_double(data_type, data)
   use jcup_constant, only : IMMEDIATE_SEND_RECV
-  use jcup_utils, only  : IntToStr, error
+  use jcup_utils, only  : IntToStr, error, put_log
   use jcup_buffer, only : put_send_data
   use jcup_config, only : is_mean_data, send_data_conf_type, get_send_data_conf_ptr, is_put_step_data, &
                           get_send_comp_id_from_data_name, set_current_conf, get_comp_exchange_type
-  use jcup_time, only : time_type, get_current_time, cal_next_exchange_time
+  use jcup_time, only : time_type, get_before_time, cal_next_exchange_time, get_delta_t
   use jcup_data, only : varp_type, is_data_defined, get_comp_id, get_data_name, set_time
   implicit none
   type(varp_type), pointer :: data_type
@@ -2865,10 +3305,13 @@ subroutine jcup_put_data_25d_double(data_type, data)
   character(NAME_LEN) :: average_data_name
   type(send_data_conf_type), pointer :: sd
   real(kind=8) :: averaging_weight
+  integer :: delta_t
   integer :: my_comp_id
   integer :: i
   character(len=NAME_LEN) :: data_name
   logical :: is_average
+
+  call put_log("--------------------------------- jcup_put_data ------------------------------------")
 
   if (.not.associated(data_type)) call error("jcup_put_data_25d_double", "data_type is not associated")
 
@@ -2876,7 +3319,7 @@ subroutine jcup_put_data_25d_double(data_type, data)
 
   my_comp_id = get_comp_id(data_type)
   call set_current_conf(my_comp_id)
-  call get_current_time(my_comp_id, 1, time)
+  call get_before_time(my_comp_id, 1, time)
 
   data_name = get_data_name(data_type)
 
@@ -2903,9 +3346,11 @@ subroutine jcup_put_data_25d_double(data_type, data)
       if (sd%my_recv_conf(i)%is_average) then
         if (.not.is_first_step) then
           average_data_name = trim(get_average_data_name(data_name,sd%my_recv_conf(i)%model_id,sd%my_recv_conf(i)%name))
-          averaging_weight = dble(time%delta_t)/dble(sd%my_recv_conf(i)%interval)
+          call get_delta_t(my_comp_id, 1, delta_t) ! 2014/10/28 [ADD]
+          !averaging_weight = dble(time%delta_t)/dble(sd%my_recv_conf(i)%interval)
+          averaging_weight = dble(delta_t)/dble(sd%my_recv_conf(i)%interval) ! 2014/10/28 [MOD]
           call cal_next_exchange_time(my_comp_id, 1, sd%my_recv_conf(i)%interval, next_time)
-          call put_send_data(data, next_time, current_comp_id, &
+          call put_send_data(data, next_time, my_comp_id, & ! 2014/11/19 [MOD] current_comp_id -> my_comp_id
                              get_send_data_id(sd%my_recv_conf(i)%model_id, data_name, is_average), &
                              average_data_name, .true., averaging_weight)
         else ! first step of average data
@@ -2930,9 +3375,33 @@ subroutine jcup_put_data_25d_double(data_type, data)
 end subroutine jcup_put_data_25d_double
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
+!> get 1d or 2d or 3d value
+!> @param[in] data_type recv data type
+!> @param[in,out] data array of recv data
+! 2015/02/23 [ADD]
+subroutine jcup_get_value(data_type, data, is_recv_ok)
+  use jcup_data, only : varg_type, get_varg_data_dim, get_varg_num_of_data
+  implicit none
+  type(varg_type), pointer :: data_type
+  real(kind=8), target, intent(INOUT) :: data(*)
+  real(kind=8), pointer :: ptr1d(:), ptr2d(:,:)
+  logical, optional, intent(OUT) :: is_recv_ok
 
+  if (get_varg_data_dim(data_type) == DATA_25D) then
+    ptr2d(1:data_type%my_grid%num_of_point, 1:get_varg_num_of_data(data_type)) => &
+                                        data(1:data_type%my_grid%num_of_point*get_varg_num_of_data(data_type))
+    call jcup_get_data_25d_double(data_type, ptr2d, is_recv_ok)
+  else
+    ptr1d => data(1:data_type%my_grid%num_of_point)
+    call jcup_get_data_1d_double(data_type, ptr1d, is_recv_ok)
+  end if
+
+end subroutine jcup_get_value
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! 2014/10/22 [MOD] is_recv_step_data -> is_get_step_data
 logical function jcup_isGetOK(data_type, time)
-  use jcup_config, only : is_recv_step_data, isRecvData
+  use jcup_config, only : is_get_step_data, isRecvData
   use jcup_utils, only  : put_log, error
   use jcup_time, only : operator(==)
   use jcup_data, only : varg_type, get_data_name, get_time
@@ -2955,7 +3424,7 @@ logical function jcup_isGetOK(data_type, time)
     return
   end if
 
-  if (.not.is_recv_step_data(name)) then
+  if (.not.is_get_step_data(name)) then
     call put_log("Current time is not recv step, get data skipped, data : "//trim(name), 1)
     return
   end if
@@ -2969,11 +3438,12 @@ end function jcup_isGetOK
 !> get 1d data
 !> @param[in] data_type recv data type
 !> @param[in] data array of recv data
+! 2014/10/22 [MOD] get_current_time -> get_before_time
 subroutine jcup_get_data_1d_double(data_type, data, is_recv_ok)
-  use jcup_utils, only : error
+  use jcup_utils, only : error, put_log
   use jcup_constant, only : IMMEDIATE_SEND_RECV
   use jcup_buffer, only : get_recv_data
-  use jcup_time, only : time_type, get_current_time, operator(==)
+  use jcup_time, only : time_type, get_before_time, operator(==)
   use jcup_config, only : recv_data_conf_type, get_send_comp_id_from_data_name, get_send_data_name, is_mean_data, &
                           get_recv_data_id_from_data_name, get_recv_comp_id_from_data_name, &
                           set_current_conf, get_recv_data_conf_ptr, get_comp_exchange_type, isRecvData
@@ -2989,12 +3459,14 @@ subroutine jcup_get_data_1d_double(data_type, data, is_recv_ok)
   character(len=NAME_LEN) :: data_name
   type(recv_data_conf_type), pointer :: rd
   
+  call put_log("--------------------------------- jcup_get_data ------------------------------------")
+
   if (.not.associated(data_type)) call error("jcup_get_data_1d_double", "data_type is not associated")
 
   my_comp_id = get_comp_id(data_type)
 
   call set_current_conf(my_comp_id)
-  call get_current_time(my_comp_id, 1, time)
+  call get_before_time(my_comp_id, 1, time)
   
   if (present(is_recv_ok)) is_recv_ok = .false.
 
@@ -3036,10 +3508,11 @@ end subroutine jcup_get_data_1d_double
 !> @param[in] data_type recv data type
 !> @param[in] data array of recv data
 ! 2014/07/17 [MOD] delete num_of_data > @param[in] num_of_data number of 2.5d data
+! 2014/10/22 [MOD] get_current_time -> get_before_time
 subroutine jcup_get_data_25d_double(data_type, data, is_recv_ok)
-  use jcup_utils, only : error
+  use jcup_utils, only : error, put_log
   use jcup_buffer, only : get_recv_data 
-  use jcup_time, only : time_type, get_current_time
+  use jcup_time, only : time_type, get_before_time
   use jcup_config, only : get_send_comp_id_from_data_name, get_send_data_name, is_mean_data, &
                           get_recv_data_id_from_data_name, get_recv_comp_id_from_data_name, &
                           set_current_conf
@@ -3054,11 +3527,13 @@ subroutine jcup_get_data_25d_double(data_type, data, is_recv_ok)
   character(len=NAME_LEN) :: send_data_name
   character(len=NAME_LEN) :: data_name
   
+  call put_log("--------------------------------- jcup_get_data ------------------------------------")
+
   if (.not.associated(data_type)) call error("jcup_get_data_25d_double", "data_type is not associated")
 
   my_comp_id = get_comp_id(data_type)
   call set_current_conf(my_comp_id)
-  call get_current_time(my_comp_id, 1, time)
+  call get_before_time(my_comp_id, 1, time)
 
   if (present(is_recv_ok)) is_recv_ok = .false.
 
@@ -3370,7 +3845,9 @@ end subroutine check_put_array_size
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! 2014/07/14 [MOD] time_array(6) -> time_array(:)
 ! 2014/07/16 [MOD] 2.5D data
+! 2014/12/08 [MOD} add jcup_send_final_step_data
 subroutine jcup_write_restart(fid, time_array)
+  use jcup_utils, only : put_log
   use jcup_buffer, only :  buffer_check_write
   use jcup_comp, only : get_num_of_total_component, is_my_component, get_component_name 
   use jcup_io_base, only : jcup_init_io, jcup_io_create_type, jcup_write_restart_base
@@ -3382,6 +3859,13 @@ subroutine jcup_write_restart(fid, time_array)
   type(local_area_type), pointer :: local_area
   type(send_data_conf_type), pointer :: send_data_ptr
   integer :: i, j
+
+  call put_log("-----------------------------------------------------------------------------------------")
+  call put_log("--------------------------------- jcup_write_restart ------------------------------------")
+  call put_log("-----------------------------------------------------------------------------------------")
+
+  call jcup_send_final_step_data() ! 2014/12/08 [ADD]
+  is_final_send = .false.
 
   call jcup_init_io()
 
@@ -3400,7 +3884,7 @@ subroutine jcup_write_restart(fid, time_array)
     end if
   end do
 
-  call buffer_check_write()
+  !!!call buffer_check_write()
 
 end subroutine jcup_write_restart
 
@@ -3413,7 +3897,7 @@ subroutine jcup_read_restart(fid, time_array)
   use jcup_io_base, only : jcup_init_io, jcup_io_create_type, jcup_read_restart_base
   use jcup_grid_base, only : local_area_type, get_num_of_grid, get_my_local_area_ptr
   use jcup_config, only : get_num_of_recv_data, get_num_of_send_data, send_data_conf_type, get_send_data_conf_ptr_from_id
-  
+  use jcup_utils, only : put_log  
   implicit none
   integer, intent(IN) :: fid
   integer, intent(IN) :: time_array(:)
@@ -3422,10 +3906,13 @@ subroutine jcup_read_restart(fid, time_array)
   integer :: max_flag_size
   integer :: i, j
 
+  call put_log("--------------------------------- jcup_read_restart ------------------------------------")
+
   max_flag_size = 0
   do i = 1, get_num_of_total_component()
     max_flag_size = max(max_flag_size, get_num_of_recv_data(i))
   end do
+
   allocate(recv_flag(max_flag_size))
 
   call jcup_init_io()

@@ -13,7 +13,7 @@ module jcup_constant
   character(len=*), public, parameter :: NO_NAME = "NO_NAME_ASSIGNED"
   integer,public,parameter :: NO_DATA = -999  
   integer,public,parameter :: NO_GRID = -999
-  integer,public,parameter :: NAME_LEN = 32
+  integer,public,parameter :: NAME_LEN = 64 ! 2014/11/12 [MOD] 32 -> 64
   integer,public,parameter :: STRING_LEN = 256
   integer,public,parameter :: MAX_MODEL  = 8
   integer,public,parameter :: MAX_DOMAIN = 5

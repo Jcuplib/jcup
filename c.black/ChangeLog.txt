@@ -561,6 +561,147 @@ Routines
 Detail
  call write_grid_mapping_infoをコメントアウト。
 
+-----------------------------------------------------------------
+
+Version:3.070200
+Date:2014/11/11
+File:jcup_interface.f90, jcup_time.f90, jcup_buffer.f90, jcup_io_base.f90, jcup_mpi_lib.f90
+
+Routines
+ jcup_set_time他多数 : add, mod
+
+Detail
+ Jcupの時間管理でカレンダー計算を廃止し、初期時刻からの経過時間（秒、ミリ秒、マイクロ秒）
+ のみでデータ交換を管理するようにした。プログラム改修箇所および改修内容は多岐かつ大規模
+ であり大幅なヴァージョンアップになる。
+
+-----------------------------------------------------------------
+
+Version:3.080000
+Date:2014/11/11
+File:jcup_interface.f90
+
+Routines
+ jcup_inc_calendar :  add
+
+Detail
+ Jcupの時間管理でカレンダー計算を廃止したため、モデル側のカレンダーをインクリメントする
+ サービスサブルーチンを別途作成した。
+
+-----------------------------------------------------------------
+
+Version:3.080001
+Date:2014/11/14
+File:jcup_interface.f90
+
+Routines
+ jcup_coupling_end :  mod
+
+Detail
+ Jcupの時間管理の変更に伴い、serialデータ交換の最終ステップで相手に送る場合にjcup_set_time
+ のコールをコメントアウトし、current_comp_id = iとした。
+
+-----------------------------------------------------------------
+
+Version:3.080002
+Date:2014/11/19
+File:jcup_interface.f90
+
+Routines
+ jcup_exchange_data_serial :  mod
+
+Detail
+ Jcupの時間管理の変更に伴い、serialデータ交換の第一ステップでデータ交換をスキップしていた
+ returnをコメントアウトした。
+
+-----------------------------------------------------------------
+
+Version:3.080003
+Date:2014/11/19
+File:jcup_interface.f90
+
+Routines
+ jcup_set_date_time_int :  mod
+
+Detail
+ マルチコンポーネント実行時のデータ交換制御のバグ。if (current_time == time)を if (current_time >= time)
+ に修正した。
+
+-----------------------------------------------------------------
+
+Version:3.080004
+Date:2014/11/19
+File:jcup_interface.f90
+
+Routines
+ jcup_put_data_25d_double :  mod
+
+Detail
+ マルチコンポーネント実行時のデータputのバグ。average dataのコンポーネントIDをcurrent_comp_idからmy_comp_idに
+ 修正した。
+
+-----------------------------------------------------------------
+
+Version:3.080005
+Date:2014/12/12
+File:jcup_time.f90
+
+Routines
+ read_time :  mod
+ write_time : mod
+
+Detail
+ リスタートの時刻出入力で、全コンポーネントの時刻を対象とするのではなく当該コンポーネントの時刻のみを出入力
+ するように修正した。
+
+-----------------------------------------------------------------
+
+Version:3.080100
+Date:2014/12/12
+File:jcup_comp.f90
+
+Routines
+ sort_component_name :  add
+ init_model_process  : mod
+
+Detail
+ リスタートの時にコンポーネントの割り当てを変えてコンポーネントIDが変わるとデータIDが変わりエラーとなる。それを
+ 回避するため、コンポーネントIDは割り当て順ではなく名前順に割り当てるようにした。
+
+-----------------------------------------------------------------
+
+Version:3.090000
+Date:2015/02/23
+File:jcup_interface.f90, jcup_data.f90
+
+Routines
+ get_varp_data_dim    : add
+ get_varg_data_dim    : add
+ get_varp_num_of_data : add
+ get_varg_num_of_data : add
+ jcup_put_value       : add
+ jcup_get_value       : add
+
+Detail
+ 水平２次元データを１次元に変換する操作が不必要に時間をとる恐れがあるので、水平２次元、あるいは３次元のデータを
+ そのまま入力とし、カップラー内部でポインタを用いて型変換を行うサブルーチンjcup_put_value, jcup_get_valueを追加した。
+ このサブルーチンを用いることで、明示的な型変換の必要なくデータのPut、Getができる。
+
+
+-----------------------------------------------------------------
+
+Version:3.090001
+Date:2015/03/26
+File:jcup_time.f90
+
+Routines
+ time_type : mod
+
+Detail
+ jcup_init_timeで時間を初期化する際にjcup_timeのcurrent_timeを未定義のまま右辺値としていた。
+ この不具合を解消するため、time_type内でyyyy, mo, dd, hh, mm = 0のように明示的に初期値を
+ 与えるようにした。
+
 
 
 

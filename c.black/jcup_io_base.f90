@@ -114,6 +114,7 @@ subroutine jcup_io_create_file_type(ftp, grid_index)
 
   if (ierror>0) then
      call error("jcup_io_create_file_type", "MPI_TYPE_commit error ")
+     stop
   end if
 
   deallocate(index_buffer)
@@ -151,6 +152,7 @@ end subroutine search_file_type
   
 !*=======+=========+=========+=========+=========+=========+=========+=========+
 ! 2014/07/15 [MOD] end_time(6) -> end_time(:)
+! 2014/11/04 [MOD] integer :: time_array -> integer(kind=8) :: time_array
 subroutine jcup_write_restart_base(fid, comp_id, end_time)
   use jcup_constant, only : STRING_LEN
   use jcup_buffer, only : get_num_of_time, get_send_buffer_ptr
@@ -170,7 +172,7 @@ subroutine jcup_write_restart_base(fid, comp_id, end_time)
   type(data_buffer), pointer :: db
   integer :: num_of_time
   integer :: i
-  integer :: time_array(8) ! 2014/07/14 [MOD]
+  integer(kind=8) :: time_array(8) ! 2014/07/14 [MOD], 2014/11/04 [MOD] integer -> integer(kind=8)
   logical :: write_flag
   character(len=NAME_LEN) :: data_name
   real(kind=8), pointer :: data_ptr(:)
@@ -245,18 +247,20 @@ subroutine jcup_write_restart_base(fid, comp_id, end_time)
 
   return
 
-200 call error('jcup_write_restart_base','cannot create log file: '//trim(mastar_file_name))
+200 call error('jcup_write_restart_base','cannot create restart mastar file: '//trim(mastar_file_name))
   
 end subroutine jcup_write_restart_base
 
 !*=======+=========+=========+=========+=========+=========+=========+=========+
 ! 2014/07/14 [MOD] end_time(6) -> end_time(:), time_array(6) -> time_array(8)
+! 2014/11/04 [MOD] integer :: time_array -> integer(kind=8) :: time_array
+! 2014/11/05 [MOD] integer :: int_buffer(12) -> integer(kind=8) :: int_buffer(12)
 subroutine jcup_read_restart_base(fid, comp_id, end_time)
   use jcup_constant, only : NAME_LEN, STRING_LEN
   use jcup_buffer, only : get_num_of_time, get_send_buffer_ptr
   use jcup_buffer, only : restore_buffer
   use jcup_comp, only : get_component_name, is_my_component
-  use jcup_utils, only : error
+  use jcup_utils, only : error, put_log
   use jcup_time, only : read_time, time_type, get_time_unit, TU_SEC, TU_MIL, TU_MCR
   use jcup_mpi_lib, only : jml_isLocalLeader, jml_BcastLocal
   implicit none
@@ -266,11 +270,12 @@ subroutine jcup_read_restart_base(fid, comp_id, end_time)
   character(len=STRING_LEN) :: mastar_file_name
   logical :: is_opened
   integer :: num_of_time
-  integer :: time_array(8) ! 2014/07/14 [MOD] time_array(6) -> time_array(8)
+  integer(kind=8) :: time_array(8) ! 2014/07/14 [MOD] time_array(6) -> time_array(8)
   integer :: component_id, data_id, data_type, data_dim
   character(len=NAME_LEN) :: data_name
   integer :: file_handler
-  integer :: int_buffer(8+1+1+1+1) ! 2014/07/14 [MOD] int_buffer(6+1+1+1+1) -> int_buffer(8+1+1+1+1)
+  integer(kind=8) :: int_buffer(8+1+1+1+1) ! 2014/07/14 [MOD] int_buffer(6+1+1+1+1) -> int_buffer(8+1+1+1+1), 
+                                           ! 2014/11/05 [MOD] integer -> integer(kind=8)
   real(kind=8), pointer :: data_ptr(:)
   type(time_type) :: data_time
 
@@ -298,11 +303,12 @@ subroutine jcup_read_restart_base(fid, comp_id, end_time)
     open(fid, file=trim(mastar_file_name),form = 'formatted', &
            access = 'sequential', action = 'read', err = 200)
 
-    write(0,*) "jcup_read_restart_base 1 ", mastar_file_name
+    !write(0,*) "jcup_read_restart_base 1 ", mastar_file_name
     call read_time(fid, comp_id)
-    write(0,*) "jcup_read_restart_base 2 ", comp_id
+    !write(0,*) "jcup_read_restart_base 2 ", comp_id
 
     do
+
       read(fid, *, end = 100) data_name
       read(fid, *, end = 100) time_array
       read(fid, *, end = 100) component_id
@@ -310,13 +316,14 @@ subroutine jcup_read_restart_base(fid, comp_id, end_time)
       read(fid, *, end = 100) data_type
       read(fid, *, end = 100) data_dim
 
-      write(0,*) "jcup_read_restart_base 3 ", trim(data_name), time_array
+      !write(0,*) "jcup_read_restart_base 3 ", trim(data_name), time_array
 
       int_buffer(1:8) = time_array
       int_buffer(9) = component_id
       int_buffer(10) = data_id
       int_buffer(11) = data_type
       int_buffer(12) = data_dim
+
       call jml_BcastLocal(comp_id, int_buffer, 1, 12)
       call jml_BcastLocal(comp_id, data_name)
 
@@ -333,16 +340,17 @@ subroutine jcup_read_restart_base(fid, comp_id, end_time)
 
     100 continue
 
-     int_buffer(1) = -1
+     int_buffer(1) = -100
      call jml_BcastLocal(comp_id, int_buffer, 1, 12)
 
   else
+
     call read_time(fid, comp_id)
 
     do
       call jml_BcastLocal(comp_id, int_buffer, 1, 12)
 
-      if (int_buffer(1) <= 0) exit
+      if (int_buffer(1) <= -100) exit
       time_array(:) = int_buffer(1:8)
       component_id  = int_buffer(9)
       data_id       = int_buffer(10)
@@ -367,12 +375,13 @@ subroutine jcup_read_restart_base(fid, comp_id, end_time)
 
   return
 
-200 call error('jcup_read_restart_base','cannot create log file: '//trim(mastar_file_name))
+200 call error('jcup_read_restart_base','cannot open restart mastar file: '//trim(mastar_file_name))
   
 end subroutine jcup_read_restart_base
 
 !*=======+=========+=========+=========+=========+=========+=========+=========
 ! 2014/07/14 [MOD] data_time(6) -> data_time(8) 
+! 2014/11/04 [MOD] integer :: data_time -> integer(kind=8) :: data_time
 subroutine jcup_read_restart_data(out_dir, comp_id, data_name, data_time, data_ptr)
   use jcup_config, only : set_current_conf, get_send_data_conf_ptr, send_data_conf_type
   use jcup_grid_base, only : get_num_of_point
@@ -380,7 +389,7 @@ subroutine jcup_read_restart_data(out_dir, comp_id, data_name, data_time, data_p
   character(len=*), intent(IN) :: out_dir
   integer, intent(IN) :: comp_id
   character(len=*), intent(IN) :: data_name
-  integer, intent(IN) :: data_time(8)
+  integer(kind=8), intent(IN) :: data_time(8)
   real(kind=8), pointer :: data_ptr(:)
   type(send_data_conf_type), pointer :: send_data_conf_ptr
   integer :: grid_id
@@ -415,6 +424,7 @@ end subroutine jcup_read_restart_data
 
 !*=======+=========+=========+=========+=========+=========+=========+=========
 ! 2014/07/16 [MOD]
+! 2014/11/04 [MOD] integer :: data_time -> integer(kind=8) :: data_time, 
 subroutine jcup_io_open_file(out_dir, comp_id, data_name, data_time, grid_id, num_of_vgrid, file_handler)
   use jcup_comp, only : get_component_name
   use jcup_mpi_lib, only : jml_GetComm
@@ -425,7 +435,7 @@ subroutine jcup_io_open_file(out_dir, comp_id, data_name, data_time, grid_id, nu
   character(len=*), intent(IN) :: out_dir
   integer, intent(IN)          :: comp_id
   character(len=*), intent(IN) :: data_name
-  integer, intent(IN)          :: data_time(8)
+  integer(kind=8), intent(IN)          :: data_time(8)
   integer, intent(IN)          :: grid_id
   integer, intent(IN)          :: num_of_vgrid
   integer, intent(OUT) :: file_handler
@@ -440,17 +450,26 @@ subroutine jcup_io_open_file(out_dir, comp_id, data_name, data_time, grid_id, nu
 
   select case (get_time_unit())
   case(TU_SEC)
-    write(file_name, '(A,A,".restart.",I4.4,5I2.2,".",A,".dat")') &
+    !write(file_name, '(A,A,".restart.",I4.4,5I2.2,".",A,".dat")') &
+    !      trim(out_dir), trim(get_component_name(comp_id)), &
+    !      data_time(1), data_time(2), data_time(3), data_time(4), data_time(5), data_time(6), trim(data_name) 
+    write(file_name, '(A,A,".restart.",I14.14,".",A,".dat")') &
           trim(out_dir), trim(get_component_name(comp_id)), &
-          data_time(1), data_time(2), data_time(3), data_time(4), data_time(5), data_time(6), trim(data_name) 
+          data_time(6), trim(data_name) 
   case(TU_MIL)
-    write(file_name, '(A,A,".restart.",I4.4,5I2.2,I3.3,".",A,".dat")') &
+    !write(file_name, '(A,A,".restart.",I4.4,5I2.2,I3.3,".",A,".dat")') &
+    !      trim(out_dir), trim(get_component_name(comp_id)), &
+    !      data_time(1), data_time(2), data_time(3), data_time(4), data_time(5), data_time(6), data_time(7), trim(data_name) 
+    write(file_name, '(A,A,".restart.",I14.14,I3.3,".",A,".dat")') &
           trim(out_dir), trim(get_component_name(comp_id)), &
-          data_time(1), data_time(2), data_time(3), data_time(4), data_time(5), data_time(6), data_time(7), trim(data_name) 
+          data_time(6), data_time(7), trim(data_name) 
   case(TU_MCR)
-    write(file_name, '(A,A,".restart.",I4.4,5I2.2,2I3.3,".",A,".dat")') &
+    !write(file_name, '(A,A,".restart.",I4.4,5I2.2,2I3.3,".",A,".dat")') &
+    !      trim(out_dir), trim(get_component_name(comp_id)), &
+    !      data_time(1), data_time(2), data_time(3), data_time(4), data_time(5), data_time(6), data_time(7), data_time(8), trim(data_name) 
+    write(file_name, '(A,A,".restart.",I14.14,2I3.3,".",A,".dat")') &
           trim(out_dir), trim(get_component_name(comp_id)), &
-          data_time(1), data_time(2), data_time(3), data_time(4), data_time(5), data_time(6), data_time(7), data_time(8), trim(data_name) 
+          data_time(6), data_time(7), data_time(8), trim(data_name) 
   case default
     call error("jcup_io_open_file", "time unit parameter error")
   end select
@@ -458,16 +477,16 @@ subroutine jcup_io_open_file(out_dir, comp_id, data_name, data_time, grid_id, nu
   call MPI_File_Open(my_comm, trim(file_name), &
                      MPI_MODE_CREATE + MPI_MODE_RDWR, MPI_INFO_NULL, file_handler, ierror)
 
-    !if (ierror>0) then
+    if (ierror>0) then
     !   write(LOG_FILE_ID, '(" Msg : Sub[jcup_io_open_file]/Mod[jcup_io_base]")')
     !   write(LOG_FILE_ID, '(" ----- MPI_File_open error",I5)') ierror 
     !   write(LOG_FILE_ID, '(" ----- file name : ",A)') trim(fhp%file_name)
     !   write(LOG_FILE_ID, '(" ------- file_handler id =",I3," file_handler =",I5,", file_type id =",I3," file_type =",I12)') &
     !                       fhp%fh_id, fhp%file_handler, fhp%file_type%ft_id, fhp%file_type%file_type
     !   close(LOG_FILE_ID)
-    !   write(0,*) "jcup_io_open_file, MPI_File_Open error ", ierror
-    !   stop
-    !end if
+       call error("jcup_io_open_file", "MPI_File_Open error, file name : "//trim(file_name))
+       stop
+    end if
 
   !write(LOG_FILE_ID, '(" Msg : Sub[jcup_io_open_file]/Mod[jcup_io_base]")')
   !write(LOG_FILE_ID, '(" ----- File open : ",A)') trim(fhp%file_name)

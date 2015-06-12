@@ -705,6 +705,26 @@ Detail
 
 
 
+-----------------------------------------------------------------
+
+Version:3.090002
+Date:2015/06/12
+File:jcup_data.f90
+
+Routines
+ varg_type, varp_type : mod
+ jcup_initialize(), jcup_init_time_int() : mod
+ time_type : mod
+
+Detail
+ varg_type, varp_type 内にprivate指定があるため、他のルーチンでメンバーの参照ができなくなっていた。
+ gfortranではエラーが出るが、Intelコンパイラでエラーにならない理由は不明。
+
+ jcup_initialize(), jcup_init_time_int()でset_time_data()をcallする際の最後の引数はinteger(8)でなければならないので、kind()関数を使ってcastするように修正。
+
+ time_typeの宣言において、yyyy,mo,dd,hhの初期化ミス。
+ 
+
 
 
 

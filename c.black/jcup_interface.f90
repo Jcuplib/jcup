@@ -328,7 +328,7 @@ subroutine jcup_initialize(model_name, default_time_unit, log_level, log_stderr)
 
   max_i_1d = 1
 
-  call set_time_data(current_time, 0, 0, 0, 0, 0, 0)
+  call set_time_data(current_time, 0, 0, 0, 0, 0, int(0,kind=8))
 
   current_time%delta_t = 0
 
@@ -872,7 +872,7 @@ subroutine jcup_init_time_int(time_array)
       call set_current_time(i, 1, 0, 0, 0, 0, 0, ss)
     !end if
   end do
-  call set_time_data(current_time, 0, 0, 0, 0, 0, -1)
+  call set_time_data(current_time, 0, 0, 0, 0, 0, int(-1,kind=8))
 
   is_InitTime = .true.
 

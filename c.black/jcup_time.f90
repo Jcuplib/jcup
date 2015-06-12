@@ -120,8 +120,12 @@ module jcup_time
   integer :: time_unit = -1 !
 
   type time_type
-    integer :: yyyy,mo,dd,hh,mm = 0
-    integer(kind=8) :: ss = 0! 2014/10/29 [MOD]
+    integer :: yyyy = 0 ! 2015/06/12 [MOD]
+    integer :: mo = 0
+    integer :: dd = 0
+    integer :: hh = 0
+    integer :: mm = 0
+    integer(kind=8) :: ss = 0 ! 2014/10/29 [MOD]
     integer :: milli_sec = 0
     integer :: micro_sec = 0
     integer :: delta_t = 0

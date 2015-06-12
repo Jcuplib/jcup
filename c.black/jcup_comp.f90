@@ -184,6 +184,7 @@ subroutine add_comp_name(current_process, comp_name, num_of_comp)
 
 end subroutine add_comp_name
 
+
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine init_my_component_info(total_comp_name)
@@ -299,7 +300,34 @@ subroutine set_component_info()
 end subroutine set_component_info
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
+! 2014/12/12 [NEW}
+subroutine sort_component_name(comp_name)
+  implicit none
+  character(len=NAME_LEN), intent(INOUT) :: comp_name(:)
+  character(len=NAME_LEN), pointer :: name_buffer(:)
+  integer :: i, j
+  integer :: index
+
+  allocate(name_buffer(size(comp_name)))
+
+
+  do i = 1, size(comp_name)
+    index = 1
+    do j = 1, size(comp_name)
+      if (LLT(trim(comp_name(j)), trim(comp_name(i)))) index = index + 1
+    end do
+    name_buffer(index) = comp_name(i)
+  end do 
+   
+  comp_name = name_buffer
+
+  deallocate(name_buffer)
+
+end subroutine sort_component_name
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
 ! 2014/08/27 [MOD] delete argument isCallInit
+! 2014/12/12 [MOD] add to call sort_component_name
 subroutine init_model_process()
   use jcup_mpi_lib, only : jml_init, jml_GetCommSizeGlobal, jml_GetMyrankGlobal, jml_create_communicator
   use jcup_utils, only : error
@@ -318,6 +346,8 @@ subroutine init_model_process()
   end if
 
   call set_global_component(total_comp_name)
+
+  call sort_component_name(total_comp_name) ! 2014/12/12
   
   call init_my_component_info(total_comp_name)
 

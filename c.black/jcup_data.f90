@@ -30,6 +30,10 @@ module jcup_data
   public :: get_data_name ! character(len=NAME_LEN) function (varp_type or varg_type)
   public :: set_time ! subroutine (varp_type or varg_type, current_time)
   public :: get_time ! type(time_type) function (varp_type or varg_type)
+  public :: get_varp_data_dim ! integer function (varp_type) ! 2015/02/23 [ADD]
+  public :: get_varg_data_dim ! integer function (varg_type) ! 2015/02/23 [ADD]
+  public :: get_varp_num_of_data ! integer function (varp_type) ! 2015/02/23 [ADD]
+  public :: get_varg_num_of_data ! integer function (varg_type) ! 2015/02/23 [ADD]
   public :: data_array_size_ok ! logical function (varp_type or varg_type, s1, s2, s3)
  
 !--------------------------------   private  ---------------------------------!
@@ -47,7 +51,7 @@ module jcup_data
 
 
   type varp_type
-    private
+!!$    private
     type(varp_type), pointer :: next_ptr
     character(len=NAME_LEN) :: name
     integer :: grid_index
@@ -62,7 +66,7 @@ module jcup_data
   type(varp_type), pointer :: current_sd_ptr
 
   type varg_type
-    private
+!!$    private
     type(varg_type), pointer :: next_ptr
     character(len=NAME_LEN) :: name
     character(len=3) :: recv_mode ! "SNP" or "AVR"
@@ -185,6 +189,7 @@ subroutine def_varp(data_type_ptr, comp_name, data_name, grid_index, num_of_data
   integer :: comp_id
 
   is_25D_data = .false.
+
   if (present(num_of_data)) then
     if (num_of_data > 1) is_25D_data = .true.
   end if
@@ -356,9 +361,10 @@ subroutine def_varg(data_type_ptr, comp_name, data_name, grid_index, num_of_data
 
   data_type_ptr => current_rd_ptr
 
-  call put_log("jcup_def_varg : Recv data definition : "//trim(data_name)//", data dim : " &
+  call put_log("jcup_def_varg : Recv data definition : "//trim(comp_name)//" : "//trim(data_name)//", data dim : " &
              //trim(IntToStr(current_rd_ptr%num_of_data))//&
-              ", exchange data tag : "//trim(IntToStr(current_rd_ptr%exchange_tag)), 2)
+              ", exchange data tag : "//trim(IntToStr(current_rd_ptr%exchange_tag))//&
+              ", time lag : "//trim(IntToStr(current_rd_ptr%time_lag)), 2)
 
 end subroutine def_varg
 
@@ -731,6 +737,58 @@ function get_varg_time(data_type) result(current_time)
   current_time = data_type%current_time
 
 end function get_varg_time
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+!> get data dimension type of varp
+!! @param data_type pointer of data type
+!! @protected
+!  2015/02/23 [ADD]
+integer function get_varp_data_dim(data_type) 
+  implicit none
+  type(varp_type), pointer :: data_type
+
+  get_varp_data_dim = data_type%data_dimension_type
+
+end function get_varp_data_dim
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+!> get data dimension type of varg
+!! @param data_type pointer of data type
+!! @protected
+!  2015/02/23 [ADD]
+integer function get_varg_data_dim(data_type) 
+  implicit none
+  type(varg_type), pointer :: data_type
+
+  get_varg_data_dim = data_type%data_dimension_type
+
+end function get_varg_data_dim
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+!> get the number of data or vertical layer of varp
+!! @param data_type pointer of data type
+!! @protected
+!  2015/02/23 [ADD]
+integer function get_varp_num_of_data(data_type) 
+  implicit none
+  type(varp_type), pointer :: data_type
+
+  get_varp_num_of_data = data_type%num_of_data
+
+end function get_varp_num_of_data
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+!> get the number of data or vertical layer of varg
+!! @param data_type pointer of data type
+!! @protected
+!  2015/02/23 [ADD]
+integer function get_varg_num_of_data(data_type) 
+  implicit none
+  type(varg_type), pointer :: data_type
+
+  get_varg_num_of_data = data_type%num_of_data
+
+end function get_varg_num_of_data
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 

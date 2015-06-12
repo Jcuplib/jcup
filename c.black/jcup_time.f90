@@ -28,7 +28,8 @@ module jcup_time
   public :: operator(<=)    ! logical function (t1, t2)
   public :: operator(<)     ! logical function (t1, t2)
   public :: DateToTimeStr
-  public :: inc_time     ! subroutine (now_time, delta_t) ! 2014/07/04 [ADD]
+  public :: inc_calendar ! subroutine (now_time, delta_t) ! 2014/10/29 [ADD]
+  public :: inc_time     ! subroutine (now_time, delta_t) ! 2014/07/04 [ADD] now_time%ss = now_time%ss + delta_t
   public :: cal_time_diff ! subroutine (time1, time2, diff_sec, diff_mil, diff_mcr) ! 2014/07/10 [ADD]
 
 
@@ -39,7 +40,8 @@ module jcup_time
   public :: set_current_time ! subroutine (component_id, domain_id, time, delta_t)
   public :: get_current_time ! subroutine (component_id, domain_id, time)
   public :: get_before_time  ! subroutine (component_id, domain_id, time)
-  public :: get_delta_t
+  public :: get_delta_t      ! subroutine (component_id, domain_id, delta_t)
+  public :: is_before_exchange_step ! logical function (component_id, domain_id, interval)
   public :: is_exchange_step ! logical functiuon (component_id, domain_id, interval)
   public :: is_exchange_step_from_c_time ! logical function (component_id, domain_id, intervar, current_time)
   public :: is_next_exchange_step
@@ -118,10 +120,15 @@ module jcup_time
   integer :: time_unit = -1 !
 
   type time_type
-    integer :: yyyy,mo,dd,hh,mm,ss
+    integer :: yyyy = 0 ! 2015/06/12 [MOD]
+    integer :: mo = 0
+    integer :: dd = 0
+    integer :: hh = 0
+    integer :: mm = 0
+    integer(kind=8) :: ss = 0 ! 2014/10/29 [MOD]
     integer :: milli_sec = 0
     integer :: micro_sec = 0
-    integer :: delta_t
+    integer :: delta_t = 0
   end type
 
   type model_time_type
@@ -188,7 +195,8 @@ end function get_time_unit
 subroutine set_time_data(tm, yyyy, mo, dd, hh, mm, ss, milli_sec, micro_sec)
   implicit none
   type(time_type), intent(INOUT) :: tm
-  integer, intent(IN) :: yyyy, mo, dd, hh, mm, ss
+  integer, intent(IN) :: yyyy, mo, dd, hh, mm
+  integer(kind=8) :: ss
   integer, optional, intent(IN) :: milli_sec, micro_sec
 
   tm%yyyy = yyyy
@@ -231,7 +239,8 @@ end subroutine set_time
 subroutine get_time_data(tm, yyyy, mo, dd, hh, mm, ss, milli_sec, micro_sec)
   implicit none
   type(time_type), intent(IN) :: tm
-  integer, intent(INOUT) :: yyyy, mo, dd, hh, mm, ss
+  integer, intent(INOUT) :: yyyy, mo, dd, hh, mm
+  integer(kind=8) :: ss
   integer, optional, intent(INOUT) :: milli_sec, micro_sec
 
   yyyy = tm%yyyy
@@ -388,38 +397,41 @@ end function GTTime
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! mod 2014/07/03
+! 2014/10/22 [MOD]
 subroutine time_str_to_date1(time_str,yyyy,mo,dd,hh,mm,ss, milli_sec, micro_sec)
   use jcup_utils, only : error
   implicit none
   character(len=*),intent(IN) :: time_str
-  integer,intent(INOUT) :: yyyy,mo,dd,hh,mm,ss, milli_sec, micro_sec
+  integer,intent(INOUT) :: yyyy,mo,dd,hh,mm
+  integer(kind=8), intent(INOUT) :: ss
+  integer, intent(INOUT) :: milli_sec, micro_sec
 
   milli_sec = 0
   micro_sec = 0
 
   select case(len_trim(time_str))
   case(14) ! second
-    read(time_str(1:4),*) yyyy
-    read(time_str(5:6),*) mo
-    read(time_str(7:8),*) dd
-    read(time_str(9:10),*) hh
-    read(time_str(11:12),*) mm
-    read(time_str(13:14),*) ss
+    !read(time_str(1:4),*) yyyy
+    !read(time_str(5:6),*) mo
+    !read(time_str(7:8),*) dd
+    !read(time_str(9:10),*) hh
+    !read(time_str(11:12),*) mm
+    read(time_str(1:14),*) ss
   case(17) ! milli second
-    read(time_str(1:4),*) yyyy
-    read(time_str(5:6),*) mo
-    read(time_str(7:8),*) dd
-    read(time_str(9:10),*) hh
-    read(time_str(11:12),*) mm
-    read(time_str(13:14),*) ss
+    !read(time_str(1:4),*) yyyy
+    !read(time_str(5:6),*) mo
+    !read(time_str(7:8),*) dd
+    !read(time_str(9:10),*) hh
+    !read(time_str(11:12),*) mm
+    read(time_str(1:14),*) ss
     read(time_str(15:17),*) milli_sec
   case(20)
-    read(time_str(1:4),*) yyyy
-    read(time_str(5:6),*) mo
-    read(time_str(7:8),*) dd
-    read(time_str(9:10),*) hh
-    read(time_str(11:12),*) mm
-    read(time_str(13:14),*) ss
+    !read(time_str(1:4),*) yyyy
+    !read(time_str(5:6),*) mo
+    !read(time_str(7:8),*) dd
+    !read(time_str(9:10),*) hh
+    !read(time_str(11:12),*) mm
+    read(time_str(1:14),*) ss
     read(time_str(15:17),*) milli_sec
     read(time_str(18:20),*) micro_sec
   case default
@@ -430,6 +442,7 @@ end subroutine time_str_to_date1
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! mod 2014/07/03
+! 2014/10/22 [MOD]
 subroutine time_str_to_date2(time_str,date)
   use jcup_utils, only : error
   implicit none
@@ -441,27 +454,27 @@ subroutine time_str_to_date2(time_str,date)
 
   select case(len_trim(time_str))
   case(14)
-    read(time_str(1:4),*) date%yyyy
-    read(time_str(5:6),*) date%mo
-    read(time_str(7:8),*) date%dd
-    read(time_str(9:10),*) date%hh
-    read(time_str(11:12),*) date%mm
-    read(time_str(13:14),*) date%ss
+    !read(time_str(1:4),*) date%yyyy
+    !read(time_str(5:6),*) date%mo
+    !read(time_str(7:8),*) date%dd
+    !read(time_str(9:10),*) date%hh
+    !read(time_str(11:12),*) date%mm
+    read(time_str(1:14),*) date%ss
   case(17)
-    read(time_str(1:4),*) date%yyyy
-    read(time_str(5:6),*) date%mo
-    read(time_str(7:8),*) date%dd
-    read(time_str(9:10),*) date%hh
-    read(time_str(11:12),*) date%mm
-    read(time_str(13:14),*) date%ss
+    !read(time_str(1:4),*) date%yyyy
+    !read(time_str(5:6),*) date%mo
+    !read(time_str(7:8),*) date%dd
+    !read(time_str(9:10),*) date%hh
+    !read(time_str(11:12),*) date%mm
+    read(time_str(1:14),*) date%ss
     read(time_str(15:17),*) date%milli_sec
   case(20)
-    read(time_str(1:4),*) date%yyyy
-    read(time_str(5:6),*) date%mo
-    read(time_str(7:8),*) date%dd
-    read(time_str(9:10),*) date%hh
-    read(time_str(11:12),*) date%mm
-    read(time_str(13:14),*) date%ss
+    !read(time_str(1:4),*) date%yyyy
+    !read(time_str(5:6),*) date%mo
+    !read(time_str(7:8),*) date%dd
+    !read(time_str(9:10),*) date%hh
+    !read(time_str(11:12),*) date%mm
+    read(time_str(1:14),*) date%ss
     read(time_str(15:17),*) date%milli_sec
     read(time_str(18:20),*) date%micro_sec
   case default
@@ -472,13 +485,16 @@ end subroutine time_str_to_date2
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! 2014/07/04  [MOD]
+! 2014/10/22 [MOD]
 subroutine date_to_time_str1(time_str,yyyy,mo,dd,hh,mm,ss, milli_sec, micro_sec)
   implicit none
   character(len=*),intent(INOUT) :: time_str
-  integer,intent(IN) :: yyyy,mo,dd,hh,mm,ss
+  integer,intent(IN) :: yyyy,mo,dd,hh,mm
+  integer(kind=8), intent(IN) :: ss
   integer, optional, intent(IN) :: milli_sec, micro_sec
 
-  write(time_str,'(i4.4,5(i2.2))') yyyy,mo,dd,hh,mm,ss
+  !write(time_str,'(i4.4,5(i2.2))') yyyy,mo,dd,hh,mm,ss
+  write(time_str,'(i14.14)') ss
 
   if (present(milli_sec)) then
     write(time_str(15:17), '(I3.3)') milli_sec
@@ -492,6 +508,7 @@ end subroutine date_to_time_str1
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! 2014/07/08 [MOD]
+! 2014/10/22 [MOD]
 subroutine date_to_time_str2(time_str,date)
   use jcup_utils, only : error
   implicit none
@@ -500,7 +517,8 @@ subroutine date_to_time_str2(time_str,date)
 
   time_str(:) = " "
 
-  write(time_str,'(I4.4,5(I2.2))') date%yyyy,date%mo,date%dd,date%hh,date%mm,date%ss
+  !write(time_str,'(I4.4,5(I2.2))') date%yyyy,date%mo,date%dd,date%hh,date%mm,date%ss
+  write(time_str,'(I14.14)') date%ss
 
   select case(time_unit)
   case(TU_SEC)
@@ -617,8 +635,8 @@ end function SecondToTime
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! calculate now_time + delta_t -> now_time
-! 2014/07/09 [NEW]
-subroutine inc_time(now_time, delta_t)
+! 2014/10/29 [NEW]
+subroutine inc_calendar(now_time, delta_t)
   use jcup_utils, only : error
   implicit none
   type(time_type), intent(INOUT) :: now_time
@@ -649,11 +667,48 @@ subroutine inc_time(now_time, delta_t)
     call error("inc_time","time_unit parameter error")
   end select
   
+end subroutine inc_calendar
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! calculate now_time + delta_t -> now_time
+! 2014/07/09 [NEW]
+subroutine inc_time(now_time, delta_t)
+  use jcup_utils, only : error
+  implicit none
+  type(time_type), intent(INOUT) :: now_time
+  integer, intent(IN) :: delta_t
+  integer(kind=8) :: time_sec, del_t_mil
+  integer :: now_milli_sec, now_micro_sec
+
+  select case (time_unit)
+  case(TU_SEC)
+    time_sec = now_time%ss !TimeToSecond(now_time)
+    time_sec = time_sec + delta_t
+    now_time%ss  = time_sec !SecondToTime(time_sec)
+  case(TU_MIL)
+    time_sec = now_time%ss !TimeToSecond(now_time)
+    now_milli_sec = now_time%milli_sec
+    time_sec = time_sec + int((now_milli_sec+delta_t)/1000)
+    now_time%ss = time_sec !SecondToTime(time_sec)
+    now_time%milli_sec = mod((now_milli_sec+delta_t), 1000)
+  case(TU_MCR)
+    time_sec = now_time%ss !TimeToSecond(now_time)
+    now_milli_sec = now_time%milli_sec
+    now_micro_sec = now_time%micro_sec
+    time_sec = time_sec + int((now_milli_sec*1000+now_micro_sec+delta_t)/1000000)
+    now_time%ss = time_sec !SecondToTime(time_sec)
+    now_time%micro_sec = mod(now_micro_sec+delta_t, 1000)
+    now_time%milli_sec = mod(now_milli_sec + int((now_micro_sec+delta_t)/1000), 1000)
+  case default
+    call error("inc_time","time_unit parameter error")
+  end select
+  
 end subroutine inc_time
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! calculate time1-time2 
 ! 2014/07/10 [NEW]
+! 2014/10/17 [MOD]
 subroutine cal_time_diff(time1, time2, diff_sec, diff_mil, diff_mcr) 
   use jcup_utils, only : error
   implicit none
@@ -666,12 +721,12 @@ subroutine cal_time_diff(time1, time2, diff_sec, diff_mil, diff_mcr)
   integer         :: mcr_sec1, mcr_sec2
   integer         :: mcr_sec_diff
 
-  if (time2>time1) then
-    call error("cal_time_diff", "time1 must >= time2") 
-  end if
+  !if (time2>time1) then
+  !  call error("cal_time_diff", "time1 must >= time2") 
+  !end if
 
-  sec1 = TimeToSecond(time1)
-  sec2 = TimeToSecond(time2)
+  sec1 = time1%ss !TimeToSecond(time1)
+  sec2 = time2%ss !TimeToSecond(time2)
   mcr_sec1 = time1%milli_sec*1000+time1%micro_sec
   mcr_sec2 = time2%milli_sec*1000+time2%micro_sec
 
@@ -743,7 +798,9 @@ subroutine set_start_time_str(mdl,dmn,time_str)
   integer,intent(IN) :: mdl,dmn
   character(len=*),intent(IN) :: time_str
 
-  integer :: yyyy,mo,dd,hh,mm,ss, milli_sec, micro_sec
+  integer :: yyyy,mo,dd,hh,mm
+  integer(kind=8) :: ss
+  integer ::  milli_sec, micro_sec
 
   call TimeStrToDate(time_str,yyyy,mo,dd,hh,mm,ss, milli_sec, micro_sec)
 
@@ -756,7 +813,8 @@ end subroutine set_start_time_str
 subroutine set_start_time_date(mdl,dmn,yyyy,mo,dd,hh,mm,ss, milli_sec, micro_sec)
   implicit none
   integer,intent(IN) :: mdl,dmn
-  integer,intent(IN) :: yyyy,mo,dd,hh,mm,ss
+  integer,intent(IN) :: yyyy,mo,dd,hh,mm
+  integer(kind=8), intent(IN) :: ss
   integer, optional, intent(IN) :: milli_sec, micro_sec
 
   call set_time_data(time(mdl)%tm(dmn)%start_time,yyyy,mo,dd,hh,mm,ss, MILLI_SEC = milli_sec, MICRO_SEC = micro_sec)
@@ -779,7 +837,8 @@ end subroutine get_start_time_str
 subroutine get_start_time_date(mdl,dmn,yyyy,mo,dd,hh,mm,ss, milli_sec, micro_sec)
   implicit none
   integer,intent(IN) :: mdl,dmn
-  integer,intent(INOUT) :: yyyy,mo,dd,hh,mm,ss
+  integer,intent(INOUT) :: yyyy,mo,dd,hh,mm
+  integer(kind=8), intent(INOUT) :: ss
   integer, optional, intent(INOUT) :: milli_sec, micro_sec
 
   call get_time_data(time(mdl)%tm(dmn)%start_time,yyyy,mo,dd,hh,mm,ss, milli_sec, micro_sec)
@@ -804,7 +863,9 @@ subroutine set_end_time_str(mdl,dmn,time_str)
   integer,intent(IN) :: mdl,dmn
   character(len=*),intent(IN) :: time_str
 
-  integer :: yyyy,mo,dd,hh,mm,ss, milli_sec, micro_sec
+  integer :: yyyy,mo,dd,hh,mm
+  integer(kind=8) :: ss
+  integer :: milli_sec, micro_sec
 
   call TimeStrToDate(time_str,yyyy,mo,dd,hh,mm,ss, milli_sec, micro_sec)
   call set_time_data(time(mdl)%tm(dmn)%end_time,yyyy,mo,dd,hh,mm,ss, milli_sec, micro_sec)
@@ -816,7 +877,8 @@ end subroutine set_end_time_str
 subroutine set_end_time_date(mdl,dmn,yyyy,mo,dd,hh,mm,ss, milli_sec, micro_sec)
   implicit none
   integer,intent(IN) :: mdl,dmn
-  integer,intent(IN) :: yyyy,mo,dd,hh,mm,ss
+  integer,intent(IN) :: yyyy,mo,dd,hh,mm
+  integer(kind=8), intent(IN) :: ss
   integer, optional, intent(IN) :: milli_sec, micro_sec
 
   call set_time_data(time(mdl)%tm(dmn)%end_time,yyyy,mo,dd,hh,mm,ss, milli_sec, micro_sec)
@@ -839,7 +901,8 @@ end subroutine get_end_time_str
 subroutine get_end_time_date(mdl,dmn,yyyy,mo,dd,hh,mm,ss, milli_sec, micro_sec)
   implicit none
   integer,intent(IN) :: mdl,dmn
-  integer,intent(INOUT) :: yyyy,mo,dd,hh,mm,ss
+  integer,intent(INOUT) :: yyyy,mo,dd,hh,mm
+  integer(kind=8), intent(INOUT) :: ss
   integer, optional, intent(INOUT) :: milli_sec, micro_sec
 
   call get_time_data(time(mdl)%tm(dmn)%end_time,yyyy,mo,dd,hh,mm,ss, milli_sec, micro_sec)
@@ -854,7 +917,9 @@ subroutine set_current_time_str(mdl,dmn,time_str, delta_t)
   character(len=*),intent(IN) :: time_str
   integer, optional, intent(IN) :: delta_t
   type(time_type) :: c_time
-  integer :: yyyy,mo,dd,hh,mm,ss, milli_sec, micro_sec
+  integer :: yyyy,mo,dd,hh,mm
+  integer(kind=8) :: ss
+  integer :: milli_sec, micro_sec
 
   !!call TimeStrToDate(time_str,yyyy,mo,dd,hh,mm,ss)
   !!call set_time_data(c_time,yyyy,mo,dd,hh,mm,ss)
@@ -876,7 +941,8 @@ end subroutine set_current_time_str
 subroutine set_current_time_date(mdl, dmn, yyyy, mo, dd, hh, mm, ss, milli_sec, micro_sec, delta_t)
   implicit none
   integer, intent(IN) :: mdl,dmn
-  integer, intent(IN) :: yyyy,mo,dd,hh,mm,ss
+  integer, intent(IN) :: yyyy,mo,dd,hh,mm
+  integer(kind=8), intent(IN) :: ss
   integer, optional, intent(IN) :: milli_sec
   integer, optional, intent(IN) :: micro_sec
   integer, optional, intent(IN) :: delta_t
@@ -931,7 +997,8 @@ end subroutine get_current_time_str
 subroutine get_current_time_date(mdl,dmn,yyyy,mo,dd,hh,mm,ss, milli_sec, micro_sec, delta_t)
   implicit none
   integer,intent(IN) :: mdl,dmn
-  integer,intent(INOUT) :: yyyy,mo,dd,hh,mm,ss
+  integer,intent(INOUT) :: yyyy,mo,dd,hh,mm
+  integer(kind=8), intent(INOUT) :: ss
   integer, optional, intent(INOUT) :: milli_sec, micro_sec
   integer, optional, intent(INOUT) :: delta_t
 
@@ -975,7 +1042,8 @@ end subroutine get_before_time_str
 subroutine get_before_time_date(mdl,dmn,yyyy,mo,dd,hh,mm,ss, milli_sec, micro_sec, delta_t)
   implicit none
   integer,intent(IN) :: mdl,dmn
-  integer,intent(INOUT) :: yyyy,mo,dd,hh,mm,ss
+  integer,intent(INOUT) :: yyyy,mo,dd,hh,mm
+  integer(kind=8), intent(INOUT) :: ss
   integer, optional, intent(INOUT) :: milli_sec, micro_sec
   integer, optional, intent(INOUT) :: delta_t
 
@@ -1011,15 +1079,41 @@ end subroutine get_delta_t
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! 2014/07/10 [ADD]
-subroutine cal_time_diff_from_start(mdl,dmn, diff_sec, diff_mil, diff_mcr)
-  implicit none
-  integer,intent(IN) :: mdl,dmn
-  integer(kind=8), intent(OUT) :: diff_sec
-  integer, intent(OUT) :: diff_mil, diff_mcr
+!subroutine cal_time_diff_from_start(mdl,dmn, diff_sec, diff_mil, diff_mcr)
+!1  implicit none
+!  integer,intent(IN) :: mdl,dmn
+!  integer(kind=8), intent(OUT) :: diff_sec
+!1  integer, intent(OUT) :: diff_mil, diff_mcr
 
-  call cal_time_diff(time(mdl)%tm(dmn)%current_time, time(mdl)%tm(dmn)%start_time, diff_sec, diff_mil, diff_mcr)
+!1  call cal_time_diff(time(mdl)%tm(dmn)%current_time, time(mdl)%tm(dmn)%start_time, diff_sec, diff_mil, diff_mcr)
  
-end subroutine cal_time_diff_from_start
+!end subroutine cal_time_diff_from_start
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! 2014/10/22 [NEW]
+logical function is_before_exchange_step(mdl, dmn, interval)
+  use jcup_utils, only : error
+  implicit none
+  integer, intent(IN) :: mdl, dmn, interval ! my model, domain, exchange interval
+  integer(kind=8) :: diff_sec
+  integer         :: diff_mil, diff_mcr
+  integer(kind=8) :: time_diff
+
+  call cal_time_diff(time(mdl)%tm(dmn)%before_time, time(mdl)%tm(dmn)%start_time, diff_sec, diff_mil, diff_mcr)
+  select case (time_unit)
+  case (TU_SEC)
+    is_before_exchange_step = (Mod(diff_sec, interval)==0)
+  case (TU_MIL)
+    time_diff = diff_sec*1000+diff_mil
+    is_before_exchange_step = (Mod(time_diff, interval) == 0)
+  case(TU_MCR)
+    time_diff = diff_sec*1000000 + diff_mil*1000 + diff_mcr
+    is_before_exchange_step = (Mod(time_diff, interval) == 0)
+  case default
+    call error("is_exchange_step","time_unit parameter error")
+  end select
+
+end function is_before_exchange_step
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! 2014/07/10 [NOD]
@@ -1031,16 +1125,14 @@ logical function is_exchange_step(mdl, dmn, interval)
   integer         :: diff_mil, diff_mcr
   integer(kind=8) :: time_diff
 
+  call cal_time_diff(time(mdl)%tm(dmn)%current_time, time(mdl)%tm(dmn)%start_time, diff_sec, diff_mil, diff_mcr)
   select case (time_unit)
   case (TU_SEC)
-    call cal_time_diff_from_start(mdl, dmn, diff_sec, diff_mil, diff_mcr)
     is_exchange_step = (Mod(diff_sec, interval)==0)
   case (TU_MIL)
-    call cal_time_diff_from_start(mdl, dmn, diff_sec, diff_mil, diff_mcr)
     time_diff = diff_sec*1000+diff_mil
     is_exchange_step = (Mod(time_diff, interval) == 0)
   case(TU_MCR)
-    call cal_time_diff_from_start(mdl, dmn, diff_sec, diff_mil, diff_mcr)
     time_diff = diff_sec*1000000 + diff_mil*1000 + diff_mcr
     is_exchange_step = (Mod(time_diff, interval) == 0)
   case default
@@ -1062,16 +1154,14 @@ logical function is_exchange_step_from_c_time(my_mdl, my_dmn, interval, current_
   integer(kind=8) :: time_diff
 
 
+  call cal_time_diff(current_time, time(my_mdl)%tm(my_dmn)%start_time, diff_sec, diff_mil, diff_mcr)
   select case(time_unit)
   case(TU_SEC)
-    call cal_time_diff(current_time, time(my_mdl)%tm(my_dmn)%start_time, diff_sec, diff_mil, diff_mcr)
     is_exchange_step_from_c_time = (Mod(diff_sec, interval)==0)
   case(TU_MIL)
-    call cal_time_diff(current_time, time(my_mdl)%tm(my_dmn)%start_time, diff_sec, diff_mil, diff_mcr)
     time_diff = diff_sec*1000 + diff_mil
     is_exchange_step_from_c_time = (Mod(time_diff, interval)==0)
   case(TU_MCR)
-    call cal_time_diff(current_time, time(my_mdl)%tm(my_dmn)%start_time, diff_sec, diff_mil, diff_mcr)
     time_diff = diff_sec*1000000 + diff_mil*1000 + diff_mcr
     is_exchange_step_from_c_time = (Mod(time_diff, interval)==0)
   case default
@@ -1090,17 +1180,15 @@ logical function is_next_exchange_step(mdl, dmn, interval)
   integer ::  diff_mil, diff_mcr
   integer(kind=8) :: time_diff
 
+  call cal_time_diff(time(mdl)%tm(dmn)%current_time, time(mdl)%tm(dmn)%start_time, diff_sec, diff_mil, diff_mcr)
   select case (time_unit)
   case(TU_SEC)
-    call cal_time_diff_from_start(mdl, dmn, diff_sec, diff_mil, diff_mcr)
     time_diff = diff_sec + time(mdl)%tm(dmn)%current_time%delta_t
     is_next_exchange_step = (Mod(time_diff, interval)==0)
   case(TU_MIL)
-    call cal_time_diff_from_start(mdl, dmn, diff_sec, diff_mil, diff_mcr)
     time_diff = diff_sec*1000 + diff_mil + time(mdl)%tm(dmn)%current_time%delta_t
     is_next_exchange_step = (Mod(time_diff, interval)==0)
   case(TU_MCR)
-    call cal_time_diff_from_start(mdl, dmn, diff_sec, diff_mil, diff_mcr)
     time_diff = diff_sec*1000000 + diff_mil*1000 + diff_mcr + time(mdl)%tm(dmn)%current_time%delta_t
     is_next_exchange_step = (Mod(time_diff, interval)==0)
   case default
@@ -1111,6 +1199,7 @@ end function is_next_exchange_step
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! 2014/07/04 [MOD]
+! 2014/10/28 [MOD] cal_time_diff(time%current_time -> cal_time_diff(time%before_time
 subroutine cal_next_exchange_time(mdl, dmn, interval, next_time)
   use jcup_utils, only : error
   implicit none
@@ -1122,21 +1211,21 @@ subroutine cal_next_exchange_time(mdl, dmn, interval, next_time)
   integer         :: diff_mil, diff_mcr
   integer(kind=8) :: time_diff
 
+  !!!call cal_time_diff(time(mdl)%tm(dmn)%current_time, time(mdl)%tm(dmn)%start_time, diff_sec, diff_mil, diff_mcr)
+  call cal_time_diff(time(mdl)%tm(dmn)%before_time, time(mdl)%tm(dmn)%start_time, diff_sec, diff_mil, diff_mcr)
+
   select case(time_unit)
   case(TU_SEC)
-    call cal_time_diff_from_start(mdl, dmn, diff_sec, diff_mil, diff_mcr)
     time_diff = diff_sec 
     num_of_interval = int(time_diff/interval)
     next_time = time(mdl)%tm(dmn)%start_time
     call inc_time(next_time, (num_of_interval+1)*interval)
   case(TU_MIL)
-    call cal_time_diff_from_start(mdl, dmn, diff_sec, diff_mil, diff_mcr)
     time_diff = diff_sec*1000 + diff_mil 
     num_of_interval = int(time_diff/interval)
     next_time = time(mdl)%tm(dmn)%start_time
     call inc_time(next_time, (num_of_interval+1)*interval)
   case(TU_MCR)
-    call cal_time_diff_from_start(mdl, dmn, diff_sec, diff_mil, diff_mcr)
     time_diff = diff_sec*1000000 + diff_mil*1000 + diff_mcr 
     num_of_interval = int(time_diff/interval)
     next_time = time(mdl)%tm(dmn)%start_time
@@ -1148,7 +1237,7 @@ subroutine cal_next_exchange_time(mdl, dmn, interval, next_time)
 end subroutine cal_next_exchange_time
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-
+! 2014/12/12 [MOD] modify to write the target component time only 
 subroutine write_time(fid, comp_id)
   use jcup_mpi_lib, only : jml_isLocalLeader
   implicit none
@@ -1157,66 +1246,69 @@ subroutine write_time(fid, comp_id)
   
   if (.not.jml_isLocalLeader(comp_id)) return
 
-  do i = 1, size(time)
-    do j = 1, size(time(i)%tm)
-      write(fid, *) time(i)%tm(j)%start_time
-      write(fid, *) time(i)%tm(j)%end_time
-      write(fid, *) time(i)%tm(j)%current_time
-      write(fid, *) time(i)%tm(j)%before_time
+  !do i = 1, size(time)
+    do j = 1, size(time(comp_id)%tm)
+      write(fid, *) time(comp_id)%tm(j)%start_time
+      write(fid, *) time(comp_id)%tm(j)%end_time
+      write(fid, *) time(comp_id)%tm(j)%current_time
+      write(fid, *) time(comp_id)%tm(j)%before_time
     end do
-  end do
+  !end do
 
 end subroutine write_time
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! mod 2014/07/03
+! 2014/11/05 [MOD} integer :: time_buffer -> integer(kind=8) :: time_buffer
+! 2014/12/12 [MOD] modify to read target component time only 
 subroutine read_time(fid, comp_id)
   use jcup_mpi_lib, only : jml_isLocalLeader, jml_BcastLocal, jml_GetMyrankGlobal
   implicit none
   integer, intent(IN) :: fid
   integer, intent(IN) :: comp_id
   integer :: i, j
-  integer :: time_buffer(9*4) ! yyyy, mo, dd, hh, mm, ss, milli, micro, delta_t
+  integer(kind=8) :: time_buffer(9*4) ! yyyy, mo, dd, hh, mm, ss, milli, micro, delta_t
   
   if (jml_isLocalLeader(comp_id)) then
-    do i = 1, size(time)   
-      do j = 1, size(time(i)%tm)
-        read(fid, *) time(i)%tm(j)%start_time
-        read(fid, *) time(i)%tm(j)%end_time
-        read(fid, *) time(i)%tm(j)%current_time
-        read(fid, *) time(i)%tm(j)%before_time
+    !do i = 1, size(time)   
+      do j = 1, size(time(comp_id)%tm)
+        read(fid, *) time(comp_id)%tm(j)%start_time
+        read(fid, *) time(comp_id)%tm(j)%end_time
+        read(fid, *) time(comp_id)%tm(j)%current_time
+        read(fid, *) time(comp_id)%tm(j)%before_time
 
-        call set_buffer(time(i)%tm(j)%start_time,   time_buffer, 1)
-        call set_buffer(time(i)%tm(j)%end_time,     time_buffer, 10)
-        call set_buffer(time(i)%tm(j)%current_time, time_buffer, 19)
-        call set_buffer(time(i)%tm(j)%before_time,  time_buffer, 28)
+        call set_buffer(time(comp_id)%tm(j)%start_time,   time_buffer, 1)
+        call set_buffer(time(comp_id)%tm(j)%end_time,     time_buffer, 10)
+        call set_buffer(time(comp_id)%tm(j)%current_time, time_buffer, 19)
+        call set_buffer(time(comp_id)%tm(j)%before_time,  time_buffer, 28)
 
         call jml_BcastLocal(comp_id, time_buffer, 1, 9*4)
 
       end do
 
-    end do
+    !end do
   else
-    do i = 1, size(time)
-      do j = 1, size(time(i)%tm)
+    !do i = 1, size(time)
+      do j = 1, size(time(comp_id)%tm)
         call jml_BcastLocal(comp_id, time_buffer, 1, 9*4)
     
-        call get_buffer(time(i)%tm(j)%start_time,   time_buffer, 1)
-        call get_buffer(time(i)%tm(j)%end_time,     time_buffer, 10)
-        call get_buffer(time(i)%tm(j)%current_time, time_buffer, 19)
-        call get_buffer(time(i)%tm(j)%before_time,  time_buffer, 28)
+        call get_buffer(time(comp_id)%tm(j)%start_time,   time_buffer, 1)
+        call get_buffer(time(comp_id)%tm(j)%end_time,     time_buffer, 10)
+        call get_buffer(time(comp_id)%tm(j)%current_time, time_buffer, 19)
+        call get_buffer(time(comp_id)%tm(j)%before_time,  time_buffer, 28)
       end do
-    end do
+    !end do
   end if
 
 end subroutine read_time
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! mod 2014/07/03
+! 2014/11/05 [MOD] integer :: buffer -> integer(kind=8) :: buffer
 subroutine set_buffer(time, buffer, is)
   implicit none
   type(time_type), intent(IN) :: time
-  integer, intent(OUT) :: buffer(:)
+  integer(kind=8), intent(OUT) :: buffer(:)
   integer, intent(IN) :: is
 
   buffer(is+0) = time%yyyy
@@ -1233,10 +1325,11 @@ end subroutine set_buffer
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! mod 2014/07/03
+! 2014/11/05 [MOD] integer :: buffer -> integer(kind=8) :: buffer
 subroutine get_buffer(time, buffer, is)
   implicit none
   type(time_type), intent(OUT) :: time
-  integer, intent(IN) :: buffer(:)
+  integer(kind=8), intent(IN) :: buffer(:)
   integer, intent(IN) :: is
 
   time%yyyy = buffer(is+0)

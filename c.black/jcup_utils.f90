@@ -48,6 +48,10 @@ module jcup_utils
 
 !--------------------------------   private  ---------------------------------!
 
+  interface IntToStr
+    module procedure IntegerToStr, LongIntToStr
+  end interface 
+
   ! private constants
   integer,private,parameter :: TIME_STR_LEN = 19
   integer,private,parameter :: STD_IN=5,STD_OUT=6,STD_ERR=0
@@ -397,15 +401,15 @@ end subroutine check_argument
 
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-
-character(len=MAX_STRING_LENGTH) function IntToStr(idata) 
+!  2014/10/30 [MOD] IntToStr -> IntegerToStr
+character(len=MAX_STRING_LENGTH) function IntegerToStr(idata) 
   implicit none
   integer,intent(IN) :: idata
 
   character(len=MAX_STRING_LENGTH) :: istr
 
   write(istr, *, err=100) idata
-  IntToStr = trim(adjustl(istr))
+  IntegerToStr = trim(adjustl(istr))
 
   return
 
@@ -413,7 +417,7 @@ character(len=MAX_STRING_LENGTH) function IntToStr(idata)
 
   call error("IntToStr","Integer argument data format error")
 
-end function IntToStr
+end function IntegerToStr
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 

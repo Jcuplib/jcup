@@ -19,6 +19,8 @@ module jcup_interpolation_interface
   public :: send_coef_to_recv_model
   public :: recv_coef_from_send_model
   public :: set_local_coef ! subroutine (my_comp_name, global_coef, local_coef, coef_type)
+  public :: set_coef_local_to_local ! subroutine (my_comp_name, my_grid_name, send_comp_name, 
+                                    !             mapping_tag, local_array_coef, local_coef, coef_type)
 
   integer, parameter, public :: OPERATION_COEF = 0
   integer, parameter, public :: SEND_COEF = 1
@@ -35,12 +37,14 @@ module jcup_interpolation_interface
   end interface
 
   interface send_array_to_recv_model
+    module procedure send_array_to_recv_model_str
     module procedure send_array_to_recv_model_int
     module procedure send_array_to_recv_model_real
     module procedure send_array_to_recv_model_dbl
   end interface
 
   interface recv_array_from_send_model
+    module procedure recv_array_from_send_model_str
     module procedure recv_array_from_send_model_int
     module procedure recv_array_from_send_model_real
     module procedure recv_array_from_send_model_dbl
@@ -187,6 +191,47 @@ subroutine get_num_of_recv_grid(recv_model_name, send_model_name, grid_tag, num_
   call get_recv_grid_index(recv_model_name, send_model_name, grid_num, num_of_grid, dummy_array)
 
 end subroutine get_num_of_recv_grid
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine send_array_to_recv_model_str(my_comp_name, recv_comp_name, array)
+  use jcup_mpi_lib, only : jml_isLocalLeader, jml_SendLeader
+  use jcup_comp, only : get_comp_id_from_name
+  implicit none
+  character(len=*), intent(IN) :: my_comp_name, recv_comp_name
+  character(len=*), intent(IN) :: array
+  integer :: recv_model
+  integer :: array_size(1)
+
+  my_model = get_comp_id_from_name(my_comp_name)
+  recv_model = get_comp_id_from_name(recv_comp_name)
+
+  if (jml_isLocalLeader(my_model)) then
+    call jml_SendLeader(array, recv_model-1) 
+  end if
+
+end subroutine send_array_to_recv_model_str
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine recv_array_from_send_model_str(my_comp_name, send_comp_name, array)
+  use jcup_mpi_lib, only : jml_isLocalLeader, jml_RecvLeader, jml_BcastLocal
+  use jcup_comp, only : get_comp_id_from_name
+  implicit none
+  character(len=*), intent(IN) :: my_comp_name, send_comp_name
+  character(len=*), intent(INOUT) :: array
+  integer  :: send_model
+
+  my_model = get_comp_id_from_name(my_comp_name)
+  send_model = get_comp_id_from_name(send_comp_name)
+
+  if (jml_isLocalLeader(my_model)) then
+    call jml_RecvLeader(array, send_model-1)
+  end if
+
+  call jml_BcastLocal(my_model, array)
+
+end subroutine recv_array_from_send_model_str
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
@@ -469,6 +514,7 @@ subroutine set_local_coef_n(my_comp_name, send_comp_name, mapping_tag, global_co
   integer, pointer :: local_coef_index(:)
   integer :: num_of_index
  
+
   select case(coef_type)
     case(OPERATION_COEF)
       call get_operation_index(my_comp_name, send_comp_name, mapping_tag, num_of_index, local_coef_index)
@@ -483,7 +529,7 @@ subroutine set_local_coef_n(my_comp_name, send_comp_name, mapping_tag, global_co
 end subroutine set_local_coef_n
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-
+! 2017/01/10 [MOD] add if (size(local_coef_index)) then
 subroutine set_local_coef_base(my_comp_name, global_coef, local_coef_index, local_coef)
   use jcup_mpi_lib, only : jml_isLocalLeader, jml_GetCommSizeLocal, jml_GatherLocal, jml_GatherVLocal, &
                            jml_ScatterVLocal
@@ -520,7 +566,11 @@ subroutine set_local_coef_base(my_comp_name, global_coef, local_coef_index, loca
     allocate(array_buffer(global_array_size))
     allocate(array_index_buffer(global_array_size))
 
-    call jml_GatherVlocal(my_model, local_coef_index, int_buffer(1), array_index_buffer, array_size, offset) 
+    if (size(local_coef_index) == 0) then
+      call jml_GatherVlocal(my_model, int_buffer, int_buffer(1), array_index_buffer, array_size, offset) 
+    else
+      call jml_GatherVlocal(my_model, local_coef_index, int_buffer(1), array_index_buffer, array_size, offset) 
+    end if
 
     do i = 1, global_array_size
       array_buffer(i) = global_coef(array_index_buffer(i)) 
@@ -539,7 +589,11 @@ subroutine set_local_coef_base(my_comp_name, global_coef, local_coef_index, loca
     allocate(array_size(1), offset(1))
     allocate(array_buffer(1), array_index_buffer(1))    
     call jml_GatherLocal(my_model, int_buffer,1,1,array_size)
-    call jml_GatherVLocal(my_model, local_coef_index, int_buffer(1), array_index_buffer, array_size, offset)
+    if (size(local_coef_index) == 0) then
+      call jml_GatherVLocal(my_model, int_buffer, int_buffer(1), array_index_buffer, array_size, offset)
+    else
+      call jml_GatherVLocal(my_model, local_coef_index, int_buffer(1), array_index_buffer, array_size, offset)
+    end if
     call jml_ScatterVLocal(my_model, array_buffer, array_size, offset, local_coef, int_buffer(1))
     deallocate(array_buffer, array_index_buffer, array_size, offset)
 
@@ -563,6 +617,68 @@ subroutine global_to_local(global_array, local_array_size, local_array_index, lo
   end do
 
 end subroutine global_to_local
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! 2017/01/13 [NEW]
+
+subroutine set_coef_local_to_local(my_comp_name, my_grid_name, send_comp_name, mapping_tag, local_array_coef, local_coef, coef_type)
+  use jcup_utils, only : error
+  use jcup_comp, only : get_comp_id_from_name
+  use jcup_grid_base, only : get_grid_index, get_grid_num
+  use jcup_grid, only : get_recv_grid_index
+  implicit none
+  character(len=*), intent(IN) :: my_comp_name, my_grid_name
+  character(len=*), intent(IN) :: send_comp_name
+  integer, intent(IN) :: mapping_tag
+  real(kind=8), intent(IN) :: local_array_coef(:)
+  real(kind=8), intent(INOUT) :: local_coef(:)
+  integer, intent(IN) :: coef_type
+  integer, pointer :: local_array_index(:)
+  integer, pointer :: intpl_array_index(:)
+  integer :: intpl_array_size
+
+  select case(coef_type)
+    case(OPERATION_COEF)
+      call error("set_coef_local_to_local", "coef_type OPERATION_COEF is not implemented")
+    case(SEND_COEF)
+      call error("set_coef_local_to_local", "coef_type SEND_COEF is not implemented")
+    case(RECV_COEF)
+      call get_grid_index(get_comp_id_from_name(trim(my_comp_name)), &
+                          get_grid_num(trim(my_comp_name), trim(my_grid_name)), &
+                          local_array_index)
+      call get_recv_grid_index(my_comp_name, send_comp_name, mapping_tag, intpl_array_size, intpl_array_index)
+      call set_local_intpl_array(local_array_index, intpl_array_index, local_array_coef, local_coef)
+  end select
+  
+end subroutine set_coef_local_to_local
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! 2017/01/13 [NEW]
+subroutine set_local_intpl_array(global_index_of_local_array, global_index_of_intpl_array, local_array, local_intpl_array)
+  implicit none
+  integer, intent(IN) :: global_index_of_local_array(:)
+  integer, intent(IN) :: global_index_of_intpl_array(:)
+  real(kind=8), intent(IN) :: local_array(:)
+  real(kind=8), intent(INOUT) :: local_intpl_array(:)
+  integer :: local_array_size, intpl_array_size
+  integer :: intpl_index, array_index
+  integer :: i, j
+
+  local_array_size = size(global_index_of_local_array)
+  intpl_array_size = size(global_index_of_intpl_array)
+
+  do i = 1, intpl_array_size
+    intpl_index = global_index_of_intpl_array(i)
+    do j = 1, local_array_size
+       if (intpl_index == global_index_of_local_array(j)) then
+         local_intpl_array(i) = local_array(j)
+         exit
+       end if
+    end do
+  end do
+
+end subroutine set_local_intpl_array
+
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 

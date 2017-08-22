@@ -511,26 +511,67 @@ end subroutine cdate_2_idate
 
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-
+! 2017/01/09 [MOD] radix sort
 subroutine sort_int_1d(num_of_data, data)
   implicit none
   integer, intent(IN) :: num_of_data
-  integer, intent(INOUT) :: data(:)
-  
-  integer :: temp_data
-  integer :: i,j
+  integer, intent(INOUT) :: data(num_of_data)
+  integer :: sindex(num_of_data)
+  integer :: digit
+  integer :: i
 
-  do i = num_of_data, 1, -1
-    do j = 1, i-1
-      if (data(j) > data(j+1)) then
-        temp_data = data(j+1)
-        data(j+1) = data(j)
-        data(j)   = temp_data
-      end if
-    end do
+  digit = int(log10(float(maxval(data)))) + 1
+
+  do i = 1, digit
+    call radix_sort(i, num_of_data, data, sindex)
+    data(:) = sindex(:)
   end do
 
 end subroutine sort_int_1d
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! 2017/01/09 [NEW]
+subroutine radix_sort(fig, num_of_data, num1, num2)
+  implicit none
+  integer, intent(IN) :: fig
+  integer, intent(IN) :: num_of_data
+  integer, intent(IN) :: num1(:)
+  integer, intent(INOUT) :: num2(:)
+  integer :: num_of_radix(0:9) ! 0, 9
+  integer :: offset(0:9)
+  integer :: radix_counter(0:9)
+  integer :: sl ! size of leaves
+  integer :: mod_rad
+  integer :: spos
+  integer :: i
+
+  sl = num_of_data
+
+  num_of_radix(:) = 0
+
+  do i = 1, sl
+    mod_rad = int(mod(num1(i),10*(10**(fig-1)))/(10**(fig-1)))
+
+    num_of_radix(mod_rad) = num_of_radix(mod_rad) + 1
+
+  end do
+
+  offset(0) = 0
+  do i = 1, 9
+    offset(i) = offset(i-1) + num_of_radix(i-1)
+  end do
+
+  radix_counter(:) = 0
+
+  do i = 1, sl
+    mod_rad = int(mod(num1(i),10*(10**(fig-1)))/(10**(fig-1)))
+    radix_counter(mod_rad) = radix_counter(mod_rad) + 1
+    spos = offset(mod_rad) + radix_counter(mod_rad)
+    num2(spos) = num1(i)
+
+  end do
+
+end subroutine radix_sort
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 

@@ -51,7 +51,6 @@ module jcup_data
 
 
   type varp_type
-!!$    private
     type(varp_type), pointer :: next_ptr
     character(len=NAME_LEN) :: name
     integer :: grid_index
@@ -66,7 +65,6 @@ module jcup_data
   type(varp_type), pointer :: current_sd_ptr
 
   type varg_type
-!!$    private
     type(varg_type), pointer :: next_ptr
     character(len=NAME_LEN) :: name
     character(len=3) :: recv_mode ! "SNP" or "AVR"

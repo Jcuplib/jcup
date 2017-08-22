@@ -210,7 +210,7 @@ subroutine init_conf(num_of_model)
   allocate(mdc(num_of_model))
 
   do m = 1, num_of_model
-    mdc(m)%model_name = get_component_name(m)
+    mdc(m)%model_name = trim(get_component_name(m))
     mdc(m)%model_id   = m
     nullify(mdc(m)%sd)
     nullify(mdc(m)%rd)
@@ -720,20 +720,50 @@ subroutine cal_exchange_interval
 end subroutine cal_exchange_interval
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-
+! 2015/06/18 [MOD]
+! 2015/07/03 [MOD]
+! 2015/11/24 [MOD]
 subroutine set_model_exchange_type()
   use jcup_constant, only : CONCURRENT_SEND_RECV, ADVANCE_SEND_RECV, BEHIND_SEND_RECV, IMMEDIATE_SEND_RECV, NO_SEND_RECV
   use jcup_utils, only : error
   implicit none
   integer :: send_model_id
   integer :: ii, i, j
+  logical :: is_immediate_all = .true.
+  integer, allocatable :: exchange_counter(:,:), immediate_counter(:,:)
 
   allocate(comp_exchange_type(size(mdc), size(mdc))) ! (my_component_id, target_component_id)
-  comp_exchange_type(:,:) = NO_SEND_RECV
+  comp_exchange_type(:,:) = -1 !NO_SEND_RECV ! 2015/06/19 [MOD]
+
+  allocate(exchange_counter(size(mdc), size(mdc)))
+  allocate(immediate_counter(size(mdc), size(mdc)))
+
+  exchange_counter(:, :)  = 0
+  immediate_counter(:, :) = 0
 
   do ii = 1, size(mdc)
     do i = 1, mdc(ii)%num_of_recv_data
-      if (.not.mdc(ii)%rd(i)%is_recv) cycle
+      exchange_counter(ii, mdc(ii)%rd(i)%send_model_id) = exchange_counter(ii, mdc(ii)%rd(i)%send_model_id) + 1
+      if (mdc(ii)%rd(i)%time_lag == 0) then ! immediate_send_recv
+         immediate_counter(ii, mdc(ii)%rd(i)%send_model_id) = immediate_counter(ii, mdc(ii)%rd(i)%send_model_id) + 1
+      end if
+    end do
+  end do
+
+  do ii = 1, size(mdc)
+    do i = 1, size(mdc)
+      if (exchange_counter(ii, i) /= 0) then
+        if (exchange_counter(ii, i) == immediate_counter(ii, i)) then
+           comp_exchange_type(ii, i) = IMMEDIATE_SEND_RECV ! set immadiate_send_recv when all recv data is immediate
+        end if
+      end if
+    end do
+  end do
+ 
+  do ii = 1, size(mdc)
+
+    do i = 1, mdc(ii)%num_of_recv_data
+      !!!!if (.not.mdc(ii)%rd(i)%is_recv) cycle ! 2015/06/18 comment out
       select case(mdc(ii)%rd(i)%time_lag)
       case(1)
         comp_exchange_type(ii, mdc(ii)%rd(i)%send_model_id) = BEHIND_SEND_RECV ! set 1
@@ -741,7 +771,7 @@ subroutine set_model_exchange_type()
         comp_exchange_type(ii, mdc(ii)%rd(i)%send_model_id) = CONCURRENT_SEND_RECV
         send_model_id = mdc(ii)%rd(i)%send_model_id
         do j = 1, mdc(send_model_id)%num_of_recv_data
-          if (.not.mdc(send_model_id)%rd(j)%is_recv) cycle
+          !!!!if (.not.mdc(send_model_id)%rd(j)%is_recv) cycle ! 2015/06/18 comment out
           if (mdc(send_model_id)%rd(j)%send_model_id == ii) then
             if (mdc(send_model_id)%rd(j)%time_lag == 1) then
               comp_exchange_type(ii, send_model_id) = ADVANCE_SEND_RECV ! set -1
@@ -750,16 +780,18 @@ subroutine set_model_exchange_type()
           end if
         end do
       case(0)
-        comp_exchange_type(ii,mdc(ii)%rd(i)%send_model_id) = IMMEDIATE_SEND_RECV
+        !!!comp_exchange_type(ii,mdc(ii)%rd(i)%send_model_id) = IMMEDIATE_SEND_RECV ! 2015/07/03 comment out
       case default
         call error("set_model_exchange_type", "time_lag setting error")
       end select
     end do
+
+
   end do
 
   do i = 1, size(mdc)
     do j = 1, size(mdc)
-      if (comp_exchange_type(i,j) ==NO_SEND_RECV) then
+      if (comp_exchange_type(i,j) == -1) then ! 2015/11/24 [MOD] !!  NO_SEND_RECV) then
         if (comp_exchange_type(j,i) == CONCURRENT_SEND_RECV) then
           comp_exchange_type(i,j) = CONCURRENT_SEND_RECV
         end if
@@ -769,6 +801,9 @@ subroutine set_model_exchange_type()
       end if
     end do
   end do
+
+  deallocate(exchange_counter)
+  deallocate(immediate_counter)
 
 end subroutine set_model_exchange_type
 
@@ -1989,6 +2024,7 @@ subroutine check_configuration(my_conf)
   !!!!use jcup_mpi_lib, only : jml_isLocalLeader
   use jcup_utils, only : error, IntToStr
   use jcup_comp, only : get_num_of_total_component
+  use jcup_constant, only : IMMEDIATE_SEND_RECV
   implicit none
   type(model_data_conf_type), intent(IN) :: my_conf
   integer :: i, j, k
@@ -2059,7 +2095,7 @@ subroutine check_configuration(my_conf)
       k = my_conf%rd(i)%send_model_id
       if (min_lag(k) /= max_lag(k)) then
         if ((min_lag(k) /= 888).and.(max_lag(k) /= -888)) then
-          call error("check_configuration","recv data time lag error, data name: "//trim(my_conf%rd(i)%name) &
+          Call error("check_configuration","recv data time lag error, data name: "//trim(my_conf%rd(i)%name) &
                      //"min lag = "//trim(IntToStr(min_lag(k)))//", max lag = "//trim(IntToStr(max_lag(k))))
         end if
       end if

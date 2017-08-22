@@ -1,264 +1,197 @@
-!
-!Copyright (c) 2011, arakawa@rist.jp
-!All rights reserved.
-!
+!====================================================================================================
+!> @brief
+!> jcup data exchange module
+
 module jcup_exchange
-  use jcup_constant, only : NUM_OF_EXCHANGE_DATA, NUM_OF_EXCHANGE_GRID, REAL_DATA, DOUBLE_DATA
-  use jcup_constant, only : DATA_2D, DATA_25D, DATA_3D
-  use jcup_constant, only : NAME_LEN
-  use jcup_config, only : recv_data_conf_type
-  use jcup_task, only : task_type
-  use jcup_time, only : time_type
-  implicit none
   private
 
 !--------------------------------   public  ----------------------------------!
 
-  public :: init_exchange_buffer ! subroutine (NONE)
-  public :: set_exchange_table   ! subroutine (NONE)
-  public :: get_num_of_send_data ! integer function (task_id)
-  public :: get_send_data_id     ! integer function (task_id, data_num)
-  public :: get_data_ptr_send    ! type(recv_data_conf_type) function(task_id, data_num)
-  public :: get_num_of_recv_data ! integer function (task_id)
-  public :: get_recv_data_id     ! integer function (task_id, data_num)
-  public :: get_data_ptr_recv    ! type(recv_data_conf_type) function(task_id, data_num)
+  public :: send_data_scalar ! subroutine (varp, data)
+  public :: recv_data_scalar ! subrouitne (varg, data)
+  public :: write_all_scalar_data ! subroutine(fid, comp_id)
+  public :: recv_all_scalar_data ! subroutine()
 
 !--------------------------------   private  ---------------------------------!
-
-  type source_task_type
-    integer :: task_id
-    integer :: num_of_data
-    integer, pointer :: recv_data_id(:)
-    type(recv_data_conf_type), pointer :: recv_data_ptr(:)
-  end type
-
-  type dest_task_type
-    integer :: task_id
-    integer :: num_of_data
-    integer, pointer :: send_data_id(:)
-    type(recv_data_conf_type), pointer :: recv_data_ptr(:)
-  end type
-
-  type exchange_table_type
-    type(source_task_type), pointer :: st(:) ! source task data
-    type(dest_task_type)  , pointer :: dt(:) ! destination task data  
-  end type
-
-  type(exchange_table_type) :: et ! exchange control table
-
-
-  real(kind=4), pointer, private :: buffer_real2d(:,:,:)
-  real(kind=8), pointer, private :: buffer_double2d(:,:,:) ! nx, ny, num_of_exchange_data
-  real(kind=8), pointer, private :: buffer_double25d(:,:,:) ! nx, ny, num_of_2d_array
-  real(kind=8), pointer, private :: buffer_double3d(:,:,:,:) ! nx, ny, nz, num_of_exchange_data
-
 
 contains
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-
-subroutine init_exchanger()
-
-end subroutine init_exchanger
-
-!=======+=========+=========+=========+=========+=========+=========+=========+
-
-subroutine set_exchange_table()
-  use jcup_task, only : get_num_of_task, get_my_task_id, get_num_of_component, &
-                        get_component_id, is_my_component, get_task_num_from_id
-  use jcup_config, only : recv_data_conf_type, get_recv_data_conf_ptr_from_id, &
-                          send_data_conf_type, get_send_data_conf_ptr_from_id, &
-                          get_num_of_send_data, get_num_of_recv_data
-  use jcup_mpi, only : jml_GetMyrankGlobal
+!> @breaf
+!> send scalar data 
+!> @param[in] data_name name of data
+!> @param[in] data 
+! 2015/04/01 [NEW]
+! 2015/05/18 [MOD] add call jml_ReduceMeanLocal
+! 2015/06/22 [MOD] jml_ReduceMeanLocal -> jml_ReduceSumLocal
+subroutine send_data_scalar(varp, data)
+  use jcup_constant, only : NAME_LEN
+  use jcup_data, only : varp_type, get_data_name
+  use jcup_config, only : send_data_conf_type, get_send_data_conf_ptr
+  use jcup_mpi_lib, only : jml_SendLeader, jml_isLocalLeader, jml_ReduceSumLocal
+  use jcup_time, only : is_exchange_step
+  use jcup_utils, only : put_log
   implicit none
-  integer :: i, j, k, r
-  integer :: counter
-  integer, allocatable :: recv_counter(:)
-  integer :: task_id, comp_id
-  
-  type(recv_data_conf_type), pointer :: rd
+  type(varp_type), pointer :: varp
+  real(kind=8), intent(IN) :: data
   type(send_data_conf_type), pointer :: sd
+  character(len=NAME_LEN) :: data_name
+  real(kind=8) :: data_array(1)
+  integer :: dest
+  integer :: tag
+  integer :: i
 
-  allocate(et%st(get_num_of_task()), et%dt(get_num_of_task()))
+  data_name = get_data_name(varp)
 
-  do i = 1, get_num_of_task()
-    et%st(i)%task_id = i
-    et%dt(i)%task_id = i
-  end do
+  sd => get_send_data_conf_ptr(DATA_NAME = data_name)
 
-  do i = 1, get_num_of_task()
-    if (i == get_my_task_id()) cycle
+  !!!!!!if (.not.jml_isLocalLeader(sd%model_id)) return ! 2015/06/17
 
-    ! count the number of my send data
-    counter = 0
-    do j = 1, get_num_of_component(i)
-      comp_id = get_component_id(i,j)
-      do k = 1, get_num_of_recv_data(comp_id)
-        rd => get_recv_data_conf_ptr_from_id(comp_id, k)
-        if (is_my_component(rd%send_model_id)) then
-          counter = counter+1
-        end if 
-      end do
-    end do
+  data_array(1) = data
+  !data_buffer(1) = data
+  do i = 1, sd%num_of_my_recv_data  
+    if (.not.is_exchange_step(sd%model_id, 1, sd%my_recv_conf(i)%interval)) then
+      !write(0,*) "send_data_scalar skipped ", sd%my_recv_conf(i)%interval
+      cycle
+    end if
    
-    et%dt(i)%num_of_data = counter
-    allocate(et%dt(i)%send_data_id(counter))
+    !call jml_ReduceMeanLocal(sd%model_id , data, data_array(1)) ! cal. mean value
+    call jml_ReduceSumLocal(sd%model_id , data, data_array(1)) ! cal. sum value 2015/06/22 [MOD]
 
-    ! set my send data id
-    counter = 0
-    do j = 1, get_num_of_component(i)
-      comp_id = get_component_id(i,j)
-      do k = 1, get_num_of_recv_data(comp_id)
-        rd => get_recv_data_conf_ptr_from_id(comp_id, k)
-        if (is_my_component(rd%send_model_id)) then
-          counter = counter+1
-          et%dt(i)%send_data_id(counter) = rd%data_id
-          et%dt(i)%recv_data_ptr(counter) = rd
-        end if 
-      end do
-    end do
-
-  end do
-  
-  ! count the number of my recv data
-  allocate(recv_counter(get_num_of_task()))
-
-  i =  get_my_task_id()
-
-  recv_counter(:) = 0
-  do j = 1, get_num_of_component(i)
-    comp_id = get_component_id(i,j)    
-    do k = 1, get_num_of_recv_data(comp_id)
-      rd => get_recv_data_conf_ptr_from_id(comp_id, k)
-      task_id = get_task_num_from_id(rd%send_model_id)
-      recv_counter(task_id) = recv_counter(task_id)+1
-    end do
-  end do
-  
-  do i = 1, get_num_of_task()
-    et%st(i)%num_of_data = recv_counter(i)
-    allocate(et%st(i)%recv_data_id(recv_counter(i)))
-    allocate(et%st(i)%recv_data_ptr(recv_counter(i)))
+    dest = sd%my_recv_conf(i)%model_id - 1
+    tag  = sd%my_recv_conf(i)%data_id
+    call put_log("-------------------------------------------------------------------------------")
+    call put_log("send gmean data, data name = "//trim(data_name))
+    call jml_SendLeader(data_array, 1, 1, dest, tag)
   end do
 
-  i =  get_my_task_id()
-
-  recv_counter(:) = 0
-  do j = 1, get_num_of_component(i)
-    comp_id = get_component_id(i,j)    
-    do k = 1, get_num_of_recv_data(comp_id)
-      rd => get_recv_data_conf_ptr_from_id(comp_id, k)
-      task_id = get_task_num_from_id(rd%send_model_id)
-      recv_counter(task_id) = recv_counter(task_id)+1
-      et%st(task_id)%recv_data_id(recv_counter(task_id)) = rd%data_id
-      et%st(task_id)%recv_data_ptr(recv_counter(task_id)) = rd
-    end do
-  end do
-  
-  !call write_exchange_table(250+jml_GetMyrankGlobal())
-
-end subroutine set_exchange_table
+end subroutine send_data_scalar
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-
-subroutine write_exchange_table(file_id)
+!> @breaf
+!> send scalar data 
+!> @param[in] data_name name of data
+!> @param[in] data 
+! 2015/04/01 [NEW]
+subroutine recv_data_scalar(varg, data)
+  use jcup_constant, only : NAME_LEN, NO_DATA
+  use jcup_mpi_lib, only : jml_ProbeLeader, jml_RecvLeader
+  use jcup_data, only : varg_type, get_data_name
+  use jcup_config, only : recv_data_conf_type, get_recv_data_conf_ptr
+  use jcup_utils, only : put_log
   implicit none
-  integer, intent(IN) ::  file_id
+  type(varg_type), pointer :: varg
+  real(kind=8), intent(INOUT) :: data
+  character(len=NAME_LEN) :: data_name
+  real(kind=8) :: data_array(1)
+  type(recv_data_conf_type), pointer :: rd
+  integer :: source, tag
+
+  data_name = get_data_name(varg)
+  rd => get_recv_data_conf_ptr(DATA_NAME = data_name)
+
+  source = rd%send_model_id - 1
+  tag    = rd%data_id
+
+  if (jml_ProbeLeader(source, tag)) then
+    !write(0,*) "recv_data_scalar 1 ", source, tag
+    call put_log("-------------------------------------------------------------------------------")
+    call put_log("recv gmean data, data name = "//trim(data_name))
+    call jml_RecvLeader(data_array, 1, 1, source, tag)
+    !call jml_BcastLocal(rd%model_id, data_array, 1, 1)
+    data = data_array(1)
+  else
+    data = NO_DATA
+    !write(0,*) "recv_data_scalar 2 ", source, tag
+  end if
+
+end subroutine recv_data_scalar
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+!> @breaf
+!> write gmean data for restart
+! 2015/04/06 [NEW]
+subroutine write_all_scalar_data(fid, comp_id)
+  use jcup_utils, only : put_log, IntToStr
+  use jcup_constant, only : NAME_LEN
+  use jcup_comp, only : get_num_of_total_component, is_my_component, get_component_name
+  use jcup_config, only : recv_data_conf_type, get_num_of_recv_data, get_recv_data_conf_ptr_from_id
+  use jcup_mpi_lib, only : jml_GetLeaderRank, jml_ProbeLeader, jml_RecvLeader
+  implicit none
+  integer, intent(IN) :: fid
+  integer, intent(IN) :: comp_id
+  type(recv_data_conf_type), pointer :: rd
+  real(kind=8) :: data_array(1)
+  character(len=NAME_LEN) :: comp_name
+  integer :: source, tag
+  integer :: j
+
+    do j = 1, get_num_of_recv_data(comp_id)
+       rd => get_recv_data_conf_ptr_from_id(comp_id, j)
+       source = rd%send_model_id - 1
+       tag    = rd%data_id
+       if (jml_ProbeLeader(source, tag)) then
+         call jml_RecvLeader(data_array, 1, 1, source, tag)
+         comp_name = trim(get_component_name(rd%send_model_id))
+         write(fid, *) comp_name
+         write(fid, *) tag
+         write(fid, *) data_array(1)
+         call put_log("write restart gmean data to "//trim(comp_name)//", data tag = "//trim(IntToStr(tag)))
+       end if
+    end do  
+
+
+end subroutine write_all_scalar_data
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+!> @breaf
+!> clean up remained data
+! 2015/04/03 [NEW]
+! 2015/06/17 [MOD]
+subroutine recv_all_scalar_data()
+  use jcup_comp, only : get_num_of_total_component, is_my_component
+  use jcup_config, only : recv_data_conf_type, get_num_of_recv_data, get_recv_data_conf_ptr_from_id
+  use jcup_mpi_lib, only : jml_GetLeaderRank, jml_ProbeLeader, jml_RecvLeader, &
+                           jml_ProbeAll, jml_RecvAll
+  use mpi
+  implicit none
+  type(recv_data_conf_type), pointer :: rd
+  real(kind=8) :: data_array(1)
+  integer :: source, tag
+  logical :: recv_flag
   integer :: i, j
 
-  write(file_id,*) "send data id"
-  do i = 1, size(et%dt)
-    write(file_id,*) "task id = ",i
-    do j = 1, size(et%dt(i)%send_data_id)
-      write(file_id, *) "data id = ", et%dt(i)%send_data_id(j)
-    end do
+  do i = 1, get_num_of_total_component()
+    if (.not.is_my_component(i)) cycle
+    do j = 1, get_num_of_recv_data(i)
+         rd => get_recv_data_conf_ptr_from_id(i, j)
+         source = rd%send_model_id - 1
+         do  while(jml_ProbeAll(source))
+             call jml_RecvAll(source) !Leader(data_array, 1, 1, source, MPI_ANY_TAG)
+         end do
+    end do  
   end do
 
-  write(file_id, *) "recv data id"
-  do i = 1, size(et%st)
-    write(file_id, *) "task id = ", i
-    do j = 1, size(et%st(i)%recv_data_id)
-      write(file_id, *) "data id = ", et%st(i)%recv_data_id(j)
-    end do
-  end do
+  !do i = 1, get_num_of_total_component()
+  !  if (.not.is_my_component(i)) cycle
+  !  write(0, *) "recv_all_scalar_data of component loop ", i
+  !  do 
+  !    recv_flag = .false.
+  !    do j = 1, get_num_of_recv_data(i)
+  !       rd => get_recv_data_conf_ptr_from_id(i, j)
+  !       source = rd%send_model_id - 1
+  !       tag    = rd%data_id
+  !      write(0,*) "recv_all_scalar_data ", i, j, source, tag
+  !       if (jml_ProbeLeader(source, tag)) then
+  !         write(0,*) "recv_all_scalar_data recv leader ", data_array(1)
+  !         call jml_RecvLeader(data_array, 1, 1, source, tag)
+  !         recv_flag = .true.
+  !       end if
+  !    end do  
+  !    if (.not.recv_flag) exit
+  !  end do
+  !end do
 
-
-  
-end subroutine write_exchange_table
-
-!=======+=========+=========+=========+=========+=========+=========+=========+
-
-integer function get_num_of_send_data(task_id)
-  implicit none
-  integer, intent(IN) :: task_id
-
-  get_num_of_send_data = et%dt(task_id)%num_of_data
-
-end function get_num_of_send_data
-
-!=======+=========+=========+=========+=========+=========+=========+=========+
-
-integer function get_send_data_id(task_id, data_num)
-  implicit none
-  integer, intent(IN) :: task_id, data_num
-
-  get_send_data_id = et%dt(task_id)%send_data_id(data_num)
-
-end function get_send_data_id
-
-!=======+=========+=========+=========+=========+=========+=========+=========+
-
-function get_data_ptr_send(task_id, data_num) result(data_ptr)
-  implicit none
-  integer, intent(IN) :: task_id, data_num
-  type(recv_data_conf_type), pointer :: data_ptr
-
-  data_ptr = et%dt(task_id)%recv_data_ptr(data_num)
-
-end function get_data_ptr_send
-
-!=======+=========+=========+=========+=========+=========+=========+=========+
-
-integer function get_num_of_recv_data(task_id)
-  implicit none
-  integer, intent(IN) :: task_id
-
-  get_num_of_recv_data = et%st(task_id)%num_of_data
-
-end function get_num_of_recv_data
-
-!=======+=========+=========+=========+=========+=========+=========+=========+
-
-integer function get_recv_data_id(task_id, data_num)
-  implicit none
-  integer, intent(IN) :: task_id, data_num
-
-  get_recv_data_id = et%st(task_id)%recv_data_id(data_num)
-
-end function get_recv_data_id
-
-!=======+=========+=========+=========+=========+=========+=========+=========+
-
-function get_data_ptr_recv(task_id, data_num) result(data_ptr)
-  implicit none
-  integer, intent(IN) :: task_id, data_num
-  type(recv_data_conf_type), pointer :: data_ptr
-
-  data_ptr = et%st(task_id)%recv_data_ptr(data_num)
-
-end function get_data_ptr_recv
-
-!=======+=========+=========+=========+=========+=========+=========+=========+
-
-subroutine init_exchange_buffer(max_i_2d, max_j_2d, max_i_3d, max_j_3d, max_k_3d)
-  implicit none
-  integer, intent(IN) :: max_i_2d, max_j_2d, max_i_3d, max_j_3d, max_k_3d
-  allocate(buffer_real2d(max_i_2d, max_j_2d, NUM_OF_EXCHANGE_DATA))
-  allocate(buffer_double2d(max_i_2d, max_j_2d, NUM_OF_EXCHANGE_DATA))
-  allocate(buffer_double3d(max_i_3d, max_j_3d, max_k_3d, NUM_OF_EXCHANGE_DATA))
-
-end subroutine init_exchange_buffer
-
-!=======+=========+=========+=========+=========+=========+=========+=========+
+end subroutine recv_all_scalar_data
 
 end module jcup_exchange

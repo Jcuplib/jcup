@@ -6,7 +6,9 @@ module jcup_io_base
   public :: jcup_init_io ! subroutine ()
   public :: jcup_io_create_type ! subroutine (comp_id, grid_id, grid_index)
   public :: jcup_write_restart_base ! subroutine (file_id, component_id, end_time)
+  public :: jcup_write_restart_gmean ! subroutine (file_id, component_id, end_time)
   public :: jcup_read_restart_base ! subroutine (file_id, component_id, end_time)
+  public :: jcup_read_restart_gmean ! subroutine (file_id, component_id, end_time)
 
 ! --------------- AGCM variables ---------------
 
@@ -153,20 +155,23 @@ end subroutine search_file_type
 !*=======+=========+=========+=========+=========+=========+=========+=========+
 ! 2014/07/15 [MOD] end_time(6) -> end_time(:)
 ! 2014/11/04 [MOD] integer :: time_array -> integer(kind=8) :: time_array
+! 2015/04/06 [MOD] jml_isLocalLeader
+! 2015/04/06 [MOD] call set_master_file_name
 subroutine jcup_write_restart_base(fid, comp_id, end_time)
+  use jcup_mpi_lib, only : jml_isLocalLeader
   use jcup_constant, only : STRING_LEN
   use jcup_buffer, only : get_num_of_time, get_send_buffer_ptr
   use jcup_time_buffer, only : time_buffer, get_start_data_ptr, get_next_time_ptr => get_next_ptr
   use jcup_data_buffer, only : data_buffer, get_next_data_ptr => get_next_ptr, write_data_buffer
   use jcup_comp, only : get_component_name
   use jcup_utils, only : error
-  use jcup_time, only : write_time, get_time_unit, TU_SEC, TU_MIL, TU_MCR
+  use jcup_time, only : write_time
   use jcup_config, only : get_send_data_conf_ptr, send_data_conf_type, set_current_conf
   implicit none
   integer, intent(IN) :: fid ! file id
   integer, intent(IN) :: comp_id ! component id
   integer, intent(IN) :: end_time(:) ! integration end time
-  character(len=STRING_LEN) :: mastar_file_name
+  character(len=STRING_LEN) :: master_file_name
   logical :: is_opened
   type(time_buffer), pointer :: tb
   type(data_buffer), pointer :: db
@@ -180,27 +185,20 @@ subroutine jcup_write_restart_base(fid, comp_id, end_time)
   integer :: file_handler
   integer :: str_index
 
-  select case(get_time_unit())
-  case (TU_SEC)
-    write(mastar_file_name, '(A,".restart.mst.",I4.4,5I2.2,".dat")') trim(get_component_name(comp_id)), &
-         end_time(1), end_time(2), end_time(3), end_time(4), end_time(5), end_time(6)
-  case (TU_MIL)
-    write(mastar_file_name, '(A,".restart.mst.",I4.4,5I2.2,I3.3,".dat")') trim(get_component_name(comp_id)), &
-         end_time(1), end_time(2), end_time(3), end_time(4), end_time(5), end_time(6), end_time(7)
-  case (TU_MCR)
-    write(mastar_file_name, '(A,".restart.mst.",I4.4,5I2.2,2I3.3,".dat")') trim(get_component_name(comp_id)), &
-         end_time(1), end_time(2), end_time(3), end_time(4), end_time(5), end_time(6), end_time(7), end_time(8)
-  case default
-    call error("jcup_write_restart_base", "time unit parameter error")
-  end select
+  if (jml_isLocalLeader(comp_id)) then
 
-  inquire(fid, opened = is_opened)
-  if (is_opened) close(fid)
+    call set_master_file_name(comp_id, end_time, "mst", master_file_name)
 
-  open(fid, file=trim(mastar_file_name),form = 'formatted', &
-         access = 'sequential', action = 'write', err = 200)
+    inquire(fid, opened = is_opened)
+    if (is_opened) close(fid)
 
-  call write_time(fid, comp_id)
+    open(fid, file=trim(master_file_name),form = 'formatted', &
+           access = 'sequential', action = 'write', err = 200)
+
+    call write_time(fid, comp_id)
+
+  end if
+
 
   tb => get_send_buffer_ptr()
 
@@ -243,11 +241,12 @@ subroutine jcup_write_restart_base(fid, comp_id, end_time)
   end do
 
 
-  close(fid)
+  if (jml_isLocalLeader(comp_id)) close(fid)
+
 
   return
 
-200 call error('jcup_write_restart_base','cannot create restart mastar file: '//trim(mastar_file_name))
+200 call error('jcup_write_restart_base','cannot create restart master file: '//trim(master_file_name))
   
 end subroutine jcup_write_restart_base
 
@@ -255,6 +254,7 @@ end subroutine jcup_write_restart_base
 ! 2014/07/14 [MOD] end_time(6) -> end_time(:), time_array(6) -> time_array(8)
 ! 2014/11/04 [MOD] integer :: time_array -> integer(kind=8) :: time_array
 ! 2014/11/05 [MOD] integer :: int_buffer(12) -> integer(kind=8) :: int_buffer(12)
+! 2015/04/06 [MOD] call set_master_file_name
 subroutine jcup_read_restart_base(fid, comp_id, end_time)
   use jcup_constant, only : NAME_LEN, STRING_LEN
   use jcup_buffer, only : get_num_of_time, get_send_buffer_ptr
@@ -267,7 +267,7 @@ subroutine jcup_read_restart_base(fid, comp_id, end_time)
   integer, intent(IN) :: fid ! file id
   integer, intent(IN) :: comp_id ! component id
   integer, intent(IN) :: end_time(:) ! integration end time ! 2014/07/14 [MOD]
-  character(len=STRING_LEN) :: mastar_file_name
+  character(len=STRING_LEN) :: master_file_name
   logical :: is_opened
   integer :: num_of_time
   integer(kind=8) :: time_array(8) ! 2014/07/14 [MOD] time_array(6) -> time_array(8)
@@ -280,30 +280,16 @@ subroutine jcup_read_restart_base(fid, comp_id, end_time)
   type(time_type) :: data_time
 
   if (jml_isLocalLeader(comp_id)) then
-    select case(get_time_unit())
-    case(TU_SEC)
-      if (size(end_time) < 6) call error("jcup_read_restart_base", "array size of end time < 6")
-      write(mastar_file_name, '(A,".restart.mst.",I4.4,5I2.2,".dat")') trim(get_component_name(comp_id)), &
-           end_time(1), end_time(2), end_time(3), end_time(4), end_time(5), end_time(6)
-    case(TU_MIL)
-      if (size(end_time) < 7) call error("jcup_read_restart_base", "array size of end time < 7")
-      write(mastar_file_name, '(A,".restart.mst.",I4.4,5I2.2,I3.3,".dat")') trim(get_component_name(comp_id)), &
-           end_time(1), end_time(2), end_time(3), end_time(4), end_time(5), end_time(6), end_time(7)
-    case(TU_MCR)
-      if (size(end_time) < 8) call error("jcup_read_restart_base", "array size of end time < 8")
-      write(mastar_file_name, '(A,".restart.mst.",I4.4,5I2.2,2I3.3,".dat")') trim(get_component_name(comp_id)), &
-           end_time(1), end_time(2), end_time(3), end_time(4), end_time(5), end_time(6), end_time(7), end_time(8)
-    case default
-      call error("jcup_read_restart_base", "time unit parameter error")
-    end select
+
+    call set_master_file_name(comp_id, end_time, "mst", master_file_name)
 
     inquire(fid, opened = is_opened)
     if (is_opened) close(fid)
 
-    open(fid, file=trim(mastar_file_name),form = 'formatted', &
+    open(fid, file=trim(master_file_name),form = 'formatted', &
            access = 'sequential', action = 'read', err = 200)
 
-    !write(0,*) "jcup_read_restart_base 1 ", mastar_file_name
+    !write(0,*) "jcup_read_restart_base 1 ", master_file_name
     call read_time(fid, comp_id)
     !write(0,*) "jcup_read_restart_base 2 ", comp_id
 
@@ -375,9 +361,10 @@ subroutine jcup_read_restart_base(fid, comp_id, end_time)
 
   return
 
-200 call error('jcup_read_restart_base','cannot open restart mastar file: '//trim(mastar_file_name))
+200 call error('jcup_read_restart_base','cannot open restart master file: '//trim(master_file_name))
   
 end subroutine jcup_read_restart_base
+
 
 !*=======+=========+=========+=========+=========+=========+=========+=========
 ! 2014/07/14 [MOD] data_time(6) -> data_time(8) 
@@ -589,7 +576,155 @@ subroutine jcup_io_read_data(file_handler, data)
 
 end subroutine jcup_io_read_data
 
+!*=======+=========+=========+=========+=========+=========+=========+=========
+! 2015/04/06 [NEW]
+! 2015/04/14 [MOD] add is_barrier_finish 
+subroutine jcup_write_restart_gmean(fid, comp_id, end_time)
+  use jcup_mpi_lib, only : jml_isLocalLeader, jml_BarrierLeader
+  use jcup_constant, only : STRING_LEN
+  use jcup_comp, only : get_component_name, get_num_of_total_component
+  use jcup_utils, only : error
+  use jcup_time, only : get_time_unit, TU_SEC, TU_MIL, TU_MCR
+  use jcup_exchange, only : write_all_scalar_data
+  implicit none
+  integer, intent(IN) :: fid ! file id
+  integer, intent(IN) :: comp_id ! component id
+  integer, intent(IN) :: end_time(:) ! integration end time
+  character(len=STRING_LEN) :: gmean_file_name
+  logical :: is_opened
+  logical, save :: is_barrier_finish = .false. ! 2015/04/14 [ADD]
+
+  integer :: i
+
+  do i = 1, get_num_of_total_component() ! 2015/04/14 [ADD]
+    if (jml_isLocalLeader(i)) then
+      if (.not.is_barrier_finish) then
+        call jml_BarrierLeader()
+        is_barrier_finish = .true.
+        exit
+      end if
+    end if
+  end do
+
+  if (.not.jml_isLocalLeader(comp_id)) return
+
+  call set_master_file_name(comp_id, end_time, "gmean", gmean_file_name)
+
+  inquire(fid, opened = is_opened)
+  if (is_opened) close(fid)
+
+  open(fid, file=trim(gmean_file_name),form = 'formatted', &
+         access = 'sequential', action = 'write', err = 200)
+
+  call write_all_scalar_data(fid, comp_id)
+
+  close(fid)
+
+  return
+
+200 call error('jcup_write_restart_gmean','cannot create restart gmean file: '//trim(gmean_file_name))
+
+end subroutine jcup_write_restart_gmean
+
+!*=======+=========+=========+=========+=========+=========+=========+=========
+! 2015/04/06 [NEW] 
+! 2015/11/24 [MOD] 200 continue
+subroutine jcup_read_restart_gmean(fid, comp_id, end_time)
+  use jcup_utils, only  : error, put_log, IntToStr
+  use jcup_constant, only : STRING_LEN, NAME_LEN
+  use jcup_mpi_lib, only : jml_isLocalLeader, jml_SendLeader
+  use jcup_comp, only : get_num_of_total_component, get_component_name
+  implicit none
+  integer, intent(IN) :: fid ! file id
+  integer, intent(IN) :: comp_id ! component id
+  integer, intent(IN) :: end_time(:) ! integration end time
+  character(len=STRING_LEN) :: gmean_file_name
+  character(len=NAME_LEN) :: source_comp_name
+  character(len=NAME_LEN) :: my_comp_name
+  integer :: tag
+  real(kind=8) :: gmean(1)
+  logical :: is_opened
+  integer :: i
+
+  if (.not.jml_isLocalLeader(comp_id)) return
+
+  my_comp_name = trim(get_component_name(comp_id))
+
+  !write(0,*) "read_restart_gmean ", trim(my_comp_name)
+
+  do i = 1, get_num_of_total_component() ! i is dest component id
+    if (i == comp_id) cycle
+
+    call set_master_file_name(i, end_time, "gmean", gmean_file_name)
+
+    inquire(fid, opened = is_opened)
+    if (is_opened) close(fid)
+
+    open(fid, file=trim(gmean_file_name),form = 'formatted', &
+           access = 'sequential', action = 'read', err = 200)
+
+    do 
+
+      read(fid, *, end = 100) source_comp_name
+      read(fid, *, end = 100) tag
+      read(fid, *, end = 100) gmean
+    
+      if (trim(source_comp_name) == trim(my_comp_name)) then ! if source component is my component
+        call put_log("send gmean data to "//trim(get_component_name(i))//", data tag = "//trim(IntToStr(tag)))
+        call jml_SendLeader(gmean, 1, 1, i-1, tag)  
+      end if
+
+    end do
+
+    100 continue
+
+    close(fid)
+ 
+  end do
+
+
+  return
+
+200 continue 
+    !call error('jcup_read_restart_gmean','cannot open restart gmean file: '//trim(gmean_file_name))
+  
+end subroutine jcup_read_restart_gmean
+
 !*=======+=========+=========+=========+=========+=========+=========+=========+
+! 2015/04/06 [NEW]
+! 2015/11/24 [MOD] add  if (end_time(1) < 0)
+subroutine set_master_file_name(comp_id, end_time, file_code, file_name)
+  use jcup_utils, only  : error
+  use jcup_time, only : get_time_unit, TU_SEC, TU_MIL, TU_MCR
+  use jcup_comp, only : get_component_name
+  implicit none
+  integer, intent(IN) :: comp_id
+  integer, intent(IN) :: end_time(:)
+  character(len=*), intent(IN) :: file_code
+  character(len=*), intent(OUT) :: file_name
+
+  if (end_time(1) < 0) then
+    write(file_name, '(A,".restart.",A,".dat")') trim(get_component_name(comp_id)), trim(file_code)
+    return
+  end if
+
+  select case(get_time_unit())
+  case (TU_SEC)
+    if (size(end_time) < 6) call error("set_master_file_name", "array size of end time < 6")
+    write(file_name, '(A,".restart.",A,".",I4.4,5I2.2,".dat")') trim(get_component_name(comp_id)), trim(file_code), &
+         end_time(1), end_time(2), end_time(3), end_time(4), end_time(5), end_time(6)
+  case (TU_MIL)
+    if (size(end_time) < 7) call error("set_master_file_name", "array size of end time < 7")
+    write(file_name, '(A,".restart.",A,".",I4.4,5I2.2,I3.3,".dat")') trim(get_component_name(comp_id)), trim(file_code), &
+         end_time(1), end_time(2), end_time(3), end_time(4), end_time(5), end_time(6), end_time(7)
+  case (TU_MCR)
+    if (size(end_time) < 8) call error("set_master_file_name", "array size of end time < 8")
+    write(file_name, '(A,".restart.",A,".",I4.4,5I2.2,2I3.3,".dat")') trim(get_component_name(comp_id)), trim(file_code), &
+         end_time(1), end_time(2), end_time(3), end_time(4), end_time(5), end_time(6), end_time(7), end_time(8)
+  case default
+    call error("set_master_file_name", "time unit parameter error")
+  end select
+end subroutine set_master_file_name
 
 end module jcup_io_base
 

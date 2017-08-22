@@ -702,36 +702,451 @@ Detail
  この不具合を解消するため、time_type内でyyyy, mo, dd, hh, mm = 0のように明示的に初期値を
  与えるようにした。
 
+-----------------------------------------------------------------
 
+Version:3.100000
+Date:2015/04/03
+File:jcup_interface.f90 jcup_exchange.f90 jcup_mpi_lib.f90
 
+Routines
+ jcup_put_data_1d_double  : mod
+ jcup_put_data_25d_double : mod
+ jcup_get_data_1d_double  : mod
+ jcup_get_data_25d_double : mod
+ jcup_coupling_end        : mod
+ jml_send_double_1d_leader : mod
+ jml_recv_double_1d_leader : mod
+ jml_ProbeLeader           : add
+ send_data_scalar          : add
+ recv_data_scalar          : add
+ recv_all_scalar_data      : add
+
+Detail
+ Jcupで配列データとは別にスカラ量を送受信するために、モジュールjcup_exchangeを作成、送受信サブルーチンを作成した。
+ このサブルーチンからコールされるjml_send_double_1d_leader,  jml_recv_double_1d_leaderを修正。またjml_ProbeLeaderを
+ 作成した。インターフェースサブルーチンjcup_put_data, jcup_get_dataを修正しスカラ値のPut, Getをできるようにした。
 
 -----------------------------------------------------------------
 
-Version:3.090002
+Version:3.100100
+Date:2015/04/06
+File:jcup_interface.f90 jcup_io_base.f90 jcup_exchange.f90 jcup_mpi_lib.f90
+
+Routines
+ jcup_write_restart  : mod
+ jcup_read_restart   : mod
+ jcup_write_restart_gmean : add
+ jcup_read_restart_gmean  : add
+ set_master_file_name     : add
+ write_all_scalar_data    : add
+ jml_BarrierLeader        : add
+
+Detail
+ Ver.3.100000で追加したスカラ量の送受信について、スカラ量のリスタートをサポートするようにした。そのため、jcup_io_base
+ にサブルーチンjcup_write_restart_gmean, jcup_read_restart_gmeanを追加し、さらに、jcup_exchangeにwrite_all_scalar_data
+ を追加した。また、スカラ量はリスタートファイル出力時にRecvしなければならず、コンポーネント間で同期が必要なため、
+ jcup_mpi_libにjml_BarrierLeaderを作成し、リスタート時にコールするようにした。
+
+-----------------------------------------------------------------
+
+Version:3.100101
+Date:2015/04/14
+File:jcup_io_base.f90
+
+Routines
+ jcup_write_restart_gmean : mod
+
+Detail
+ スカラ量のリスタート出力で、コンポーネントの組み合わせによってjml_BarrierLeaderのコールのタイミングが不適切になる
+ バグを修正。
+
+-----------------------------------------------------------------
+
+Version:3.100200
+Date:2015/04/14
+File:jcup_grid_base.f90
+
+Routines
+ get_grid_index : add
+
+Detail
+ 格子番号配列を返すサブルーチンを追加。
+
+-----------------------------------------------------------------
+
+Version:3.100300
+Date:2015/05/18
+File:jcup_mpi_lib.f90, jcup_exhcange.f90
+
+Routines
+ jml_reduce_sum_double_1d_local : add
+ jml_reduce_mean_double_1d_local : add
+ send_data_scalar : mod
+
+Detail
+ スカラ値の送信時に、各ノードの平均値を計算するよう修正。
+
+-----------------------------------------------------------------
+
+Version:3.100400
+Date:2015/06/04
+File:jcup_mpi_lib.f90
+
+Routines
+ jml_create_communicator : mod
+
+Detail
+ inter_communicatorの生成時に、自分自身同士のコミュニケータも生成するよう修正。この修正はScup互換性を保つため。Scupは同じ
+ コンポーネント同士のデータ交換を許容する。ただしこの修正だけで同じコンポーネント間のデータ交換ができるようになるかどうかは
+ 不明。
+
+-----------------------------------------------------------------
+
+Version:3.100401
+Date:2015/06/12
+File:jcup_time.f90
+
+Routines
+ type time_type : mod
+
+Detail
+ 年月日時分秒の初期化部分のバグ修正。
+
+-----------------------------------------------------------------
+
+Version:3.100500
 Date:2015/06/12
 File:jcup_data.f90
 
 Routines
- varg_type, varp_type : mod
- jcup_initialize(), jcup_init_time_int() : mod
- time_type : mod
+ type varp_type, varg_type : mod
 
 Detail
- varg_type, varp_type 内にprivate指定があるため、他のルーチンでメンバーの参照ができなくなっていた。
- gfortranではエラーが出るが、Intelコンパイラでエラーにならない理由は不明。
+ varp_type, varpg_typeのprivateを削除。
 
- jcup_initialize(), jcup_init_time_int()でset_time_data()をcallする際の最後の引数はinteger(8)でなければならないので、kind()関数を使ってcastするように修正。
+-----------------------------------------------------------------
 
- time_typeの宣言において、yyyy,mo,dd,hhの初期化ミス。
- 
+Version:3.100501
+Date:2015/06/17
+File:jcup_exchange.f90
+
+Routines
+ send_data_scalar : mod
+
+Detail
+ if (.not.jml_isLocalLeader(sd%model_id)) returnをコメントアウト。Scalarデータはlocal meanを計算しなければならないため、
+ local leaderでなければreturnするのは不適切。
 
 
+-----------------------------------------------------------------
 
+Version:3.100502
+Date:2015/06/17
+File:jcup_mpi_lib.f90, jcup_exchange.f90
 
+Routines
+ jml_ProbeAll : new
+ jml_RecvAll  : new
+ recv_all_scalar_data : mod
 
+Detail
+ プログラム終了時にMPIバッファにデータが残っていたらMPI_Finalizeでハングする。この問題はgmeanデータの送受信で発生する。
+ recv_all_scalar_dataを修正し、特定のタグではなくMPI_ANY_TAGでプローブし、受信するようにした。
 
+-----------------------------------------------------------------
 
+Version:3.100503
+Date:2015/06/18
+File:jcup_config.f90
 
+Routines
+ set_model_exchange_type : mod
+
+Detail
+ 同一バイナリでのシリアル通信時に、片側のみの送受信の場合データ受信がスキップされる。この問題はjcup_exchange_data_serial内で、
+ before_comp_idに関わる判定に起因する。両側送受信ではこの問題は発生しないため、set_model_exchange_typeを修正し、送受信データが
+ 存在しない場合でもmodel_exchange_typeに意味のある値を代入するようにした。この修正により、送受信データがない場合でも
+ jcup_exchange_data_serialがコールされ、その結果before_comp_idに関わる判定も想定した動作をするようになった。
+
+-----------------------------------------------------------------
+
+Version:3.100504
+Date:2015/07/03
+File:jcup_config.f90
+
+Routines
+ set_model_exchange_type : mod
+
+Detail
+ コンポーネント間でのデータ交換タイムラグの設定で、受信データの最後のデータのラグをコンポーネントのラグとするようにしていた。
+ この場合、最後のデータがimmediateかつ他のデータが別のラグだった場合、動作がおかしくなる。そこで、全受信データのラグが０
+ の場合のみimmediateとするようにした。
+
+-----------------------------------------------------------------
+
+Version:3.100600
+Date:2015/07/15
+File:jcup_interface.f90
+
+Routines
+ jcup_get_data_25d_double      : mod
+ jcup_put_send_data_25d_double : new
+ jcup_get_data_25d_double      : mod
+ jcup_recv_get_data_25d_double : new
+
+Detail
+ 2.5次元データの逐次送受信を実装していなかったので実装した。
+
+-----------------------------------------------------------------
+
+Version:3.100601
+Date:2015/08/19
+File:jcup_interface.f90
+
+Routines
+ jcup_initialize               : mod
+ jcup_init_time_int            : mod
+
+Detail
+ set_time_dataの第７引数がinteger(kind=8)を要求しているのに対し、整数(0や-1)を与えると
+ コンパイラによってはコンパイルエラーになる。これを回避するためint(変数, kind=8)とする。
+
+-----------------------------------------------------------------
+
+Version:3.100602
+Date:2015/09/04
+File:jcup_interface.f90
+
+Routines
+ type(time_type), current_time : mod
+
+Detail
+ FXコンパイラでcurrent_timeの宣言はsave属性でなければならないとエラーになったのでsave
+ 属性を付加する。
+
+-----------------------------------------------------------------
+
+Version:3.110000
+Date:2015/11/24
+File:jcup_interface.f90, jcup_io_base
+
+Routines
+ set_master_file_name    : mod
+ jcup_write_restart      : mod
+ jcup_read_restart       : mod
+ jcup_read_restart_gmean : mod
+ jcup_coupling_end       : mod
+
+Detail
+ リスタート出入力サブルーチンには時刻を指定する引数time_arrayがあった。しかしJcup自体が
+ 現在時刻を必要としなくなり、また分野によっては現在時刻の概念そのものがないモデルも多い
+ ため、time_arrayをoptional引数とし、存在しない場合には-1をset_master_file_nameに渡すように
+ した。set_master_file_nameでは時刻が負の場合に、マスタファイル名に時刻情報を含めないようにした。
+ なお、データファイル名には今まで通り積分初期からの経過時刻（秒）が用いられる。
+ gmeanデータは存在しない場合があるので、読み込み時にファイルがなければエラーではなく黙って戻るようにした。
+ jcup_coupling_endの引数time_arrayも内部で使われていないため、optional引数にした。
+
+-----------------------------------------------------------------
+
+Version:3.110001
+Date:2015/11/24
+File:jcup_config.f90
+
+Routines
+ set_model_exchange_type  : mod
+
+Detail
+ 送信、受信がone wayのときに送受信モードの設定が-1となってしまい正しく送受信されないバグを修正。
+
+-----------------------------------------------------------------
+
+Version:3.110100
+Date:2015/12/24
+File:jcup_interface.f90
+
+Routines
+ jcup_put_value : mod
+ jcup_get_value : mod
+
+Detail
+ Fortran2003に対応していないコンパイラのために、コンパイルオプションでjcup_put_value, jcup_get_value
+ をコンパイルしないオプションを追加
+
+-----------------------------------------------------------------
+
+Version:3.110101
+Date:2016/02/10
+File:jcup_mpi_lib.f90
+
+Routines
+ jml_send_real_1d_leader : mod
+
+Detail
+ bufferがintegerで定義されていたのをreal(kind=4)に訂正。
+
+-----------------------------------------------------------------
+
+Version:3.110102
+Date:2016/03/02
+File:jcup_time.f90
+
+Routines
+ set_buffer : mod
+
+Detail
+ intent(OUT) :: buffer(:)をintent(INOUT) :: buffer(:)に修正
+
+-----------------------------------------------------------------
+
+Version:3.110103
+Date:2016/05/24
+File:jcup_time.f90
+
+Routines
+ is_leap_year : add
+ GetYearDate  : mod
+ GetMonthDate : mod
+
+Detail
+ 閏年の対応に不備(100で割り切れる年にも閏年になっていた）。関数is_leap_yearを作成し、バグを修正。
+
+-----------------------------------------------------------------
+
+Version:3.120000
+Date:2016/07/05
+File:jcup_mpi_lib.f90, jcup_interpolation_interface.f90, jcup_interface.f90
+
+Routines
+ jml_send_string_leader         : add
+ jml_recv_string_leader         : add
+ send_array_to_recv_model_str   : add
+ recv_array_from_send_model_str : add
+
+Detail
+ コンポーネント間で文字列の送受信を行うためのサブルーチン群を追加。
+
+-----------------------------------------------------------------
+
+Version:3.120100
+Date:2016/12/22
+File:jcup_grid_base.f90, jcup_interface.f90
+
+Routines
+ set_pe_num                     : add
+ set_pe_num_base                : add
+ set_global_mapping_table       : mod
+ jcup_set_mapping_table         : mod
+
+Detail
+ グローバルなPE番号の生成部分を格子情報の設定ルーチンからマッピングテーブル入力ルーチンに移動。
+
+-----------------------------------------------------------------
+
+Version:3.130000
+Date:2017/01/08
+File:jcup_grid.f90, jcup_interface.f90
+
+Routines
+ jcup_set_mapping_table_local   : add
+ set_grid_mapping_1d_local      : add
+
+Detail
+ あらかじめ領域分割されたローカルなマッピングテーブルを入力情報とし、内部ではローカルな処理のみ
+ を行うように、インターフェースを追加。
+
+-----------------------------------------------------------------
+
+Version:3.130100
+Date:2017/01/09
+File:jcup_utils.f90, jcup_grid.f90
+
+Routines
+ radix_sort                     : add
+ sort_int_1d                    : mod
+ cal_num_of_my_grid             : mod
+ set_my_local_grid_index        : mod
+ cal_and_set_my_local_grid_index: add
+ set_local_grid_mapping_1d      : mod
+
+Detail
+ local grid indexの計算でビン方を使っていたがメモリ喰いなのでjcup_utilsのソートルーチンをradix sort
+ に変更し、local grid indexの計算で配列のソートを使うようにした。更に、格子数の計算とインデックスの
+ 計算を一つにまとめて、ソーティング計算を１度で済むようにした。
+
+-----------------------------------------------------------------
+
+Version:3.130101
+Date:2017/01/10
+File:jcup_interpolation_interface.f90
+
+Routines
+ set_local_coef_base            : mod
+
+Detail
+ allocateされていない大きさ０の配列に対して送受信しようとして配列がアサインされていないというエラーが
+ 出たため、大きさ０の配列についてはint_bufferをダミーの配列として与えるようにした。
+
+-----------------------------------------------------------------
+
+Version:3.140000
+Date:2017/01/13
+File:jcup_interpolation_interface.f90, jcup_interface.f90
+
+Routines
+ set_local_intpl_array          : add
+ set_coef_local_to_local        : add
+ jcup_set_coef_local_to_local   : add
+
+Detail
+ localな受信側格子係数配列から受信側の補間係数配列を生成するルーチン群を作成。現在はRECV_COEFのみに対応。
+
+-----------------------------------------------------------------
+
+Version:3.140001
+Date:2017/02/02
+File:jcup_grid.f90
+
+Routines
+ cal_and_set_my_local_grid_index : mod
+
+Detail
+ 送信格子数が０のときに大きさ０の配列をallocateするコードを追加。
+
+-----------------------------------------------------------------
+
+Version:3.150000
+Date:2017/02/14
+File:jcup_intercomm.f90, jcup_grid.f90, jcup_interface.f90
+
+Routines
+ jcup_init_advanced_exchange : add
+ exchange_data_comp_new      : add
+ exchange_data_comp          : mod
+ jcup_intercomm.90のルーチン : add
+
+Detail
+ コンポーネント間のデータ通信をlocalなMxN通信ではなく、指定したランク数毎に集約して送受信するようにした。
+ そのためのモジュールをjcup_intercomm.f90に作成し、exchange_data_comp_newはjcup_intercommのルーチンを
+ コールするようにした。advanced_exchangeは-DADVANCED_EXCHANGEで使用される。その際はサブルーチン
+ jcup_init_advanced_exchangeを最初にコールし、データをまとめるランクの数を指定する。
+
+-----------------------------------------------------------------
+
+Version:3.150001
+Date:2017/02/14
+File:jcup_mpi_lib.f90
+
+Routines
+ jml_set_num_of_isend        : mod
+ jml_set_num_of_irecv        : mod
+ jml_isend_double_1d_local   : mod
+ jml_irecv_double_1d_local   : mod
+ jml_isend_double_1d_model   : mod
+ jml_irecv_double_1d_model   : mod
+
+Detail
+ 送受信を行わない場合、isend_requestやirecv_requestのallocatable配列に大きさ０の配列をallocateするようにした。
+ isend, irecvのサブルーチンで配列の大きさをチェックするようにした。
 
 
 

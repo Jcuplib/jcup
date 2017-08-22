@@ -14,6 +14,7 @@ module jcup_grid_base
   public :: init_grid_base
   public :: destruct_grid_base
   public :: set_my_area_info ! subroutine (grid_index, component_name, grid_name)
+  public :: set_pe_num       ! subroutine (comp_id, grid_name)
   public :: exchange_grid_info
   public :: global_index_to_local_index ! subroutine (comp_id, grid_num, global_index, local_index)
   public :: get_num_of_component ! integer function
@@ -30,6 +31,7 @@ module jcup_grid_base
   public :: send_index2pe ! subroutine (my_comp_id, my_grid_num, dest_comp_id, dest_grid_num)
   public :: recv_index2pe ! subroutine (source_comp_id, source_grid_num)
   public :: get_grid_info ! subroutine (comp_name, grid_name, num_of_index, min_index, max_index)
+  public :: get_grid_index ! subroutine (component_id, grid_id, grid_index) ! 2015/05/11
 
   public :: local_area_type
 
@@ -187,7 +189,7 @@ subroutine set_my_area_info(grid_index, component_name, grid_name)
 end subroutine set_my_area_info
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-
+! 2016/12/22 [MOD]
 subroutine set_global_mapping_table(comp_id, local_area, global_area)
   use jcup_mpi_lib, only : jml_ReduceMinLocal, jml_ReduceMaxLocal, jml_isLocalLeader, &
                            jml_GetCommSizeLocal, jml_SendLocal, jml_RecvLocal, jml_ReduceSumLocal, jml_BcastLocal
@@ -215,6 +217,56 @@ subroutine set_global_mapping_table(comp_id, local_area, global_area)
   call jml_ReduceSumLocal(comp_id, int_buffer(1), res)
   global_area%num_of_global_point = res
 
+  if (jml_isLocalLeader(comp_id)) then
+    int_buffer(1) = global_area%num_of_global_point
+    int_buffer(2) = global_area%num_of_index
+    int_buffer(3) = global_area%min_index
+    int_buffer(4) = global_area%max_index
+  end if
+
+  call jml_BcastLocal(comp_id, int_buffer, 1, 4, 0)
+
+  global_area%num_of_global_point = int_buffer(1)
+  global_area%num_of_index = int_buffer(2)
+  global_area%min_index = int_buffer(3)
+  global_area%max_index = int_buffer(4)
+
+  !!!call set_pe_num_base(comp_id, local_area, global_area)
+
+end subroutine set_global_mapping_table
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! 2016/12/22 [NEW]
+subroutine set_pe_num(comp_id, grid_name)
+  implicit none
+  integer, intent(IN) :: comp_id
+  character(len=*), intent(IN) :: grid_name
+  integer :: grid_id
+  integer :: i
+
+  do i = 1, comp_area(comp_id)%num_of_grid
+    if (trim(grid_name) == trim(comp_area(comp_id)%local_area(i)%grid_name)) then
+      grid_id = comp_area(comp_id)%local_area(i)%grid_num
+      call set_pe_num_base(comp_id, comp_area(comp_id)%local_area(grid_id), comp_area(comp_id)%global_area(grid_id))
+    end if
+  end do
+
+end subroutine set_pe_num
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! 2016/12/22 [NEW]
+subroutine set_pe_num_base(comp_id, local_area, global_area)
+  use jcup_mpi_lib, only : jml_ReduceMinLocal, jml_ReduceMaxLocal, jml_isLocalLeader, &
+                           jml_GetCommSizeLocal, jml_SendLocal, jml_RecvLocal, jml_ReduceSumLocal, jml_BcastLocal
+  implicit none
+  integer, intent(IN) :: comp_id
+  type(local_area_type), intent(IN) :: local_area
+  type(global_area_type), intent(INOUT) :: global_area
+  integer, allocatable :: index_buffer(:)
+  integer :: int_buffer(4)
+  integer :: res, pe, i
+
+  if (associated(global_area%index2pe)) return
 
   if (jml_isLocalLeader(comp_id)) then
     allocate(global_area%index2pe(global_area%min_index:global_area%max_index))
@@ -225,7 +277,7 @@ subroutine set_global_mapping_table(comp_id, local_area, global_area)
     allocate(global_area%index2pe(1))
     allocate(index_buffer(1))
   end if
-  
+
   if (jml_isLocalLeader(comp_id)) then
     do i = 1, local_area%num_of_point
       global_area%index2pe(local_area%grid_index(i)) = 1
@@ -244,23 +296,9 @@ subroutine set_global_mapping_table(comp_id, local_area, global_area)
     call jml_SendLocal(comp_id, local_area%grid_index, 1, local_area%num_of_point, 0)
   end if    
 
-  if (jml_isLocalLeader(comp_id)) then
-    int_buffer(1) = global_area%num_of_global_point
-    int_buffer(2) = global_area%num_of_index
-    int_buffer(3) = global_area%min_index
-    int_buffer(4) = global_area%max_index
-  end if
-
-  call jml_BcastLocal(comp_id, int_buffer, 1, 4, 0)
-
-  global_area%num_of_global_point = int_buffer(1)
-  global_area%num_of_index = int_buffer(2)
-  global_area%min_index = int_buffer(3)
-  global_area%max_index = int_buffer(4)
-
   deallocate(index_buffer)
 
-end subroutine set_global_mapping_table
+end subroutine set_pe_num_base
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
@@ -652,6 +690,17 @@ subroutine get_grid_info(comp_name, grid_name, num_of_index, min_index, max_inde
   end do
   
 end subroutine get_grid_info
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine get_grid_index(comp_id, grid_id, grid_index)
+  implicit none
+  integer, intent(IN) :: comp_id, grid_id
+  integer, pointer :: grid_index(:)
+
+  grid_index => comp_area(comp_id)%local_area(grid_id)%grid_index
+
+end subroutine get_grid_index
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 

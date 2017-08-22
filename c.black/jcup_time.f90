@@ -27,11 +27,11 @@ module jcup_time
   public :: operator(>)     ! logical function (t1, t2)
   public :: operator(<=)    ! logical function (t1, t2)
   public :: operator(<)     ! logical function (t1, t2)
+  public :: TimeToSecond ! integer(kind=8) function (time)
   public :: DateToTimeStr
   public :: inc_calendar ! subroutine (now_time, delta_t) ! 2014/10/29 [ADD]
   public :: inc_time     ! subroutine (now_time, delta_t) ! 2014/07/04 [ADD] now_time%ss = now_time%ss + delta_t
   public :: cal_time_diff ! subroutine (time1, time2, diff_sec, diff_mil, diff_mcr) ! 2014/07/10 [ADD]
-
 
   public :: init_all_time   ! subroutine (comp_id)
   public :: init_each_time  ! subroutine (comp_id, domain_id)
@@ -125,7 +125,7 @@ module jcup_time
     integer :: dd = 0
     integer :: hh = 0
     integer :: mm = 0
-    integer(kind=8) :: ss = 0 ! 2014/10/29 [MOD]
+    integer(kind=8) :: ss = 0! 2014/10/29 [MOD]
     integer :: milli_sec = 0
     integer :: micro_sec = 0
     integer :: delta_t = 0
@@ -144,27 +144,13 @@ module jcup_time
   
   type(model_time),pointer,dimension(:),private :: time
 
-  integer,parameter,private :: BASIC_YEAR = 1000
+  integer, parameter, private :: BASIC_YEAR = 1200 ! mod(BASIC_YEAR, 400) == 0
 
-  private :: set_time
-  private :: set_start_time_str
-  private :: set_start_time_date
-  private :: get_start_time_str
-  private :: get_start_time_date
-  private :: set_end_time_str
-  private :: set_end_time_date
-  private :: get_end_time_str
-  private :: get_end_time_date
-  private :: set_current_time_str
-  private :: set_current_time_date
-  private :: get_current_time_str
-  private :: get_current_time_date
-  private :: time_str_to_date1
-  private :: time_str_to_date2
-  private :: date_to_time_str1
-  private :: date_to_time_str2
-  private :: GetYearDate
-  private :: GetMonthDate
+  ! [ADD] 2016/05/23
+  integer, parameter, private :: MONTH_DATE(12)          = (/31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31/)
+  integer, parameter, private :: MONTH_DATE_SUM(12)      = (/ 0, 31, 59, 90,120,151,181,212,243,273,304,334/) 
+  integer, parameter, private :: MONTH_DATE_LEAP(12)     = (/31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31/)
+  integer, parameter, private :: MONTH_DATE_SUM_LEAP(12) = (/ 0, 31, 60, 91,121,152,182,213,244,274,305,335/) 
 
 contains
 
@@ -534,6 +520,30 @@ subroutine date_to_time_str2(time_str,date)
 end subroutine date_to_time_str2
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
+! 2016/05/23 [ADD] 
+
+logical function is_leap_year(year)
+  integer, intent(IN) :: year
+  
+  is_leap_year = .false.
+
+  if (mod(year, 4) /= 0) return 
+
+  if (mod(year, 400) == 0) then
+    is_leap_year = .true.
+    return
+  end if
+
+  if (mod(year, 100) == 0) return
+
+  if (mod(year, 4) == 0) then
+    is_leap_year = .true.
+    return
+  end if
+    
+end function is_leap_year
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
 
 integer(kind=8) function TimeToSecond(time)
   implicit none
@@ -549,7 +559,7 @@ integer(kind=8) function TimeToSecond(time)
 end function TimeToSecond
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-
+! 2016/05/24 [MOD] 
 integer(kind=8) function GetYearDate(yyyy)
   use jcup_utils, only : error, IntToStr
   implicit none
@@ -557,12 +567,12 @@ integer(kind=8) function GetYearDate(yyyy)
 
   if (yyyy<BASIC_YEAR) call error("GetYearDate","year : "//trim(IntToStr(yyyy))//" should be GE BASE_YEAR")
 
-  GetYearDate = 365*(yyyy-BASIC_YEAR)+int((yyyy-BASIC_YEAR+3)/4)
+  GetYearDate = 365*(yyyy-BASIC_YEAR)+int((yyyy-BASIC_YEAR+3)/4) - int((yyyy-BASIC_YEAR-1)/100) + int((yyyy-BASIC_YEAR-1)/400)
 
 end function GetYearDate
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-
+! 2016/05/23 [MOD] mod to use MONTH_DATE_SUM
 integer(kind=8) function GetMonthDate(yyyy,mo)
   use jcup_utils, only : error
   implicit none
@@ -571,6 +581,14 @@ integer(kind=8) function GetMonthDate(yyyy,mo)
   integer :: md
 
   if ((mo<1).or.(mo>12)) call error("GetMonthDate","month should be 1<= <=12")
+
+  if (is_leap_year(yyyy)) then
+    GetMonthDate = MONTH_DATE_SUM_LEAP(mo)
+  else
+    GetMonthDate = MONTH_DATE_SUM(mo)
+  end if
+
+  return
 
   md = 0
   if (mo> 1) md = 31
@@ -749,13 +767,15 @@ end subroutine cal_time_diff
 !---------------------   model_time related procedures  ----------------------!
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-
+! 2016/05/24 [MOD] add BASIC_YEAR check
 subroutine init_all_time(mdl)
   use jcup_utils, only : error
   implicit none
   integer,intent(IN) :: mdl
 
   integer :: status
+
+  if (mod(BASIC_YEAR, 400) /= 0) call error("InitTime", "mod(BASIC_YEAR, 400) /= 0")
 
   allocate(time(mdl),STAT=status)
 
@@ -1305,10 +1325,11 @@ end subroutine read_time
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! mod 2014/07/03
 ! 2014/11/05 [MOD] integer :: buffer -> integer(kind=8) :: buffer
+! 2016/03/02 [MOD] intent(OUT) :: buffer(:) -> intent(INOUT) :: buffer(:)
 subroutine set_buffer(time, buffer, is)
   implicit none
   type(time_type), intent(IN) :: time
-  integer(kind=8), intent(OUT) :: buffer(:)
+  integer(kind=8), intent(INOUT) :: buffer(:)
   integer, intent(IN) :: is
 
   buffer(is+0) = time%yyyy
@@ -1328,7 +1349,7 @@ end subroutine set_buffer
 ! 2014/11/05 [MOD] integer :: buffer -> integer(kind=8) :: buffer
 subroutine get_buffer(time, buffer, is)
   implicit none
-  type(time_type), intent(OUT) :: time
+  type(time_type), intent(INOUT) :: time
   integer(kind=8), intent(IN) :: buffer(:)
   integer, intent(IN) :: is
 

@@ -1122,13 +1122,13 @@ logical function is_before_exchange_step(mdl, dmn, interval)
   call cal_time_diff(time(mdl)%tm(dmn)%before_time, time(mdl)%tm(dmn)%start_time, diff_sec, diff_mil, diff_mcr)
   select case (time_unit)
   case (TU_SEC)
-    is_before_exchange_step = (Mod(diff_sec, interval)==0)
+    is_before_exchange_step = (Mod(diff_sec, int(interval,kind=8))==0)
   case (TU_MIL)
     time_diff = diff_sec*1000+diff_mil
-    is_before_exchange_step = (Mod(time_diff, interval) == 0)
+    is_before_exchange_step = (Mod(time_diff, int(interval,kind=8)) == 0)
   case(TU_MCR)
     time_diff = diff_sec*1000000 + diff_mil*1000 + diff_mcr
-    is_before_exchange_step = (Mod(time_diff, interval) == 0)
+    is_before_exchange_step = (Mod(time_diff, int(interval,kind=8)) == 0)
   case default
     call error("is_exchange_step","time_unit parameter error")
   end select
@@ -1148,13 +1148,13 @@ logical function is_exchange_step(mdl, dmn, interval)
   call cal_time_diff(time(mdl)%tm(dmn)%current_time, time(mdl)%tm(dmn)%start_time, diff_sec, diff_mil, diff_mcr)
   select case (time_unit)
   case (TU_SEC)
-    is_exchange_step = (Mod(diff_sec, interval)==0)
+    is_exchange_step = (Mod(diff_sec, int(interval,kind=8))==0)
   case (TU_MIL)
     time_diff = diff_sec*1000+diff_mil
-    is_exchange_step = (Mod(time_diff, interval) == 0)
+    is_exchange_step = (Mod(time_diff, int(interval,kind=8)) == 0)
   case(TU_MCR)
     time_diff = diff_sec*1000000 + diff_mil*1000 + diff_mcr
-    is_exchange_step = (Mod(time_diff, interval) == 0)
+    is_exchange_step = (Mod(time_diff, int(interval,kind=8)) == 0)
   case default
     call error("is_exchange_step","time_unit parameter error")
   end select
@@ -1177,13 +1177,13 @@ logical function is_exchange_step_from_c_time(my_mdl, my_dmn, interval, current_
   call cal_time_diff(current_time, time(my_mdl)%tm(my_dmn)%start_time, diff_sec, diff_mil, diff_mcr)
   select case(time_unit)
   case(TU_SEC)
-    is_exchange_step_from_c_time = (Mod(diff_sec, interval)==0)
+    is_exchange_step_from_c_time = (Mod(diff_sec, int(interval,kind=8))==0)
   case(TU_MIL)
     time_diff = diff_sec*1000 + diff_mil
-    is_exchange_step_from_c_time = (Mod(time_diff, interval)==0)
+    is_exchange_step_from_c_time = (Mod(time_diff, int(interval,kind=8))==0)
   case(TU_MCR)
     time_diff = diff_sec*1000000 + diff_mil*1000 + diff_mcr
-    is_exchange_step_from_c_time = (Mod(time_diff, interval)==0)
+    is_exchange_step_from_c_time = (Mod(time_diff, int(interval,kind=8))==0)
   case default
     call error("is_exchange_step_from_c_time","time_unit parameter error")
   end select
@@ -1204,13 +1204,13 @@ logical function is_next_exchange_step(mdl, dmn, interval)
   select case (time_unit)
   case(TU_SEC)
     time_diff = diff_sec + time(mdl)%tm(dmn)%current_time%delta_t
-    is_next_exchange_step = (Mod(time_diff, interval)==0)
+    is_next_exchange_step = (Mod(time_diff, int(interval,kind=8))==0)
   case(TU_MIL)
     time_diff = diff_sec*1000 + diff_mil + time(mdl)%tm(dmn)%current_time%delta_t
-    is_next_exchange_step = (Mod(time_diff, interval)==0)
+    is_next_exchange_step = (Mod(time_diff, int(interval,kind=8))==0)
   case(TU_MCR)
     time_diff = diff_sec*1000000 + diff_mil*1000 + diff_mcr + time(mdl)%tm(dmn)%current_time%delta_t
-    is_next_exchange_step = (Mod(time_diff, interval)==0)
+    is_next_exchange_step = (Mod(time_diff, int(interval,kind=8))==0)
   case default
     call error("is_next_exchange_step","time_unit parameter error")
   end select

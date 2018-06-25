@@ -338,7 +338,8 @@ subroutine put_data_double_1d(dt, component_id, data_id, name, db_start, is_mean
       db_current%is_using = .true.
       db_current%data_type = DOUBLE_DATA
       db_current%data_dim  = DATA_1D
-      call put_log("reuse data buffer double 1d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//", data id = "//trim(IntToStr(data_id)))  
+      call put_log("reuse data buffer double 1d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//&
+                   ", data id = "//trim(IntToStr(data_id)))
       return
     end if
     if (associated(db_current%next_ptr, db_start)) exit
@@ -361,7 +362,8 @@ subroutine put_data_double_1d(dt, component_id, data_id, name, db_start, is_mean
   db_current%data_type = DOUBLE_DATA
   db_current%data_dim  = DATA_1D
 
-  call put_log("allocate new data buffer double 1d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//", data id = "//trim(IntToStr(data_id))// &
+  call put_log("allocate new data buffer double 1d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//&
+               ", data id = "//trim(IntToStr(data_id))// &
                     ", Size:"//trim(IntToStr(size(dt,1))))
 
 end subroutine put_data_double_1d
@@ -406,7 +408,8 @@ subroutine put_data_double_2d(dt, component_id, data_id, name, db_start, is_mean
       db_current%is_using = .true.
       db_current%data_type = DOUBLE_DATA
       db_current%data_dim  = DATA_2D
-      call put_log("reuse data buffer double 2d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//", data id = "//trim(IntToStr(data_id)))  
+      call put_log("reuse data buffer double 2d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//&
+                   ", data id = "//trim(IntToStr(data_id)))
       return
     end if
     if (associated(db_current%next_ptr, db_start)) exit
@@ -429,7 +432,8 @@ subroutine put_data_double_2d(dt, component_id, data_id, name, db_start, is_mean
   db_current%data_type = DOUBLE_DATA
   db_current%data_dim  = DATA_2D
 
-  call put_log("allocate new data buffer double 2d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//", data id = "//trim(IntToStr(data_id))// &
+  call put_log("allocate new data buffer double 2d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//&
+               ", data id = "//trim(IntToStr(data_id))// &
                     ", Size:"//trim(IntToStr(size(dt,1)))//"x"//trim(IntToStr(size(dt,2))))  
 
 end subroutine put_data_double_2d
@@ -1299,7 +1303,7 @@ subroutine write_time_buffer_info(tb)
 
   tb%num_of_data = get_num_of_using_data_buffer(tb%dt_start)
 
-  write(log_str,'(" Time buffer info : ",A,L,I5)') trim(time_str)//" ", tb%is_using, tb%num_of_data
+  write(log_str,'(" Time buffer info : ",A,L3,I5)') trim(time_str)//" ", tb%is_using, tb%num_of_data
   call put_log(trim(log_str))
 
   !!!write(0,*) "time buffer ",tb%is_using, time_str 
@@ -1346,8 +1350,8 @@ module jcup_buffer
   public :: buffer_check_write
   public :: get_num_of_time ! integer function (time_buffer_ptr) 2013.06.07 [ADD]
   public :: get_send_buffer_ptr ! function () result (send_buffer_ptr) 2013.06.07 [ADD]
-  public :: write_buffer ! subroutine (file_id) 2013.05.29 [ADD]
-  public :: read_buffer  ! subroutine (file_id) 2013.05.29 [ADD]
+!   public :: write_buffer ! subroutine (file_id) 2013.05.29 [ADD]
+!   public :: read_buffer  ! subroutine (file_id) 2013.05.29 [ADD]
   public :: restore_buffer ! subroutine (dt, time, component_id, data_id, name, data_type, data_dim) 2013.06.13 [ADD]
 
 !--------------------------------   private  ---------------------------------!
@@ -1448,7 +1452,8 @@ subroutine put_send_data_double_1d(dt, time, component_id, data_id, name, is_mea
 
   !write(weight_str, '(F)') weight
   call put_log("Put data, data name = "//trim(name)//", data id = "//trim(IntToStr(data_id)), 1) !//", weight= "//trim(weight_str),1)
-  call put_log("put_send_data_double_1d : put data : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//", data id = "//trim(IntToStr(data_id)))
+  call put_log("put_send_data_double_1d : put data : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//&
+               ", data id = "//trim(IntToStr(data_id)))
   call search_time_buffer(send_buffer, time)
   call put_data(dt, component_id, data_id, name, get_start_data_ptr(send_buffer), is_mean, weight)
   call inc_num_of_data(send_buffer)
@@ -1470,7 +1475,8 @@ subroutine put_send_data_double_2d(dt, time, component_id, data_id, name, is_mea
   real(kind=8), intent(IN) :: weight ! weight for data average (delta_t/interval)
 
   call put_log("Put data, data name = "//trim(name)//", data id = "//trim(IntToStr(data_id)),1)
-  call put_log("put_send_data_double_2d : put data : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//", data id = "//trim(IntToStr(data_id)))
+  call put_log("put_send_data_double_2d : put data : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//&
+               ", data id = "//trim(IntToStr(data_id)))
   call search_time_buffer(send_buffer, time)
   call put_data(dt, component_id, data_id, name, get_start_data_ptr(send_buffer), is_mean, weight)
   call inc_num_of_data(send_buffer)
@@ -1516,7 +1522,8 @@ subroutine get_send_data_double_1d(dt, time, component_id, data_id, name)
 
   call DateToTimeStr(time_str, time)
   call put_log(&
-    & "get_send_data_double_1d : get data : name = "//trim(name)//", data id = "//trim(IntToStr(data_id))//", time = "//trim(time_str))
+    & "get_send_data_double_1d : get data : name = "//trim(name)//&
+    & ", data id = "//trim(IntToStr(data_id))//", time = "//trim(time_str))
   call search_time_buffer(send_buffer, time)
   call get_data(dt, component_id, data_id, name, get_start_data_ptr(send_buffer), status)
 

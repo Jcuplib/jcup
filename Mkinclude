@@ -1,7 +1,7 @@
 #
 # Set TOPDIR here or as a environmental variable.
 # 
-# TOPDIR = $(HOME)/Jcup
+JCUPDIR = ${HOME}/jcup
 TOPDIR = $(JCUPDIR)
 
 
@@ -12,7 +12,7 @@ TOPDIR = $(JCUPDIR)
 #SYSTEM               = Oakleaf.cross
 #SYSTEM          = Linux-IFC.mpich
 #SYSTEM          = Linux-IFC.openmpi
-#SYSTEM          = Linux-GNU.openmpi
+SYSTEM          = Linux-GNU.openmpi
 
 ################ Directory Specification ###############
 

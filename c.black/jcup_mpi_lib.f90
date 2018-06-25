@@ -2080,6 +2080,7 @@ subroutine jml_send_double_1d_leader(data,is,ie,dest,tag)
   integer, intent(IN)  :: is, ie
   integer, intent(IN)  :: dest
   integer, optional, intent(IN) :: tag
+  real(kind=8) :: buffer(is:ie)
   integer :: request
   integer :: status(MPI_STATUS_SIZE)
   integer :: dest_rank
@@ -2097,11 +2098,13 @@ subroutine jml_send_double_1d_leader(data,is,ie,dest,tag)
   dest_rank = leader_pe(dest)
   data_size = ie-is+1
 
+  buffer(is:ie) = data(is:ie)
+  
   if (dest_rank == leader%my_rank) then
     call check_buffer_size(data_size)
-    call MPI_BSEND(data(is:),data_size,MPI_DOUBLE_PRECISION,dest_rank,MPI_TAG,leader%mpi_comm,ierror)
+    call MPI_BSEND(buffer,data_size,MPI_DOUBLE_PRECISION,dest_rank,MPI_TAG,leader%mpi_comm,ierror)
   else
-    call MPI_ISEND(data(is:),data_size,MPI_DOUBLE_PRECISION,dest_rank,MPI_TAG,leader%mpi_comm,request,ierror)
+    call MPI_ISEND(buffer,data_size,MPI_DOUBLE_PRECISION,dest_rank,MPI_TAG,leader%mpi_comm,request,ierror)
     call MPI_WAIT(request,status,ierror)
   end if
 

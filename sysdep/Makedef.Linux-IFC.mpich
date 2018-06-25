@@ -11,13 +11,13 @@ FC              = ${MPIBINDIR}/mpif90
 CC		= ${MPIBINDIR}/mpicc
 
 DEFMPI = MPI2
-DEFINES = 
+###DEFINES = -DADVANCED_EXCHANGE
 
 #OPTIONS = -cpp  -mcmodel medium -shared-intel -check all -g
 #OPTIONS = -g -cpp -C -ladebug
 #OPTIONS = -check all
-OPTIONS = -cpp  -mcmodel medium -shared-intel  -debug all -check all -g
-#OPTIONS = -cpp  -mcmodel medium -shared-intel 
+#OPTIONS = -cpp  -mcmodel medium -shared-intel  -debug all -check all -g -convert big_endian
+OPTIONS = -cpp  -mcmodel medium -shared-intel -convert big_endian -O3
 #OPTIONS = -cpp -g -O
 
 INCDIRS = -I${MPIINCDIR}

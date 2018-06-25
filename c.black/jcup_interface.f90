@@ -187,7 +187,7 @@ subroutine jcup_set_new_comp(component_name)
   call set_my_component(component_name)
 
 end subroutine jcup_set_new_comp
-
+!========+=========+=========+=========+=========+=========+=========+=========+=========+=========+=========+=========+==========+
 !=======+=========+=========+=========+=========+=========+=========+=========+
 !> @breaf
 !> initialize Jcup
@@ -201,7 +201,8 @@ subroutine jcup_initialize(model_name, default_time_unit, log_level, log_stderr)
   use jcup_comp, only : init_model_process, get_num_of_total_component, is_my_component, get_component_name
   use jcup_utils, only : set_log_level, init_log, put_log, IntToStr
   use jcup_buffer, only : init_buffer, buffer_check_write
-  use jcup_time, only : time_type, init_all_time, init_each_time, set_time_data, TU_SEC, TU_MIL, TU_MCR, set_time_unit, get_time_unit
+  use jcup_time, only : time_type, init_all_time, init_each_time, set_time_data, &
+                        TU_SEC, TU_MIL, TU_MCR, set_time_unit, get_time_unit
   use jcup_data, only : init_data_def
   use jcup_grid, only : init_grid
   use jcup_mpi_lib, only : jml_abort, jml_AllreduceMin, jml_AllreduceMax, jml_AllreduceMaxLocal
@@ -1292,7 +1293,8 @@ subroutine jcup_set_mapping_table_local(my_model_name, &
 
   if ((is_my_component(recv_model_id)).and.(.not.is_my_component(send_model_id))) then
 
-    call set_grid_mapping_1d_local(send_model_id, recv_model_id, map_num, send_grid_num, recv_grid_num, nrx, send_grid, recv_grid, send_pe)
+     call set_grid_mapping_1d_local(send_model_id, recv_model_id, map_num, send_grid_num, recv_grid_num, &
+                                    nrx, send_grid, recv_grid, send_pe)
 
     call set_mapping_table(recv_table_checker(recv_model_id,:), send_model_id, map_num)
     call send_grid_mapping(send_model_id, recv_model_id, map_num)
@@ -1305,10 +1307,12 @@ subroutine jcup_set_mapping_table_local(my_model_name, &
     if (.not.is_my_table) return
 
     if (jml_GetLeaderRank(send_model_id)==jml_GetLeaderRank(recv_model_id)) then
-      call set_grid_mapping_1d_local(send_model_id, recv_model_id, map_num, send_grid_num, recv_grid_num, nrx, send_grid, recv_grid, send_pe)
+       call set_grid_mapping_1d_local(send_model_id, recv_model_id, map_num, send_grid_num, recv_grid_num, &
+                                      nrx, send_grid, recv_grid, send_pe)
     else
       if (my_model_id==recv_model_id) then
-        call set_grid_mapping_1d_local(send_model_id, recv_model_id, map_num, send_grid_num, recv_grid_num, nrx, send_grid, recv_grid, send_pe)
+         call set_grid_mapping_1d_local(send_model_id, recv_model_id, map_num, send_grid_num, recv_grid_num, &
+                                        nrx, send_grid, recv_grid, send_pe)
       else
         call jcup_abnormal_end("set_mapping_table_local", "grid index must be set on local leader PE")
       end if
@@ -1583,7 +1587,8 @@ subroutine jcup_set_date_time_int(component_name, time_array, delta_t, is_exchan
   call put_log("Component Time : "//trim(IntToStr(time%yyyy))//"/"//trim(IntToStr(time%mo))//"/"//trim(IntToStr(time%dd)) &
                //"/"//trim(IntToStr(time%hh))//"/"//trim(IntToStr(time%mm))//"/"//trim(IntToStr(time%ss)) &
                // ", Delta T : "//trim(IntToStr(delta_t))//", component : "//trim(component_name))
-  call put_log("Current   Time : "//trim(IntToStr(current_time%yyyy))//"/"//trim(IntToStr(current_time%mo))//"/"//trim(IntToStr(current_time%dd)) &
+  call put_log("Current   Time : "//trim(IntToStr(current_time%yyyy))//"/"//trim(IntToStr(current_time%mo))&
+                //"/"//trim(IntToStr(current_time%dd)) &
                //"/"//trim(IntToStr(current_time%hh))//"/"//trim(IntToStr(current_time%mm))//"/"//trim(IntToStr(current_time%ss)))
   call put_log("-------------------------------------------------------------------------------")
 
@@ -2679,7 +2684,8 @@ subroutine jcup_exchange_data_1d_double(dest_model_name, data_name, average_data
   call exchange_data_comp(current_comp_id, recv_comp_id, send_mapping_tag(current_comp_id, recv_comp_id), &
                            DOUBLE_DATA, num_of_data, exchange_data_id, DATA_1D)
 
-  call put_log("exchange_data_1d_double completed. source model : "//trim(get_component_name(current_comp_id))//", dest model : " &
+  call put_log("exchange_data_1d_double completed. source model : " &
+               //trim(get_component_name(current_comp_id))//", dest model : " &
                //trim(dest_model_name))
 
   !!write(0,*) "jcup_send_data_double_1d_new 2 ", jml_GetMyrankGlobal(), is_my_component(current_comp_id)
@@ -2747,7 +2753,8 @@ subroutine jcup_exchange_data_25d_double(dest_model_name, data_name, average_dat
                            DOUBLE_DATA, num_of_data, exchange_data_id, DATA_2D)
 
 
-  call put_log("exchange_data_25d_double completed. source model : "//trim(get_component_name(current_comp_id))//", dest model : " &
+  call put_log("exchange_data_25d_double completed. source model : " &
+               //trim(get_component_name(current_comp_id))//", dest model : " &
                //trim(dest_model_name))
 
 end subroutine jcup_exchange_data_25d_double
@@ -3202,7 +3209,8 @@ subroutine jcup_recv_data_immediately(send_comp_name, recv_comp_name)
               call set_current_conf(recv_comp_id)
               current_comp_id = recv_comp_id
               if (is_my_component(recv_comp_id)) then
-                call jcup_interpolate_data_25d_double(trim(rd%send_model), recv_data_name(1), num_of_2d_array, exchange_data_id, .true.)
+                 call jcup_interpolate_data_25d_double(trim(rd%send_model), recv_data_name(1), num_of_2d_array, &
+                                                        exchange_data_id, .true.)
               end if
             case default
               call error("jcup_recv_data_immediately", "data dimension error")

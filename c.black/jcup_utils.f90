@@ -295,13 +295,15 @@ subroutine put_log_to_stderr(log_l, LogStr)
   if (get_log_level() == DETAIL_LOG) then
   !if (jml_isLocalLeader()) then
     call set_date_time_string()
-    write(LogUnitID,'(A19," : ",A," :: ",A)') timestr,trim(model_name),LogStr 
+    write(LogUnitID,'(A19," : ",A," :: ")') timestr, trim(model_name)
+    write(LogUnitID,'(A)') trim(LogStr)
   !end if
   else
     if (log_l==1) then
     !if (jml_isLocalLeader()) then
       call set_date_time_string()
-      write(LogUnitID,'(A19," : ",A," :: ",A)') timestr,trim(model_name),LogStr 
+      write(LogUnitID,'(A19," : ",A," :: ")') timestr, trim(model_name)
+      write(LogUnitID,'(A)') trim(LogStr)
     !end if
     end if
   end if

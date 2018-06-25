@@ -69,7 +69,7 @@ end subroutine send_data_scalar
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 !> @breaf
-!> send scalar data 
+!> recv scalar data 
 !> @param[in] data_name name of data
 !> @param[in] data 
 ! 2015/04/01 [NEW]

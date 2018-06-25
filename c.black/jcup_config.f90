@@ -210,7 +210,7 @@ subroutine init_conf(num_of_model)
   allocate(mdc(num_of_model))
 
   do m = 1, num_of_model
-    mdc(m)%model_name = trim(get_component_name(m))
+    mdc(m)%model_name = get_component_name(m)
     mdc(m)%model_id   = m
     nullify(mdc(m)%sd)
     nullify(mdc(m)%rd)
@@ -2151,7 +2151,8 @@ subroutine check_time_lag(target_conf, my_model_id, my_time_lag)
           if (my_time_lag == 0) cycle
         end select
         call error("check_time_lag", "time_lag setting error between " &
-                   //trim(get_component_name(my_model_id))//trim(IntTostr(my_time_lag))//" and "//trim(get_component_name(target_conf%model_id))//trim(IntToStr(target_conf%rd(i)%time_lag)))
+                   //trim(get_component_name(my_model_id))//trim(IntTostr(my_time_lag))// &
+                   " and "//trim(get_component_name(target_conf%model_id))//trim(IntToStr(target_conf%rd(i)%time_lag)))
       end if
     end if
   end do

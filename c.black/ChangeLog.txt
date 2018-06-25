@@ -1148,5 +1148,17 @@ Detail
  送受信を行わない場合、isend_requestやirecv_requestのallocatable配列に大きさ０の配列をallocateするようにした。
  isend, irecvのサブルーチンで配列の大きさをチェックするようにした。
 
+-----------------------------------------------------------------
+
+Version:3.150100
+Date:2018/01/26
+File:jcup_buffer.f90, jcup_config.f90, jcup_interface.f90, jcup_mpi_lib.f90, jcup_time.f90, jcup_utils.f90
+
+Routines
+  many
+  
+Detail
+  ES3でコンパイルエラーになった部分を修正。
+
 
 

@@ -161,8 +161,8 @@ subroutine jcup_write_restart_base(fid, comp_id, end_time)
   use jcup_mpi_lib, only : jml_isLocalLeader
   use jcup_constant, only : STRING_LEN
   use jcup_buffer, only : get_num_of_time, get_send_buffer_ptr
-  use jcup_time_buffer, only : time_buffer, get_start_data_ptr, get_next_time_ptr => get_next_ptr
-  use jcup_data_buffer, only : data_buffer, get_next_data_ptr => get_next_ptr, write_data_buffer
+  use jcup_time_buffer, only : time_buffer_type, get_start_data_ptr, get_next_time_ptr => get_next_ptr
+  use jcup_data_buffer, only : data_buffer_type, get_next_data_ptr => get_next_ptr, write_data_buffer
   use jcup_comp, only : get_component_name
   use jcup_utils, only : error
   use jcup_time, only : write_time
@@ -173,8 +173,8 @@ subroutine jcup_write_restart_base(fid, comp_id, end_time)
   integer, intent(IN) :: end_time(:) ! integration end time
   character(len=STRING_LEN) :: master_file_name
   logical :: is_opened
-  type(time_buffer), pointer :: tb
-  type(data_buffer), pointer :: db
+  type(time_buffer_type), pointer :: tb
+  type(data_buffer_type), pointer :: db
   integer :: num_of_time
   integer :: i
   integer(kind=8) :: time_array(8) ! 2014/07/14 [MOD], 2014/11/04 [MOD] integer -> integer(kind=8)

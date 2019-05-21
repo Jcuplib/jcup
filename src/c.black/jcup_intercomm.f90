@@ -43,7 +43,7 @@ module jcup_intercomm
     logical :: ofirst = .true.
     integer :: my_grid_size ! number of send/recv grid point of my area, my_grid_size = sum(target_grid_size)
     integer :: num_of_target ! number of pe of my target
-    type(target_info_type), allocatable :: target_info(:)
+    type(target_info_type), pointer :: target_info(:)
   end type
 
   type boss_info_type
@@ -401,7 +401,8 @@ subroutine cal_child_size_and_offset(boss_info_ptr)
   do i = 1, num_of_child
     boss_info_ptr%child_grid_size(i) = 0
     do j = 1, boss_info_ptr%child_info(i)%num_of_target
-      boss_info_ptr%child_grid_size(i) = boss_info_ptr%child_grid_size(i) + boss_info_ptr%child_info(i)%target_info(j)%target_grid_size
+       boss_info_ptr%child_grid_size(i) = boss_info_ptr%child_grid_size(i) &
+                                        + boss_info_ptr%child_info(i)%target_info(j)%target_grid_size
     end do
   end do
 
@@ -590,7 +591,8 @@ subroutine cal_global_offset_send(boss_ptr)
   !if (jml_GetMyrankGlobal() == 0) then
   !  do j = 1, num_of_child
   !    do k = 1, boss_ptr%child_info(j)%num_of_target 
-  !         write(0, *) "global offset send = ", j, k, boss_ptr%child_info(j)%target_info(k)%rank_num, boss_ptr%child_info(j)%target_info(k)%global_offset
+  !         write(0, *) "global offset send = ", j, k, boss_ptr%child_info(j)%target_info(k)%rank_num, 
+  !                             boss_ptr%child_info(j)%target_info(k)%global_offset
   !    end do
   !  end do
   !end if
@@ -650,7 +652,8 @@ subroutine cal_global_offset_recv(boss_ptr)
   !if (jml_GetMyrankGlobal() == 0) then
   !  do j = 1, num_of_child
   !    do k = 1, boss_ptr%child_info(j)%num_of_target 
-  !         write(0, *) "global offset recv = ", j, k, boss_ptr%child_info(j)%target_info(k)%rank_num, boss_ptr%child_info(j)%target_info(k)%global_offset
+  !         write(0, *) "global offset recv = ", j, k, boss_ptr%child_info(j)%target_info(k)%rank_num, 
+  !         boss_ptr%child_info(j)%target_info(k)%global_offset
   !    end do
   !  end do
   !end if
@@ -663,7 +666,7 @@ end subroutine cal_global_offset_recv
 
 subroutine send_data_intercomm(data, num_of_data, exchange_data_id)
   use jcup_mpi_lib, only : jml_ISendModel, jml_send_waitall, jml_GetMyrankGlobal
-  real(kind=8), intent(IN), pointer :: data(:)
+  real(kind=8), pointer :: data(:)
   integer, intent(IN) :: num_of_data
   integer, intent(IN) :: exchange_data_id
   integer :: temp_offset, buffer_offset
@@ -704,7 +707,7 @@ end subroutine send_data_intercomm
 !> initialize intercomm
 subroutine gather_data_to_boss(data, num_of_data)
   implicit none
-  real(kind=8), intent(IN), pointer :: data(:)
+  real(kind=8), pointer :: data(:)
   integer, intent(IN) :: num_of_data
   real(kind=8) :: dummy_array1(1)
   integer :: dummy_array2(1), dummy_array3(1)  
@@ -747,7 +750,7 @@ end subroutine gather_data_to_boss
 
 subroutine recv_data_intercomm(data, num_of_data, exchange_data_id)
   use jcup_mpi_lib, only : jml_IRecvModel, jml_recv_waitall, jml_GetMyrankGlobal
-  real(kind=8), intent(IN), pointer :: data(:)
+  real(kind=8), pointer :: data(:)
   integer, intent(IN) :: num_of_data
   integer, intent(IN) :: exchange_data_id
   integer :: temp_offset, buffer_offset
@@ -790,7 +793,7 @@ end subroutine recv_data_intercomm
 !> initialize intercomm
 subroutine scatter_data_from_boss(data, num_of_data)
   implicit none
-  real(kind=8), intent(IN), pointer :: data(:)
+  real(kind=8), pointer :: data(:)
   integer, intent(IN) :: num_of_data
   real(kind=8) :: dummy_array1(1)
   integer :: dummy_array2(1), dummy_array3(1)  
@@ -804,11 +807,14 @@ subroutine scatter_data_from_boss(data, num_of_data)
   if (is_boss) then
     boss_info_ptr%child_grid_size_tmp(:) = boss_info_ptr%child_grid_size(:) * num_of_data
     boss_info_ptr%child_offset_tmp(:) = boss_info_ptr%child_offset(:) * num_of_data
-    call MPI_ScatterV(boss_buffer, boss_info_ptr%child_grid_size_tmp, boss_info_ptr%child_offset_tmp, MPI_DOUBLE_PRECISION, &
-                     local_buffer, my_info_ptr%my_grid_size*num_of_data, MPI_DOUBLE_PRECISION, 0, family_comm, ierr)                    
+    call MPI_ScatterV(boss_buffer, boss_info_ptr%child_grid_size_tmp, boss_info_ptr%child_offset_tmp, &
+                      MPI_DOUBLE_PRECISION, &
+                     local_buffer, my_info_ptr%my_grid_size*num_of_data, MPI_DOUBLE_PRECISION, 0, &
+                     family_comm, ierr)                    
   else        
     call MPI_ScatterV(dummy_array1, dummy_array2, dummy_array3, MPI_DOUBLE_PRECISION, &
-                     local_buffer, my_info_ptr%my_grid_size * num_of_data, MPI_DOUBLE_PRECISION, 0, family_comm, ierr)                    
+                     local_buffer, my_info_ptr%my_grid_size * num_of_data, MPI_DOUBLE_PRECISION, 0, &
+                     family_comm, ierr)                    
   end if
 
   ! unpack data to local buffer

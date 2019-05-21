@@ -20,6 +20,7 @@ module jcup_mpi_lib
   public :: jml_GetCommGlobal     ! integer function ()
   public :: jml_GetMyrankGlobal   ! integer function ()
   public :: jml_GetCommSizeGlobal ! integer function ()
+  public :: jml_GetCommLeader ! integer function()
   public :: jml_GetComm       ! integer function (component_id)
   public :: jml_GetCommNULL   ! integer function ()
   public :: jml_isRoot        ! logical function ()
@@ -240,7 +241,7 @@ module jcup_mpi_lib
   type(comm_type) :: leader        ! leader communicator
   integer, pointer :: leader_pe(:) ! conversion table from component id to leader pe
  
-  integer :: num_of_total_component ! number of total component
+  integer, private :: num_of_total_component ! number of total component
   type(comm_type), pointer :: local(:)
   type(comm_type), pointer :: current_comp ! current_component
 
@@ -424,7 +425,7 @@ subroutine set_current_component(component_id)
   integer :: i
 
   do i = 1, num_of_total_component
-    if ((local(i)%group_id==component_id)) then
+     if ((local(i)%group_id==component_id)) then
       current_comp => local(i)
       return
     end if
@@ -644,6 +645,15 @@ integer function jml_GetCommSizeGlobal()
   jml_GetCommSizeGlobal = global%num_of_pe
 
 end function jml_GetCommSizeGlobal
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+integer function jml_GetCommLeader()
+  implicit none
+
+  jml_GetCommLeader = leader%mpi_comm
+
+end function jml_GetCommLeader
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
@@ -2441,9 +2451,9 @@ end subroutine jml_send_real_3d_model
 subroutine jml_send_double_1d_model(comp,data,is,ie,dest_model,dest_pe)
   implicit none
   integer, intent(IN) :: comp
+  integer, intent(IN) :: is, ie
   real(kind=8), intent(IN) :: data(:)
   real(kind=8) :: buffer(is:ie)
-  integer, intent(IN) :: is, ie
   integer, intent(IN) :: dest_model, dest_pe
 
   integer :: request
@@ -2869,22 +2879,25 @@ end subroutine jml_irecv_double_1d_model
 
 subroutine jml_send_waitall()
   implicit none
-
+  
   if (isend_counter==0) return
+
   call mpi_WaitAll(isend_counter, isend_request, isend_status, ierror)
   isend_counter = 0
-
+  isend_request(:) = 0
+   
 end subroutine jml_send_waitall
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine jml_recv_waitall()
   implicit none
-
+  
   if (irecv_counter==0) return
   call mpi_WaitAll(irecv_counter, irecv_request, irecv_status, ierror)
   irecv_counter = 0
-
+  irecv_request(:) = 0
+  
 end subroutine jml_recv_waitall
 
 !=======+=========+=========+=========+=========+=========+=========+=========+

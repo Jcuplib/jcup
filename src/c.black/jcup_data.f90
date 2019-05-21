@@ -20,6 +20,7 @@ module jcup_data
   public :: def_varg ! subroutine (data_type_ptr, comp_name, data_name, grid_index, num_of_data, 
                      ! send_model_name, send_data_name, recv_mode, interval, time_lag, mapping_tag, exchange_tag)
   public :: end_def_varg ! subroutine (comp_id)
+  public :: set_exchange_type ! subroutine (comp_id) 2018/07/31 [ADD] 
   public :: check_data_definition
   public :: get_send_data_dimension
   public :: get_recv_data_dimension
@@ -59,7 +60,9 @@ module jcup_data
     integer :: data_dimension_type
     integer :: num_of_data ! number of data (for 2.5D)
     type(time_type) :: current_time
-  end type
+    logical :: is_sync_exchange    ! 2018/07/31
+    logical :: is_assync_exchange  ! 2018/07/31
+ end type varp_type
 
   type(varp_type), pointer :: sd_ptr(:) ! (num_of_total_component)
   type(varp_type), pointer :: current_sd_ptr
@@ -72,6 +75,7 @@ module jcup_data
     integer :: time_lag
     integer :: mapping_tag
     integer :: exchange_tag
+    integer :: time_intpl_tag ! time interpolation tag 2018/07/25
     character(len=NAME_LEN) :: send_model_name
     character(len=NAME_LEN) :: send_data_name
     integer :: grid_index
@@ -212,6 +216,7 @@ subroutine def_varp(data_type_ptr, comp_name, data_name, grid_index, num_of_data
   current_sd_ptr%my_grid => get_my_local_area_ptr(comp_id, grid_index)
   current_sd_ptr%name = data_name
 
+  
   if (is_25D_data) then
     current_sd_ptr%data_dimension_type = DATA_25D
     current_sd_ptr%num_of_data = num_of_data
@@ -220,7 +225,11 @@ subroutine def_varp(data_type_ptr, comp_name, data_name, grid_index, num_of_data
     current_sd_ptr%num_of_data = 1
   end if
 
+  current_sd_ptr%is_sync_exchange = .false.
+  current_sd_ptr%is_assync_exchange = .false.
+  
   data_type_ptr => current_sd_ptr
+
   call put_log("jcup_def_varp : Send data definition : "//trim(data_name)//", defined data dimension : " &
              !//trim(IntToStr(current_sd_ptr%data_dimension_type)), 2)
              //trim(IntToStr(current_sd_ptr%num_of_data)), 2)
@@ -266,8 +275,8 @@ end subroutine end_def_varp
 
 subroutine def_varg(data_type_ptr, comp_name, data_name, grid_index, num_of_data, send_model_name, send_data_name, &
                     recv_mode, &
-                    interval, time_lag, mapping_tag, exchange_tag)
-  use jcup_constant, only : DATA_1D, DATA_2D, DATA_25D, DATA_3D
+                    interval, time_lag, mapping_tag, exchange_tag, time_intpl_tag)
+  use jcup_constant, only : DATA_1D, DATA_2D, DATA_25D, DATA_3D, ASSYNC_SEND_RECV
   use jcup_utils, only : error, put_log, IntToStr
   use jcup_config, only : is_my_send_data, get_send_data_conf_ptr, &
                           is_my_recv_data, get_recv_data_conf_ptr, &
@@ -287,6 +296,7 @@ subroutine def_varg(data_type_ptr, comp_name, data_name, grid_index, num_of_data
   integer, optional, intent(IN) :: time_lag
   integer, optional, intent(IN) :: mapping_tag
   integer, optional, intent(IN) :: exchange_tag
+  integer, optional, intent(IN) :: time_intpl_tag ! time interpolation tag 2018/07/25
   logical :: is_25D_data
   integer :: comp_id
   integer :: send_comp_id
@@ -332,6 +342,9 @@ subroutine def_varg(data_type_ptr, comp_name, data_name, grid_index, num_of_data
 
   if (present(time_lag)) then
     current_rd_ptr%time_lag = time_lag
+    if (time_lag == ASSYNC_SEND_RECV) then
+      current_rd_ptr%time_intpl_tag = -1
+    end if
   else
     current_rd_ptr%time_lag = default_setting(comp_id, send_comp_id)%time_lag
   end if
@@ -346,6 +359,16 @@ subroutine def_varg(data_type_ptr, comp_name, data_name, grid_index, num_of_data
     current_rd_ptr%exchange_tag = exchange_tag
   else
     current_rd_ptr%exchange_tag = default_setting(comp_id, send_comp_id)%exchange_tag
+  end if
+
+  if (present(time_intpl_tag)) then
+    if (time_intpl_tag <= 0 ) then
+       call error("jcup_def_varg", "time_intpl_tag must be > 0")
+    end if
+    call put_log("jcup_def_varg : optional argument time_intpl_tag exists. " &
+                // "Therefore time_lag is set ASSYNC_SEND_RECV",2)
+    current_rd_ptr%time_intpl_tag = time_intpl_tag
+    current_rd_ptr%time_lag = ASSYNC_SEND_RECV
   end if
 
 
@@ -388,6 +411,7 @@ subroutine end_def_varg(comp_id)
 
   current_rd_ptr => rd_ptr(comp_id)
   data_counter = 0
+
   do
     if (.not.associated(current_rd_ptr%next_ptr)) exit
     data_counter = data_counter + 1
@@ -395,12 +419,41 @@ subroutine end_def_varg(comp_id)
     call set_recv_config(comp_id, data_counter, current_rd_ptr%name, current_rd_ptr%grid_index, &
                          current_rd_ptr%num_of_data, &
                          current_rd_ptr%recv_mode, current_rd_ptr%interval, current_rd_ptr%time_lag, &
-                         current_rd_ptr%mapping_tag, current_rd_ptr%exchange_tag, &
+                         current_rd_ptr%mapping_tag, current_rd_ptr%exchange_tag, current_rd_ptr%time_intpl_tag, &
                          current_rd_ptr%send_model_name, current_rd_ptr%send_data_name)
     current_rd_ptr%rd => get_recv_data_conf_ptr(current_rd_ptr%name)
   end do
 
 end subroutine end_def_varg
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine set_exchange_type(comp_id)
+  use jcup_constant, only : ASSYNC_SEND_RECV
+  use jcup_config, only : set_current_conf
+  implicit none
+  integer, intent(IN) :: comp_id
+  integer ::i
+
+  call set_current_conf(comp_id)
+
+  current_sd_ptr => sd_ptr(comp_id)
+  current_sd_ptr => current_sd_ptr%next_ptr
+  do 
+    if (.not.associated(current_sd_ptr)) exit
+    
+    do i = 1, current_sd_ptr%sd%num_of_my_recv_data
+       if (current_sd_ptr%sd%my_recv_conf(i)%time_lag == ASSYNC_SEND_RECV) then
+          current_sd_ptr%is_assync_exchange = .true.
+       else
+          current_sd_ptr%is_sync_exchange = .true.
+       end if
+    end do
+    current_sd_ptr => current_sd_ptr%next_ptr
+  end do
+
+
+end subroutine set_exchange_type
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 

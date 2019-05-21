@@ -165,11 +165,15 @@ module jcup_grid
   public :: set_data
   public :: get_data     ! subroutine (recv_comp_id, send_comp_id, mapping_tag, data, num_of_data)
   public :: send_data_1d ! subroutine (send_comp_id, recv_comp_id, mapping_tag, data_type, num_of_data)
+  public :: get_send_data_buffer_size ! integer function(send_comp_id, recv_comp_id, mapping_tag) ! 2018/07/23 for jpl nowait send
+  public :: send_data_1d_nowait ! subroutine (send_comp_id, recv_comp_id, mapping_tag, data_type, num_of_data) ! 2018/07/05 for jpl
   public :: recv_data    ! subroutine (recv_comp_id, send_comp_id, mapping_tag, data_type, num_of_data)
-
+  public :: recv_data_nowait    ! subroutine (recv_comp_id, send_comp_id, mapping_tag, data_type, num_of_data) ! 2018/07/05 for jpl
+  public :: send_recv_waitall   ! subroutine ()  ! 20180705 for jpl
   public :: exchange_data_comp
 
   public :: interpolate_data_1d
+  public :: get_data_double_1d
 
 !--------------------------------   private  ---------------------------------!
 
@@ -1648,7 +1652,7 @@ subroutine send_data_1d(send_comp_id, recv_comp_id, mapping_tag, data_type, num_
   real(kind=8), pointer :: data_ptr
 
   spa => send_array(send_comp_id, recv_comp_id)%pe_array(mapping_tag)
-  !!call put_log("send_data_start")
+  call put_log("send_data_start")
 
     do d = 1, num_of_data
       call convert_send_1d_data_to_1d(send_comp_id, recv_comp_id, mapping_tag, send_double_buffer_1d(:,d),d)
@@ -1662,16 +1666,110 @@ subroutine send_data_1d(send_comp_id, recv_comp_id, mapping_tag, data_type, num_
       select case(data_type)
         case(REAL_DATA)
         case(DOUBLE_DATA)
-        !!call put_log("ISend "//trim(IntToStr(recv_pe))//" size "//trim(IntToStr((ie-is+1)*num_of_data)))
+        call put_log("ISend "//trim(IntToStr(recv_pe))//" size "//trim(IntToStr((ie-is+1)*num_of_data)))
         data_ptr => spa%data_buffer(offset+1)
         call jml_ISendModel(send_comp_id, data_ptr, offset+1, offset+(ie-is+1)*num_of_data, &
                             recv_comp_id, recv_pe-1, exchange_data_id)
-        !!call put_log("ISend finish "//trim(IntToStr(recv_pe))//" size "//trim(IntToStr((ie-is+1)*num_of_data)))
+        call put_log("ISend finish "//trim(IntToStr(recv_pe))//" size "//trim(IntToStr((ie-is+1)*num_of_data)))
       end select 
     end do
-   call jml_send_waitall()
+
+    call jml_send_waitall()
 
 end subroutine send_data_1d
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+!> 2018/07/23 for nowait send
+function get_send_data_buffer_size(send_comp_id, recv_comp_id) result(res)
+  implicit none
+  integer, intent(IN) :: send_comp_id, recv_comp_id
+  integer :: res, buffer_size
+  integer :: i
+  
+  res = 0
+
+  do i = 1, size(send_array(send_comp_id, recv_comp_id)%pe_array)
+     
+    buffer_size = size(send_array(send_comp_id, recv_comp_id)%pe_array(i)%data_buffer)
+    if (res < buffer_size) res = buffer_size
+  end do
+ 
+end function get_send_data_buffer_size
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+!> 2018/07/23 for nowait send
+
+subroutine convert_send_1d_data_to_1d_nowait(send_comp_id, recv_comp_id, mapping_tag, data, data_num, send_buffer)
+  implicit none
+  integer, intent(IN) :: send_comp_id, recv_comp_id
+  integer, intent(IN) :: mapping_tag
+  real(kind=8), intent(IN) :: data(:)
+  integer, intent(IN) :: data_num
+  real(kind=8), intent(INOUT) :: send_buffer(:)
+  integer :: offset
+  integer :: i, j, d, p
+  integer :: counter
+
+
+  peg => a_grid(send_comp_id, recv_comp_id)%ex_grid(mapping_tag)
+  spa => send_array(send_comp_id, recv_comp_id)%pe_array(mapping_tag)
+  counter = 0
+  do p = 1, spa%num_of_pe
+    offset = (spa%pa(p)%s_point-1)*NUM_OF_EXCHANGE_DATA
+    offset = offset+(spa%pa(p)%e_point-spa%pa(p)%s_point+1)*(data_num-1)
+    do d = spa%pa(p)%s_point, spa%pa(p)%e_point
+      counter=counter+1
+      send_buffer(offset+d-spa%pa(p)%s_point+1) = data(peg%local_send_index(counter))
+    end do
+  end do
+  
+end subroutine convert_send_1d_data_to_1d_nowait
+                                     
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine send_data_1d_nowait(send_comp_id, recv_comp_id, mapping_tag, data_type, num_of_data, exchange_data_id, send_buffer)
+  use jcup_mpi_lib, only : jml_ISendModel, jml_send_waitall
+  use jcup_constant, only : REAL_DATA, DOUBLE_DATA
+  use jcup_utils, only : IntToStr, put_log
+  implicit none
+  integer, intent(IN) :: send_comp_id, recv_comp_id
+  integer, intent(IN) :: mapping_tag
+  integer, intent(IN) :: data_type
+  integer, intent(IN) :: num_of_data
+  integer, intent(IN) :: exchange_data_id
+  real(kind=8), target, intent(INOUT) :: send_buffer(:)
+  integer :: offset
+  integer :: recv_pe
+  integer :: is, ie
+  integer :: d, i
+  real(kind=8), pointer :: data_ptr
+
+  spa => send_array(send_comp_id, recv_comp_id)%pe_array(mapping_tag)
+  call put_log("send_data_start")
+
+    do d = 1, num_of_data
+       call convert_send_1d_data_to_1d_nowait(send_comp_id, recv_comp_id, mapping_tag, &
+                                              send_double_buffer_1d(:,d),d, send_buffer)
+    end do
+
+    do i = 1, spa%num_of_pe
+      offset = (spa%pa(i)%s_point-1)*NUM_OF_EXCHANGE_DATA
+      recv_pe = spa%pa(i)%pe_num
+      is = spa%pa(i)%s_point
+      ie = spa%pa(i)%e_point
+      select case(data_type)
+        case(REAL_DATA)
+        case(DOUBLE_DATA)
+           call put_log("ISend NOWAIT "//trim(IntToStr(recv_pe))//" size "//trim(IntToStr((ie-is+1)*num_of_data))// &
+                        " exchange tag "//trim(IntToStr(exchange_data_id)))
+        data_ptr => send_buffer(offset+1)
+        call jml_ISendModel(send_comp_id, data_ptr, offset+1, offset+(ie-is+1)*num_of_data, &
+                            recv_comp_id, recv_pe-1, exchange_data_id)
+        call put_log("ISend NOWAIT finish "//trim(IntToStr(recv_pe))//" size "//trim(IntToStr((ie-is+1)*num_of_data)))
+      end select 
+    end do
+
+end subroutine send_data_1d_nowait
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
@@ -1693,8 +1791,8 @@ subroutine recv_data(recv_comp_id, send_comp_id, mapping_tag, data_type, num_of_
   real(kind=8), pointer :: data_ptr
 
   rpa => recv_array(recv_comp_id, send_comp_id)%pe_array(mapping_tag)
-  !write(0,*) "recv_data ", recv_comp_id, send_comp_id, mapping_tag, data_type, num_of_data, exchange_data_id
-  !call put_log("recv_data_start")
+
+  call put_log("recv_data_start")
   !do d = 1, num_of_data
     do i = 1, rpa%num_of_pe
       offset = (rpa%pa(i)%s_point-1)*NUM_OF_EXCHANGE_DATA
@@ -1705,16 +1803,19 @@ subroutine recv_data(recv_comp_id, send_comp_id, mapping_tag, data_type, num_of_
       case(REAL_DATA)
         !!!!!call jml_RecvModel(recv_array%data_buffer, is, ie, send_model, send_pe-1) 
       case(DOUBLE_DATA)
-        !!!call put_log("IRecv "//trim(IntToStr(send_pe))//" size "//trim(IntToStr((ie-is+1)*num_of_data)))
+         call put_log("IRecv "//trim(IntToStr(send_pe))//" size "//trim(IntToStr((ie-is+1)*num_of_data))// &
+                      " exchange tag "//trim(IntToStr(exchange_data_id)))
         data_ptr => rpa%data_buffer(offset+1)
         call jml_IRecvModel(recv_comp_id, data_ptr, offset+1, offset+(ie-is+1)*num_of_data, &
                             send_comp_id, send_pe-1, exchange_data_id)
-        !!!call put_log("IRecv finish "//trim(IntToStr(send_pe))//" size "//trim(IntToStr((ie-is+1)*num_of_data)))
+        call put_log("IRecv finish "//trim(IntToStr(send_pe))//" size "//trim(IntToStr((ie-is+1)*num_of_data)))
       end select
     end do
 
   call jml_recv_waitall()
 
+  call put_log("recv_data, data receive completed")
+  
   !send_double_buffer_1d = 0.d0
 
   do p = 1, rpa%num_of_pe
@@ -1734,12 +1835,96 @@ end subroutine recv_data
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
+subroutine recv_data_nowait(recv_comp_id, send_comp_id, mapping_tag, data_type, num_of_data, exchange_data_id)
+  use jcup_mpi_lib, only : jml_IRecvModel, jml_recv_waitall
+  use jcup_constant, only : REAL_DATA, DOUBLE_DATA
+  use jcup_utils, only : IntTOStr, put_log
+  implicit none
+  integer, intent(IN) :: recv_comp_id, send_comp_id
+  integer, intent(IN) :: mapping_tag
+  integer, intent(IN) :: data_type
+  integer, intent(IN) :: num_of_data
+  integer, intent(IN) :: exchange_data_id
+
+  integer :: offset
+  integer :: send_pe
+  integer :: is, ie
+  integer :: d, i, j, p
+  real(kind=8), pointer :: data_ptr
+
+  rpa => recv_array(recv_comp_id, send_comp_id)%pe_array(mapping_tag)
+
+  call put_log("recv_data_start")
+  !do d = 1, num_of_data
+    do i = 1, rpa%num_of_pe
+      offset = (rpa%pa(i)%s_point-1)*NUM_OF_EXCHANGE_DATA
+      send_pe = rpa%pa(i)%pe_num
+      is = rpa%pa(i)%s_point
+      ie = rpa%pa(i)%e_point
+      select case(data_type)
+      case(REAL_DATA)
+        !!!!!call jml_RecvModel(recv_array%data_buffer, is, ie, send_model, send_pe-1) 
+      case(DOUBLE_DATA)
+        call put_log("IRecv "//trim(IntToStr(send_pe))//" size "//trim(IntToStr((ie-is+1)*num_of_data)))
+        data_ptr => rpa%data_buffer(offset+1)
+        call jml_IRecvModel(recv_comp_id, data_ptr, offset+1, offset+(ie-is+1)*num_of_data, &
+                            send_comp_id, send_pe-1, exchange_data_id)
+        call put_log("IRecv finish "//trim(IntToStr(send_pe))//" size "//trim(IntToStr((ie-is+1)*num_of_data)))
+      end select
+    end do
+
+
+  call put_log("recv_data, data receive completed")
+  
+  !send_double_buffer_1d = 0.d0
+
+    !call put_log("recv_data_end")
+  
+end subroutine recv_data_nowait
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine send_recv_waitall(recv_comp_id, send_comp_id, mapping_tag, data_type, num_of_data, exchange_data_id)
+  use jcup_mpi_lib, only : jml_send_waitall, jml_recv_waitall
+  implicit none
+  integer, intent(IN) :: recv_comp_id, send_comp_id
+  integer, intent(IN) :: mapping_tag
+  integer, intent(IN) :: data_type
+  integer, intent(IN) :: num_of_data
+  integer, intent(IN) :: exchange_data_id
+  integer :: offset
+  integer :: p, d, i
+
+  write(0, *) "send_recv_waitall "
+  call jml_send_waitall()
+  write(0, *) "send_recv_waitall 1"
+  call jml_recv_waitall()
+  write(0, *) "send_recv_waitall 2"
+
+  rpa => recv_array(recv_comp_id, send_comp_id)%pe_array(mapping_tag)
+
+  do p = 1, rpa%num_of_pe
+    do d = 1, num_of_data
+      offset = (rpa%pa(p)%s_point-1)*NUM_OF_EXCHANGE_DATA
+      offset = offset+(rpa%pa(p)%e_point-rpa%pa(p)%s_point+1)*(d-1)
+      do i = rpa%pa(p)%s_point, rpa%pa(p)%e_point
+        a_grid(recv_comp_id, send_comp_id)%ex_grid(mapping_tag)%send_double_buffer_1d(i,d) = &
+                       rpa%data_buffer(offset+i-rpa%pa(p)%s_point+1)
+      end do
+    end do
+  end do
+  
+
+end subroutine send_recv_waitall
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
 #ifndef ADVANCED_EXCHANGE
 subroutine exchange_data_comp(send_comp_id, recv_comp_id, mapping_tag, data_type, num_of_data, exchange_data_id, &
                               data_2d3d)
 #else
-subroutine exchange_data_comp_org(send_comp_id, recv_comp_id, mapping_tag, data_type, num_of_data, exchange_data_id, &
-                              data_2d3d)
+!subroutine exchange_data_comp_org(send_comp_id, recv_comp_id, mapping_tag, data_type, num_of_data, exchange_data_id, &
+!                              data_2d3d)
 #endif
 
   use jcup_mpi_lib, only : &
@@ -1911,13 +2096,13 @@ subroutine exchange_data_comp_org(send_comp_id, recv_comp_id, mapping_tag, data_
 #ifndef ADVANCED_EXCHANGE
 end subroutine exchange_data_comp
 #else
-end subroutine exchange_data_comp_org
+!end subroutine exchange_data_comp_org
 #endif
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 #ifdef ADVANCED_EXCHANGE
-subroutine exchange_data_comp(send_comp_id, recv_comp_id, mapping_tag, data_type, num_of_data, exchange_data_id, &
-                              data_2d3d)
+!subroutine exchange_data_comp(send_comp_id, recv_comp_id, mapping_tag, data_type, num_of_data, exchange_data_id, &
+!                              data_2d3d)
 #else
 subroutine exchange_data_comp_new(send_comp_id, recv_comp_id, mapping_tag, data_type, num_of_data, exchange_data_id, &
                                   data_2d3d)
@@ -1995,7 +2180,7 @@ subroutine exchange_data_comp_new(send_comp_id, recv_comp_id, mapping_tag, data_
   !!!!write(0,*) "exchange_data_comp 6 ", jml_GetMyrankGlobal()
 
 #ifdef ADVANCED_EXCHANGE
-end subroutine exchange_data_comp
+!end subroutine exchange_data_comp
 #else
 end subroutine exchange_data_comp_new
 #endif
@@ -2004,7 +2189,7 @@ end subroutine exchange_data_comp_new
 
 subroutine interpolate_data_1d(recv_comp_id, send_comp_id, mapping_tag, data_type, num_of_data, exchange_tag)
   use jcup_constant, only : REAL_DATA, DOUBLE_DATA
-  use jcup_interpolation, only : interpolate_data
+  !!!use jcup_interpolation, only : interpolate_data
   use jcup_config, only : get_comp_name_from_comp_id
   implicit none
   integer, intent(IN) :: recv_comp_id, send_comp_id
@@ -2013,7 +2198,6 @@ subroutine interpolate_data_1d(recv_comp_id, send_comp_id, mapping_tag, data_typ
   integer, intent(IN) :: num_of_data
   integer, intent(IN) :: exchange_tag(:)
   integer :: d, i, j, k
-
 
   peg => a_grid(recv_comp_id, send_comp_id)%ex_grid(mapping_tag)
 

@@ -1142,7 +1142,7 @@ Routines
  jml_isend_double_1d_local   : mod
  jml_irecv_double_1d_local   : mod
  jml_isend_double_1d_model   : mod
- jml_irecv_double_1d_model   : mod
+ jml_irecv_double_1d_model   : modc
 
 Detail
  送受信を行わない場合、isend_requestやirecv_requestのallocatable配列に大きさ０の配列をallocateするようにした。
@@ -1150,15 +1150,69 @@ Detail
 
 -----------------------------------------------------------------
 
-Version:3.150100
+Version:4.000000
+Date:2017/05/14
+
+時間補間を伴う結合を可能にするためにJcupにプラグインを作成する。このプラグインはJcupの内部モジュールを用いる
+ため、Jcupの各モジュールの独立性を高めプラグインから使用できるようにする必要がある。
+そこでJcup4としてJcupの内部構造を大幅に改良整備した。以下整備の内容について記述する。
+
+・buffer関連
+jcup_buffer.f90をjcup_buffer_base.f90とjcup_buffer.f90に分離した。jcup_buffer_base.f90ではtime_buffer_type
+の型定義と型に対する操作を記述し、インスタンスであるtype(time_buffer_type), pointer :: send_buffer, recv_buffer
+をjcup_buffer.f90で定義するようにした。これによって、Jcupのデータバッファとは別にプラグインでもデータバッファを
+定義・使用できるようになる。
+
+・config関連
+jcup_interface.f90で定義されていたルーチンget_average_data_nameとget_send_data_idをjcup_config.f90に移動した。
+
+-----------------------------------------------------------------
+
+Version:4.000100
 Date:2018/01/26
-File:jcup_buffer.f90, jcup_config.f90, jcup_interface.f90, jcup_mpi_lib.f90, jcup_time.f90, jcup_utils.f90
+
+File:jcup_utils.f90, jcup_time.f90, jcup_buffer_base.f90, jcup_config.f90, jcup_intercomm.f90
+     jcup_exchange.f90, jcup_interface.f90, jcup_mpi_lib.f90
 
 Routines
   many
-  
-Detail
-  ES3でコンパイルエラーになった部分を修正。
 
+Detail
+ ES3のコンパイラに適合するよう修正。具体的には1行の長さを132文字未満にする。
+ 
+-----------------------------------------------------------------
+
+Version:4.010000
+Date:2018/02/07
+
+File:jcup_exchange.f90, jcup_interface.f90
+
+
+Routines
+ send_data_vector            : add
+ recv_data_vector            : add
+ jcup_put_data_1d_double     : mod
+ jcup_put_data_25d_double    : mod
+ jcup_get_data_1d_double     : mod
+ jcup_get_data_25d_double    : mod
+ jcup_put_value              : mod
+ jcup_get_value              : mod
+
+Detail
+ スカラ量送受信機能をベクトル量に変更
+ 
+-----------------------------------------------------------------
+
+Version:4.020000
+Date:2019/05/21
+
+非同期データ交換ライブラリJAL(Jcup Asyncrhonous Library)を追加した。このため、ディレクトリ構造を変更。
+srcディレクトリにjcup_interface.f90を配置し、src/c.blackに従来のJcupファイルを、src/c.whiteにJALファイル
+を置くようにした。
+従来のjcupとjalの動作はjcup_interfaceのサブルーチン内部で切り分けられる。
+動作切り分けのため、
+サブルーチン　jcup_def_varg
+のインターフェースを変更。オプショナル引数time_intpl_tagを追加し、これが設定されている場合非同期通信
+を行うようにした。
 
 

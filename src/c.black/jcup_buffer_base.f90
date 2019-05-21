@@ -13,7 +13,7 @@ module jcup_data_buffer
 
 !--------------------------------   public  ----------------------------------!
 
-  public :: data_buffer
+  public :: data_buffer_type
   public :: init_data_buffer
   public :: destruct_data_buffer
   public :: put_data
@@ -33,7 +33,7 @@ module jcup_data_buffer
 
   integer, parameter, public :: NO_DATA = 9999999
 
-  type data_buffer
+  type data_buffer_type
     private
     integer :: component_id
     integer :: data_id
@@ -42,7 +42,7 @@ module jcup_data_buffer
     logical :: is_using
     integer :: data_type ! real, double 
     integer :: data_dim  ! 2D or 3D
-    type(data_buffer), pointer :: before_ptr, next_ptr
+    type(data_buffer_type), pointer :: before_ptr, next_ptr
   end type
   
 !--------------------------------   private  ---------------------------------!
@@ -73,7 +73,7 @@ contains
 
 subroutine init_data_buffer(db)
   implicit none
-  type(data_buffer), pointer :: db
+  type(data_buffer_type), pointer :: db
   
   allocate(db)
   db%before_ptr => db
@@ -88,9 +88,9 @@ end subroutine init_data_buffer
 
 subroutine destruct_data_buffer(db)
   implicit none
-  type(data_buffer), pointer :: db
-  type(data_buffer), pointer :: start_ptr
-  type(data_buffer), pointer :: tmp_ptr
+  type(data_buffer_type), pointer :: db
+  type(data_buffer_type), pointer :: start_ptr
+  type(data_buffer_type), pointer :: tmp_ptr
 
   start_ptr => db
   do 
@@ -109,9 +109,9 @@ end subroutine destruct_data_buffer
 
 subroutine insert_data_buffer(db)
   implicit none
-  type(data_buffer), pointer :: db
+  type(data_buffer_type), pointer :: db
 
-  type(data_buffer), pointer :: new_data
+  type(data_buffer_type), pointer :: new_data
 
   call init_data_buffer(new_data)
   new_data%before_ptr => db
@@ -128,7 +128,7 @@ end subroutine insert_data_buffer
 
 subroutine delete_data_buffer(db)
   implicit none
-  type(data_buffer), pointer :: db
+  type(data_buffer_type), pointer :: db
 
   db%before_ptr%next_ptr => db%next_ptr
   db%next_ptr%before_ptr => db%before_ptr
@@ -306,11 +306,11 @@ subroutine put_data_double_1d(dt, component_id, data_id, name, db_start, is_mean
   real(kind=8), intent(IN) :: dt(:)
   integer, intent(IN) :: component_id, data_id
   character(len=*), intent(IN) :: name
-  type(data_buffer), pointer :: db_start
+  type(data_buffer_type), pointer :: db_start
   logical, intent(IN) :: is_mean
   real(kind=8), intent(IN) :: weight
 
-  type(data_buffer), pointer :: db_current
+  type(data_buffer_type), pointer :: db_current
 
   db_current => db_start
   do 
@@ -338,8 +338,8 @@ subroutine put_data_double_1d(dt, component_id, data_id, name, db_start, is_mean
       db_current%is_using = .true.
       db_current%data_type = DOUBLE_DATA
       db_current%data_dim  = DATA_1D
-      call put_log("reuse data buffer double 1d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//&
-                   ", data id = "//trim(IntToStr(data_id)))
+      call put_log("reuse data buffer double 1d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id)) &
+                   //", data id = "//trim(IntToStr(data_id)))  
       return
     end if
     if (associated(db_current%next_ptr, db_start)) exit
@@ -362,8 +362,8 @@ subroutine put_data_double_1d(dt, component_id, data_id, name, db_start, is_mean
   db_current%data_type = DOUBLE_DATA
   db_current%data_dim  = DATA_1D
 
-  call put_log("allocate new data buffer double 1d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//&
-               ", data id = "//trim(IntToStr(data_id))// &
+  call put_log("allocate new data buffer double 1d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id)) &
+                     //", data id = "//trim(IntToStr(data_id))// &
                     ", Size:"//trim(IntToStr(size(dt,1))))
 
 end subroutine put_data_double_1d
@@ -376,11 +376,11 @@ subroutine put_data_double_2d(dt, component_id, data_id, name, db_start, is_mean
   real(kind=8), intent(IN) :: dt(:,:)
   integer, intent(IN) :: component_id, data_id
   character(len=*), intent(IN) :: name
-  type(data_buffer), pointer :: db_start
+  type(data_buffer_type), pointer :: db_start
   logical, intent(IN) :: is_mean
   real(kind=8), intent(IN) :: weight
 
-  type(data_buffer), pointer :: db_current
+  type(data_buffer_type), pointer :: db_current
 
   db_current => db_start
   do 
@@ -408,8 +408,8 @@ subroutine put_data_double_2d(dt, component_id, data_id, name, db_start, is_mean
       db_current%is_using = .true.
       db_current%data_type = DOUBLE_DATA
       db_current%data_dim  = DATA_2D
-      call put_log("reuse data buffer double 2d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//&
-                   ", data id = "//trim(IntToStr(data_id)))
+      call put_log("reuse data buffer double 2d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id)) &
+                   //", data id = "//trim(IntToStr(data_id)))  
       return
     end if
     if (associated(db_current%next_ptr, db_start)) exit
@@ -432,8 +432,8 @@ subroutine put_data_double_2d(dt, component_id, data_id, name, db_start, is_mean
   db_current%data_type = DOUBLE_DATA
   db_current%data_dim  = DATA_2D
 
-  call put_log("allocate new data buffer double 2d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//&
-               ", data id = "//trim(IntToStr(data_id))// &
+  call put_log("allocate new data buffer double 2d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id)) &
+                //", data id = "//trim(IntToStr(data_id))// &
                     ", Size:"//trim(IntToStr(size(dt,1)))//"x"//trim(IntToStr(size(dt,2))))  
 
 end subroutine put_data_double_2d
@@ -446,11 +446,11 @@ subroutine put_data_double_3d(dt, component_id, data_id, name, db_start, is_mean
   real(kind=8), intent(IN) :: dt(:,:,:)
   integer, intent(IN) :: component_id, data_id
   character(len=*), intent(IN) :: name
-  type(data_buffer), pointer :: db_start
+  type(data_buffer_type), pointer :: db_start
   logical, intent(IN) :: is_mean
   real(kind=8), intent(IN) :: weight
 
-  type(data_buffer), pointer :: db_current
+  type(data_buffer_type), pointer :: db_current
 
   db_current => db_start
   do 
@@ -516,10 +516,10 @@ subroutine get_data_double_1d(dt, component_id, data_id, name, db_start, status)
   real(kind=8), intent(INOUT) :: dt(:)
   integer, intent(IN) :: component_id, data_id
   character(len=*), intent(IN) :: name
-  type(data_buffer), pointer :: db_start
+  type(data_buffer_type), pointer :: db_start
   integer, intent(OUT) :: status
 
-  type(data_buffer), pointer :: db_current
+  type(data_buffer_type), pointer :: db_current
 
   db_current => db_start
 
@@ -560,10 +560,10 @@ subroutine get_data_double_2d(dt, component_id, data_id, name, db_start, status)
   real(kind=8), intent(INOUT) :: dt(:,:)
   integer, intent(IN) :: component_id, data_id
   character(len=*), intent(IN) :: name
-  type(data_buffer), pointer :: db_start
+  type(data_buffer_type), pointer :: db_start
   integer, intent(OUT) :: status
 
-  type(data_buffer), pointer :: db_current
+  type(data_buffer_type), pointer :: db_current
 
   db_current => db_start
 
@@ -602,10 +602,10 @@ subroutine get_data_double_3d(dt, component_id, data_id, name, db_start, status)
   real(kind=8), intent(INOUT) :: dt(:,:,:)
   integer, intent(IN) :: component_id, data_id
   character(len=*), intent(IN) :: name
-  type(data_buffer), pointer :: db_start
+  type(data_buffer_type), pointer :: db_start
   integer, intent(OUT) :: status
 
-  type(data_buffer), pointer :: db_current
+  type(data_buffer_type), pointer :: db_current
 
   db_current => db_start
 
@@ -641,10 +641,10 @@ end subroutine get_data_double_3d
 function search_data_buffer(db_start, data_id) result(db_current)
   use jcup_utils, only : put_log, IntToStr
   implicit none
-  type(data_buffer), pointer :: db_start
+  type(data_buffer_type), pointer :: db_start
   integer, intent(IN) :: data_id
 
-  type(data_buffer), pointer :: db_current
+  type(data_buffer_type), pointer :: db_current
 
   db_current => db_start
 
@@ -665,11 +665,11 @@ end function search_data_buffer
 subroutine reset_data_buffer(db_start, data_id, status)
   use jcup_utils, only : put_log, error, IntToStr
   implicit none
-  type(data_buffer), pointer :: db_start
+  type(data_buffer_type), pointer :: db_start
   integer, intent(IN) :: data_id
   integer, intent(OUT) :: status
 
-  type(data_buffer), pointer :: db_current
+  type(data_buffer_type), pointer :: db_current
 
   db_current => db_start
 
@@ -700,8 +700,8 @@ end subroutine reset_data_buffer
 subroutine reset_all_data_buffer(db_start)
   use jcup_utils, only : put_log, IntToStr
   implicit none
-  type(data_buffer), pointer :: db_start
-  type(data_buffer), pointer :: db_current
+  type(data_buffer_type), pointer :: db_start
+  type(data_buffer_type), pointer :: db_current
 
   db_current => db_start
 
@@ -728,10 +728,10 @@ end subroutine reset_all_data_buffer
 subroutine reset_comp_data_buffer(db_start, component_id)
   use jcup_utils, only : put_log, IntToStr
   implicit none
-  type(data_buffer), pointer :: db_start
+  type(data_buffer_type), pointer :: db_start
   integer, intent(IN) :: component_id
 
-  type(data_buffer), pointer :: db_current
+  type(data_buffer_type), pointer :: db_current
 
   db_current => db_start
 
@@ -759,8 +759,8 @@ end subroutine reset_comp_data_buffer
 integer function get_num_of_using_data_buffer(db_start)
   use jcup_utils, only : put_log
   implicit none
-  type(data_buffer), pointer :: db_start
-  type(data_buffer), pointer :: db_current
+  type(data_buffer_type), pointer :: db_start
+  type(data_buffer_type), pointer :: db_current
 
   integer :: counter
 
@@ -784,7 +784,7 @@ end function get_num_of_using_data_buffer
 
 character(len=NAME_LEN) function get_name(db)
   implicit none
-  type(data_buffer), pointer :: db
+  type(data_buffer_type), pointer :: db
 
   get_name = db%name
 
@@ -794,7 +794,7 @@ end function get_name
 
 integer function get_data_type(db)
   implicit none
-  type(data_buffer), pointer :: db
+  type(data_buffer_type), pointer :: db
 
   get_data_type = db%data_type
 
@@ -804,7 +804,7 @@ end function get_data_type
 
 logical function is_using(db)
   implicit none
-  type(data_buffer), pointer :: db
+  type(data_buffer_type), pointer :: db
 
   is_using = db%is_using
 
@@ -814,8 +814,8 @@ end function is_using
 
 function get_next_ptr(db) result(next_ptr)
   implicit none
-  type(data_buffer), pointer :: db
-  type(data_buffer), pointer :: next_ptr
+  type(data_buffer_type), pointer :: db
+  type(data_buffer_type), pointer :: next_ptr
 
   next_ptr => db%next_ptr
  
@@ -827,7 +827,7 @@ subroutine write_data_buffer_info(db)
   use jcup_constant, only : STRING_LEN
   use jcup_utils, only : put_log
   implicit none
-  type(data_buffer), pointer :: db
+  type(data_buffer_type), pointer :: db
   character(len=STRING_LEN) :: log_str
 
   write(log_str,'("  Data buffer info : ",A,L2,I8)') trim(db%name)//", ", db%is_using, size(db%double_d,1)
@@ -843,7 +843,7 @@ subroutine write_data_buffer(data_time, db, fid, comp_id, write_flag, data_name,
   use jcup_mpi_lib, only : jml_isLocalLeader
   implicit none
   integer(kind=8), intent(IN) :: data_time(8)
-  type(data_buffer), pointer :: db
+  type(data_buffer_type), pointer :: db
   integer, intent(IN) :: fid
   integer, intent(IN) :: comp_id
   logical, intent(OUT) :: write_flag
@@ -885,10 +885,10 @@ subroutine restore_data_buffer(dt, component_id, data_id, name, data_type, data_
   character(len=*), intent(IN) :: name
   integer, intent(IN) :: data_type
   integer, intent(IN) :: data_dim
-  type(data_buffer), pointer :: db_start
+  type(data_buffer_type), pointer :: db_start
 
 
-  type(data_buffer), pointer :: db_current
+  type(data_buffer_type), pointer :: db_current
 
   db_current => db_start
   do 
@@ -947,12 +947,12 @@ end module jcup_data_buffer
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 module jcup_time_buffer
-  use jcup_data_buffer, only : data_buffer, NO_DATA
+  use jcup_data_buffer, only : data_buffer_type, NO_DATA
   use jcup_time, only : time_type
 
 !--------------------------------   public  ----------------------------------!
  
-  public :: time_buffer
+  public :: time_buffer_type
   public :: init_time_buffer
   public :: destruct_time_buffer
   public :: search_time_buffer
@@ -971,9 +971,9 @@ module jcup_time_buffer
   public :: get_num_of_data
   public :: write_time_buffer_info
 
-  type time_buffer
-    type(data_buffer), pointer :: dt_start, dt_current
-    type(time_buffer), pointer :: before_ptr, next_ptr    
+  type time_buffer_type
+    type(data_buffer_type), pointer :: dt_start, dt_current
+    type(time_buffer_type), pointer :: before_ptr, next_ptr    
     integer :: num_of_data
     type(time_type) :: time
     logical :: is_using
@@ -988,7 +988,7 @@ contains
 subroutine init_time_buffer(tb, time)
   use jcup_data_buffer, only : init_data_buffer
   implicit none
-  type(time_buffer), pointer :: tb
+  type(time_buffer_type), pointer :: tb
   type(time_type), intent(IN) :: time
 
   allocate(tb)
@@ -1007,9 +1007,9 @@ end subroutine init_time_buffer
 subroutine destruct_time_buffer(tb)
   use jcup_data_buffer, only : destruct_data_buffer
   implicit none
-  type(time_buffer), pointer :: tb
-  type(time_buffer), pointer :: tmp_ptr
-  type(time_buffer), pointer :: start_ptr
+  type(time_buffer_type), pointer :: tb
+  type(time_buffer_type), pointer :: tmp_ptr
+  type(time_buffer_type), pointer :: start_ptr
 
   start_ptr => tb
   do 
@@ -1030,10 +1030,10 @@ subroutine insert_time_buffer(tb, time)
   use jcup_time, only : DateToTimeStr
   use jcup_utils, only : put_log
   implicit none
-  type(time_buffer), pointer :: tb
+  type(time_buffer_type), pointer :: tb
   type(time_type) :: time
 
-  type(time_buffer), pointer :: new_data
+  type(time_buffer_type), pointer :: new_data
   character(len=20) :: time_str
 
   call init_time_buffer(new_data, time)
@@ -1055,10 +1055,10 @@ subroutine delete_time_buffer(tb, time)
   use jcup_time, only : DateToTimeStr
   use jcup_data_buffer, only : destruct_data_buffer
   implicit none
-  type(time_buffer), pointer :: tb
+  type(time_buffer_type), pointer :: tb
   type(time_type), intent(IN) :: time
 
-  type(time_buffer), pointer :: tmp_ptr
+  type(time_buffer_type), pointer :: tmp_ptr
 
   character(len=20) :: time_str
 
@@ -1085,7 +1085,7 @@ subroutine reset_time_buffer(tb, time, component_id)
   use jcup_time, only : DateToTimeStr
   use jcup_data_buffer, only : reset_comp_data_buffer, get_num_of_using_data_buffer
   implicit none
-  type(time_buffer), pointer :: tb
+  type(time_buffer_type), pointer :: tb
   type(time_type), intent(IN) :: time
   integer, intent(IN) :: component_id
 
@@ -1109,11 +1109,11 @@ subroutine reset_past_time_buffer(tb, current_time, component_id)
   use jcup_time, only : operator(<), DateToTimeStr
   use jcup_data_buffer, only : reset_comp_data_buffer, get_num_of_using_data_buffer
   implicit none
-  type(time_buffer), pointer :: tb
+  type(time_buffer_type), pointer :: tb
   type(time_type), intent(IN) :: current_time
   integer, intent(IN) :: component_id
 
-  type(time_buffer), pointer :: start_time
+  type(time_buffer_type), pointer :: start_time
   character(len=20) :: time_str
 
   start_time => tb
@@ -1139,11 +1139,11 @@ subroutine search_time_buffer(tb, time, insert_flag)
   use jcup_utils, only : put_log
   use jcup_time, only : operator(==), DateToTimeStr
   implicit none
-  type(time_buffer), pointer :: tb
+  type(time_buffer_type), pointer :: tb
   type(time_type), intent(IN) :: time
   logical, optional, intent(IN) :: insert_flag 
 
-  type(time_buffer), pointer :: start_time
+  type(time_buffer_type), pointer :: start_time
   character(len=20) :: time_str
   character(len=20) :: old_time_str
   
@@ -1194,8 +1194,8 @@ end subroutine search_time_buffer
 
 function get_start_data_ptr(tb) result(data_ptr)
   implicit none
-  type(time_buffer), pointer :: tb
-  type(data_buffer), pointer :: data_ptr
+  type(time_buffer_type), pointer :: tb
+  type(data_buffer_type), pointer :: data_ptr
 
   data_ptr => tb%dt_start
 
@@ -1205,8 +1205,8 @@ end function get_start_data_ptr
 
 function get_current_data_ptr(tb) result(data_ptr)
   implicit none
-  type(time_buffer), pointer :: tb
-  type(data_buffer), pointer :: data_ptr
+  type(time_buffer_type), pointer :: tb
+  type(data_buffer_type), pointer :: data_ptr
 
   data_ptr => tb%dt_current
 
@@ -1216,9 +1216,9 @@ end function get_current_data_ptr
 
 function get_before_ptr(tb) result(time_ptr)
   implicit none
-  type(time_buffer), pointer :: tb
+  type(time_buffer_type), pointer :: tb
 
-  type(time_buffer), pointer :: time_ptr
+  type(time_buffer_type), pointer :: time_ptr
 
   time_ptr => tb%before_ptr
 
@@ -1228,9 +1228,9 @@ end function get_before_ptr
 
 function get_next_ptr(tb) result(time_ptr)
   implicit none
-  type(time_buffer), pointer :: tb
+  type(time_buffer_type), pointer :: tb
 
-  type(time_buffer), pointer :: time_ptr
+  type(time_buffer_type), pointer :: time_ptr
 
   time_ptr => tb%next_ptr
 
@@ -1240,7 +1240,7 @@ end function get_next_ptr
 
 function get_time(tb) result(time)
   implicit none
-  type(time_buffer), pointer :: tb
+  type(time_buffer_type), pointer :: tb
   type(time_type) :: time
 
   time = tb%time
@@ -1251,7 +1251,7 @@ end function get_time
 
 subroutine inc_num_of_data(tb)
   implicit none
-  type(time_buffer), pointer :: tb
+  type(time_buffer_type), pointer :: tb
 
   tb%num_of_data = tb%num_of_data+1
 
@@ -1261,7 +1261,7 @@ end subroutine inc_num_of_data
 
 subroutine dec_num_of_data(tb)
   implicit none
-  type(time_buffer), pointer :: tb
+  type(time_buffer_type), pointer :: tb
 
   tb%num_of_data = tb%num_of_data-1
 
@@ -1271,7 +1271,7 @@ end subroutine dec_num_of_data
 
 integer function get_num_of_data(tb)
   implicit none
-  type(time_buffer), pointer :: tb
+  type(time_buffer_type), pointer :: tb
 
   get_num_of_data = tb%num_of_data
 
@@ -1281,7 +1281,7 @@ end function get_num_of_data
 
 logical function is_using(tb)
   implicit none
-  type(time_buffer), pointer :: tb
+  type(time_buffer_type), pointer :: tb
 
   is_using = tb%is_using
 
@@ -1295,7 +1295,7 @@ subroutine write_time_buffer_info(tb)
   use jcup_utils, only : put_log
   use jcup_data_buffer, only : write_data_buffer_info, get_next_ptr, get_num_of_using_data_buffer
   implicit none
-  type(time_buffer), pointer :: tb
+  type(time_buffer_type), pointer :: tb
   character(len=20) :: time_str
   character(len=STRING_LEN) :: log_str
 
@@ -1327,121 +1327,118 @@ end module jcup_time_buffer
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-module jcup_buffer
-  use jcup_time_buffer, only : time_buffer
+module jcup_buffer_base
+  use jcup_time_buffer, only : time_buffer_type
   use jcup_time, only : time_type
 
 !--------------------------------   public  ----------------------------------!
 
-  public :: init_buffer
-  public :: destruct_buffer
-  public :: get_send_data_type
-  public :: put_send_data
-  public :: get_send_data
-  public :: remove_send_data
-  public :: remove_send_time
-  public :: remove_past_send_data
-  public :: remove_past_recv_data
+  public :: init_buffer_base
+  public :: destruct_buffer_base
+  public :: get_data_type
+  public :: put_data_base
+  public :: get_data_base
+  public :: remove_data
+  public :: remove_time
+  public :: remove_past_data
+
   public :: get_recv_data_type
-  public :: put_recv_data
-  public :: get_recv_data
-  public :: remove_recv_data
-  public :: remove_recv_time
   public :: buffer_check_write
   public :: get_num_of_time ! integer function (time_buffer_ptr) 2013.06.07 [ADD]
   public :: get_send_buffer_ptr ! function () result (send_buffer_ptr) 2013.06.07 [ADD]
-!   public :: write_buffer ! subroutine (file_id) 2013.05.29 [ADD]
-!   public :: read_buffer  ! subroutine (file_id) 2013.05.29 [ADD]
-  public :: restore_buffer ! subroutine (dt, time, component_id, data_id, name, data_type, data_dim) 2013.06.13 [ADD]
+  !public :: write_buffer ! subroutine (file_id) 2013.05.29 [ADD]
+  !public :: read_buffer  ! subroutine (file_id) 2013.05.29 [ADD]
+  public :: check_write_buffer ! subroutine () 2017/04/28 [ADD]
+  public :: restore_buffer_base ! subroutine (dt, time, component_id, data_id, name, data_type, data_dim) 2013.06.13 [ADD]
 
 !--------------------------------   private  ---------------------------------!
 
   private
 
-  interface put_send_data
-    module procedure put_send_data_double_1d
-    module procedure put_send_data_double_2d
-    module procedure put_send_data_double_3d
+  interface put_data_base
+    module procedure put_data_double_1d
+    module procedure put_data_double_2d
+    module procedure put_data_double_3d
   end interface
 
-  interface get_send_data
-    module procedure get_send_data_double_1d
-    module procedure get_send_data_double_2d
-    module procedure get_send_data_double_3d
+  interface get_data_base
+    module procedure get_data_double_1d
+    module procedure get_data_double_2d
+    module procedure get_data_double_3d
   end interface
 
-  interface put_recv_data
-    module procedure put_recv_data_double_1d
-    module procedure put_recv_data_double_2d
-    module procedure put_recv_data_double_3d
-  end interface
-
-  interface get_recv_data
-    module procedure get_recv_data_double_1d
-    module procedure get_recv_data_double_2d
-    module procedure get_recv_data_double_3d
-  end interface
-
-  type(time_buffer), pointer :: send_buffer
-  type(time_buffer), pointer :: recv_buffer
-
-  private :: put_send_data_double_2d
-  private :: put_send_data_double_3d
-  private :: get_send_data_double_2d
-  private :: get_send_data_double_3d
-  private :: put_recv_data_double_2d
-  private :: put_recv_data_double_3d
-  private :: get_recv_data_double_2d
-  private :: get_recv_data_double_3d
+  private :: put_data_double_2d
+  private :: put_data_double_3d
+  private :: get_data_double_2d
+  private :: get_data_double_3d
   
 contains
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine init_buffer()
+subroutine init_buffer_base(buffer)
   use jcup_time_buffer, only : init_time_buffer
   implicit none
+  type(time_buffer_type), pointer :: buffer
 
   type(time_type) :: time
   time%yyyy = 1000 ; time%mo = 1 ; time%dd = 1 ; time%hh = 1  ; time%mm = 0 ; time%ss = 0
   time%delta_t = 0.d0
-  call init_time_buffer(send_buffer, time)
-  call init_time_buffer(recv_buffer, time)
 
-end subroutine init_buffer
+  call init_time_buffer(buffer, time)
+
+end subroutine init_buffer_base
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine destruct_buffer()
+subroutine init_buffer_base_org(send_buffer, recv_buffer)
+  use jcup_time_buffer, only : init_time_buffer
+  implicit none
+  type(time_buffer_type), pointer :: send_buffer, recv_buffer
+
+  type(time_type) :: time
+  time%yyyy = 1000 ; time%mo = 1 ; time%dd = 1 ; time%hh = 1  ; time%mm = 0 ; time%ss = 0
+  time%delta_t = 0.d0
+
+  call init_time_buffer(send_buffer, time)
+  call init_time_buffer(recv_buffer, time)
+
+end subroutine init_buffer_base_org
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine destruct_buffer_base(send_buffer, recv_buffer)
   use jcup_time_buffer, only : destruct_time_buffer
   implicit none
+  type(time_buffer_type), pointer :: send_buffer, recv_buffer
 
   call destruct_time_buffer(send_buffer)
   call destruct_time_buffer(recv_buffer)
   
-end subroutine destruct_buffer
+end subroutine destruct_buffer_base
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-integer function get_send_data_type(time, data_id)
-  use jcup_data_buffer, only : get_data_type, search_data_buffer
+integer function get_data_type(tb, time, data_id)
+  use jcup_data_buffer, only : get_datatype => get_data_type, search_data_buffer
   use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr
   implicit none
+  type(time_buffer_type), pointer :: tb
   type(time_type), intent(IN) :: time  
   integer, intent(IN) :: data_id
 
-  call search_time_buffer(send_buffer, time)
-  get_send_data_type = get_data_type(search_data_buffer(get_start_data_ptr(send_buffer),data_id))
+  call search_time_buffer(tb, time)
+  get_data_type = get_datatype(search_data_buffer(get_start_data_ptr(tb),data_id))
 
-end function get_send_data_type
+end function get_data_type
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine put_send_data_double_1d(dt, time, component_id, data_id, name, is_mean, weight)
-  use jcup_utils, only : put_log, IntToStr
+subroutine put_data_double_1d(tb, dt, time, component_id, data_id, name, is_mean, weight)
   use jcup_data_buffer, only : put_data
   use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr, inc_num_of_data
   implicit none
+  type(time_buffer_type), pointer :: tb
   real(kind=8), intent(IN) :: dt(:)
   type(time_type), intent(IN) :: time  
   integer, intent(IN) :: component_id, data_id
@@ -1450,23 +1447,20 @@ subroutine put_send_data_double_1d(dt, time, component_id, data_id, name, is_mea
   real(kind=8), intent(IN) :: weight ! weight for data average (delta_t/interval)
   character(len=6) :: weight_str
 
-  !write(weight_str, '(F)') weight
-  call put_log("Put data, data name = "//trim(name)//", data id = "//trim(IntToStr(data_id)), 1) !//", weight= "//trim(weight_str),1)
-  call put_log("put_send_data_double_1d : put data : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//&
-               ", data id = "//trim(IntToStr(data_id)))
-  call search_time_buffer(send_buffer, time)
-  call put_data(dt, component_id, data_id, name, get_start_data_ptr(send_buffer), is_mean, weight)
-  call inc_num_of_data(send_buffer)
+  call search_time_buffer(tb, time)
+  call put_data(dt, component_id, data_id, name, get_start_data_ptr(tb), is_mean, weight)
+  call inc_num_of_data(tb)
 
-end subroutine put_send_data_double_1d
+end subroutine put_data_double_1d
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine put_send_data_double_2d(dt, time, component_id, data_id, name, is_mean, weight)
+subroutine put_data_double_2d(tb, dt, time, component_id, data_id, name, is_mean, weight)
   use jcup_utils, only : put_log, IntToStr
   use jcup_data_buffer, only : put_data
   use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr, inc_num_of_data
   implicit none
+  type(time_buffer_type), pointer :: tb
   real(kind=8), intent(IN) :: dt(:,:)
   type(time_type), intent(IN) :: time  
   integer, intent(IN) :: component_id, data_id
@@ -1474,22 +1468,20 @@ subroutine put_send_data_double_2d(dt, time, component_id, data_id, name, is_mea
   logical, intent(IN) :: is_mean
   real(kind=8), intent(IN) :: weight ! weight for data average (delta_t/interval)
 
-  call put_log("Put data, data name = "//trim(name)//", data id = "//trim(IntToStr(data_id)),1)
-  call put_log("put_send_data_double_2d : put data : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id))//&
-               ", data id = "//trim(IntToStr(data_id)))
-  call search_time_buffer(send_buffer, time)
-  call put_data(dt, component_id, data_id, name, get_start_data_ptr(send_buffer), is_mean, weight)
-  call inc_num_of_data(send_buffer)
+  call search_time_buffer(tb, time)
+  call put_data(dt, component_id, data_id, name, get_start_data_ptr(tb), is_mean, weight)
+  call inc_num_of_data(tb)
 
-end subroutine put_send_data_double_2d
+end subroutine put_data_double_2d
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine put_send_data_double_3d(dt, time, component_id, data_id, name, is_mean, weight)
+subroutine put_data_double_3d(tb, dt, time, component_id, data_id, name, is_mean, weight)
   use jcup_utils, only : put_log, IntToStr
   use jcup_data_buffer, only : put_data
   use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr, inc_num_of_data
   implicit none
+  type(time_buffer_type), pointer :: tb
   real(kind=8), intent(IN) :: dt(:,:,:)
   type(time_type), intent(IN) :: time  
   integer, intent(IN) :: component_id, data_id
@@ -1497,345 +1489,186 @@ subroutine put_send_data_double_3d(dt, time, component_id, data_id, name, is_mea
   logical, intent(IN) :: is_mean
   real(kind=8), intent(IN) :: weight ! weight for data average (delta_t/interval)
 
-  call put_log("Put data, data name = "//trim(name)//", data id = "//trim(IntToStr(data_id)),1)
-  call put_log("put_send_data_double_3d : put data : name = "//trim(name)//", data id = "//trim(IntToStr(data_id)))
-  call search_time_buffer(send_buffer, time)
-  call put_data(dt, component_id, data_id, name, get_start_data_ptr(send_buffer), is_mean, weight)
-  call inc_num_of_data(send_buffer)
+  call search_time_buffer(tb, time)
+  call put_data(dt, component_id, data_id, name, get_start_data_ptr(tb), is_mean, weight)
+  call inc_num_of_data(tb)
 
-end subroutine put_send_data_double_3d
+end subroutine put_data_double_3d
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine get_send_data_double_1d(dt, time, component_id, data_id, name)
+subroutine get_data_double_1d(tb, dt, time, component_id, data_id, name, is_dec, is_reset_data)
   use jcup_utils, only : put_log, IntToStr
-  use jcup_time, only : DateToTimeStr
-  use jcup_data_buffer, only : get_data
-  use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr
+  use jcup_data_buffer, only : get_data, reset_data_buffer
+  use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr, dec_num_of_data, &
+                               get_num_of_data, reset_time_buffer
   implicit none
+  type(time_buffer_type), pointer :: tb
   real(kind=8), intent(INOUT) :: dt(:)
-  type(time_type), intent(IN) :: time  
   integer, intent(IN) :: component_id, data_id
+  type(time_type), intent(IN) :: time  
   character(len=*), intent(IN) :: name
+  logical, optional, intent(IN) :: is_dec
+  logical, optional, intent(IN) :: is_reset_data
+
+  logical :: is_reset
   integer :: status
-  character(len=20) :: time_str
 
-  call DateToTimeStr(time_str, time)
-  call put_log(&
-    & "get_send_data_double_1d : get data : name = "//trim(name)//&
-    & ", data id = "//trim(IntToStr(data_id))//", time = "//trim(time_str))
-  call search_time_buffer(send_buffer, time)
-  call get_data(dt, component_id, data_id, name, get_start_data_ptr(send_buffer), status)
+  if (present(is_reset_data)) then
+    is_reset = is_reset_data
+  else
+    is_reset = .true.
+  end if
 
-end subroutine get_send_data_double_1d
+  call search_time_buffer(tb, time)
+  call get_data(dt, component_id, data_id, name, get_start_data_ptr(tb), status)
+
+  if (present(is_dec)) then
+    if (is_dec) call dec_num_of_data(tb)
+  end if
+
+  if (is_reset) then
+    call reset_data_buffer(get_start_data_ptr(tb), data_id, status)
+    if (get_num_of_data(tb) == 0) then
+      call reset_time_buffer(tb, time, component_id)
+    end if
+  end if
+
+end subroutine get_data_double_1d
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine get_send_data_double_2d(dt, time, component_id, data_id, name)
+subroutine get_data_double_2d(tb, dt, time, component_id, data_id, name, is_dec, is_reset_data)
   use jcup_utils, only : put_log, IntToStr
-  use jcup_data_buffer, only : get_data
-  use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr
+  use jcup_data_buffer, only : get_data, reset_data_buffer
+  use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr, dec_num_of_data, &
+                               get_num_of_data, reset_time_buffer
   implicit none
+  type(time_buffer_type), pointer :: tb
   real(kind=8), intent(INOUT) :: dt(:,:)
-  type(time_type), intent(IN) :: time  
   integer, intent(IN) :: component_id, data_id
+  type(time_type), intent(IN) :: time  
   character(len=*), intent(IN) :: name
+  logical, optional, intent(IN) :: is_dec
+  logical, optional, intent(IN) :: is_reset_data
+
+  logical :: is_reset
   integer :: status
 
-  call put_log("get_send_data_double_2d : get data : name = "//trim(name)//", data id = "//trim(IntToStr(data_id)))
-  call search_time_buffer(send_buffer, time)
-  call get_data(dt, component_id, data_id, name, get_start_data_ptr(send_buffer), status)
+  if (present(is_reset_data)) then
+    is_reset = is_reset_data
+  else
+    is_reset = .true.
+  end if
 
-end subroutine get_send_data_double_2d
+  call search_time_buffer(tb, time)
+  call get_data(dt, component_id, data_id, name, get_start_data_ptr(tb), status)
+
+  if (present(is_dec)) then
+    if (is_dec) call dec_num_of_data(tb)
+  end if
+
+  if (is_reset) then
+    call reset_data_buffer(get_start_data_ptr(tb), data_id, status)
+    if (get_num_of_data(tb) == 0) then
+      call reset_time_buffer(tb, time, component_id)
+    end if
+  end if
+
+end subroutine get_data_double_2d
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine get_send_data_double_3d(dt, time, component_id, data_id, name)
+subroutine get_data_double_3d(tb, dt, time, component_id, data_id, name, is_dec, is_reset_data)
   use jcup_utils, only : put_log, IntToStr
-  use jcup_data_buffer, only : get_data
-  use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr
+  use jcup_data_buffer, only : get_data, reset_data_buffer
+  use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr, dec_num_of_data, &
+                               get_num_of_data, reset_time_buffer
   implicit none
+  type(time_buffer_type), pointer :: tb
   real(kind=8), intent(INOUT) :: dt(:,:,:)
-  type(time_type), intent(IN) :: time  
   integer, intent(IN) :: component_id, data_id
+  type(time_type), intent(IN) :: time  
   character(len=*), intent(IN) :: name
+  logical, optional, intent(IN) :: is_dec
+  logical, optional, intent(IN) :: is_reset_data
+
+  logical :: is_reset
   integer :: status
 
+  if (present(is_reset_data)) then
+    is_reset = is_reset_data
+  else
+    is_reset = .true.
+  end if
 
-  call put_log("get_send_data_double_3d : get data : name = "//trim(name)//", data id = "//trim(IntToStr(data_id)))
-  call search_time_buffer(send_buffer, time)
-  call get_data(dt, component_id, data_id, name, get_start_data_ptr(send_buffer), status)
+  call search_time_buffer(tb, time)
+  call get_data(dt, component_id, data_id, name, get_start_data_ptr(tb), status)
 
-end subroutine get_send_data_double_3d
+  if (present(is_dec)) then
+    if (is_dec) call dec_num_of_data(tb)
+  end if
+
+  if (is_reset) then
+    call reset_data_buffer(get_start_data_ptr(tb), data_id, status)
+    if (get_num_of_data(tb) == 0) then
+      call reset_time_buffer(tb, time, component_id)
+    end if
+  end if
+
+end subroutine get_data_double_3d
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine remove_send_data(time, data_id)
+subroutine remove_data(tb, time, data_id)
   use jcup_data_buffer, only : reset_data_buffer
   use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr
   implicit none 
+  type(time_buffer_type), pointer :: tb
   type(time_type), intent(IN) :: time
   integer, intent(IN) :: data_id
   integer :: status
 
-  call search_time_buffer(send_buffer, time, .false.)
-  call reset_data_buffer(get_start_data_ptr(send_buffer), data_id, status)
+  call search_time_buffer(tb, time, .false.)
+  call reset_data_buffer(get_start_data_ptr(tb), data_id, status)
 
-end subroutine remove_send_data 
+end subroutine remove_data 
   
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine remove_send_time(time, component_id)
+subroutine remove_time(tb, time, component_id)
   use jcup_time_buffer, only : reset_time_buffer
   implicit none
+  type(time_buffer_type), pointer :: tb
   type(time_type), intent(IN) :: time
   integer, intent(IN) :: component_id
  
-  call reset_time_buffer(send_buffer, time, component_id)
+  call reset_time_buffer(tb, time, component_id)
 
-end subroutine remove_send_time
+end subroutine remove_time
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine remove_past_send_data(current_time, component_id)
-  use jcup_utils, only : put_log
+subroutine remove_past_data(tb, current_time, component_id)
   use jcup_time_buffer, only : reset_past_time_buffer
+  implicit none
+  type(time_buffer_type), pointer :: tb
   type(time_type), intent(IN) :: current_time
   integer, intent(IN) :: component_id
 
-  call put_log("remove past send data")
-  call reset_past_time_buffer(send_buffer, current_time, component_id)
+  call reset_past_time_buffer(tb, current_time, component_id)
 
-end subroutine remove_past_send_data
-
-!=======+=========+=========+=========+=========+=========+=========+=========+
-
-subroutine remove_past_recv_data(current_time, component_id)
-  use jcup_utils, only : put_log
-  use jcup_time_buffer, only : reset_past_time_buffer
-  type(time_type), intent(IN) :: current_time
-  integer, intent(IN) :: component_id
-
-  call put_log("remove past recv data")
-  call reset_past_time_buffer(recv_buffer, current_time, component_id)
-
-end subroutine remove_past_recv_data
-
-!=======+=========+=========+=========+=========+=========+=========+=========+
-
-integer function get_recv_data_type(time, data_id)
-  use jcup_data_buffer, only : get_data_type, search_data_buffer
-  use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr
-  implicit none
-  type(time_type), intent(IN) :: time  
-  integer, intent(IN) :: data_id
-
-  call search_time_buffer(recv_buffer, time)
-  get_recv_data_type = get_data_type(search_data_buffer(get_start_data_ptr(recv_buffer),data_id))
-
-end function get_recv_data_type
-
-!=======+=========+=========+=========+=========+=========+=========+=========+
-
-subroutine put_recv_data_double_1d(dt, time, component_id, data_id, name)
-  use jcup_data_buffer, only : put_data
-  use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr, inc_num_of_data
-  implicit none
-  real(kind=8), intent(IN) :: dt(:)
-  type(time_type), intent(IN) :: time  
-  integer, intent(IN) :: component_id, data_id
-  character(len=*), intent(IN) :: name
-
-  call search_time_buffer(recv_buffer, time)
-  call put_data(dt, component_id, data_id, name, get_start_data_ptr(recv_buffer), .false., 1.d0)
-  call inc_num_of_data(recv_buffer)
-
-end subroutine put_recv_data_double_1d
-
-!=======+=========+=========+=========+=========+=========+=========+=========+
-
-subroutine put_recv_data_double_2d(dt, time, component_id, data_id, name)
-  use jcup_data_buffer, only : put_data
-  use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr, inc_num_of_data
-  implicit none
-  real(kind=8), intent(IN) :: dt(:,:)
-  type(time_type), intent(IN) :: time  
-  integer, intent(IN) :: component_id, data_id
-  character(len=*), intent(IN) :: name
-
-  call search_time_buffer(recv_buffer, time)
-  call put_data(dt, component_id, data_id, name, get_start_data_ptr(recv_buffer), .false., 1.d0)
-  call inc_num_of_data(recv_buffer)
-
-end subroutine put_recv_data_double_2d
-
-!=======+=========+=========+=========+=========+=========+=========+=========+
-
-subroutine put_recv_data_double_3d(dt, time, component_id, data_id, name)
-  use jcup_data_buffer, only : put_data
-  use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr, inc_num_of_data
-  implicit none
-  real(kind=8), intent(IN) :: dt(:,:,:)
-  type(time_type), intent(IN) :: time  
-  integer, intent(IN) :: component_id, data_id
-  character(len=*), intent(IN) :: name
-
-  call search_time_buffer(recv_buffer, time)
-  call put_data(dt, component_id, data_id, name, get_start_data_ptr(recv_buffer), .false., 1.d0)
-  call inc_num_of_data(recv_buffer)
-
-end subroutine put_recv_data_double_3d
-
-!=======+=========+=========+=========+=========+=========+=========+=========+
-
-subroutine get_recv_data_double_1d(dt, time, component_id, data_id, name, is_reset_data)
-  use jcup_utils, only : put_log, IntToStr
-  use jcup_data_buffer, only : get_data, reset_data_buffer
-  use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr, dec_num_of_data, &
-                               get_num_of_data, reset_time_buffer
-  implicit none
-  real(kind=8), intent(INOUT) :: dt(:)
-  integer, intent(IN) :: component_id, data_id
-  type(time_type), intent(IN) :: time  
-  character(len=*), intent(IN) :: name
-  logical, optional, intent(IN) :: is_reset_data
-
-  logical :: is_reset
-  integer :: status
-
-  if (present(is_reset_data)) then
-    is_reset = is_reset_data
-  else
-    is_reset = .true.
-  end if
-
-  call put_log("Get data, data name = "//trim(name)//", data id = "//trim(IntToStr(data_id)),1)
-  call search_time_buffer(recv_buffer, time)
-  call get_data(dt, component_id, data_id, name, get_start_data_ptr(recv_buffer), status)
-  call dec_num_of_data(recv_buffer)
-
-  if (is_reset) then
-    call reset_data_buffer(get_start_data_ptr(recv_buffer), data_id, status)
-    if (get_num_of_data(recv_buffer) == 0) then
-      call reset_time_buffer(recv_buffer, time, component_id)
-    end if
-  end if
-
-end subroutine get_recv_data_double_1d
-
-!=======+=========+=========+=========+=========+=========+=========+=========+
-
-subroutine get_recv_data_double_2d(dt, time, component_id, data_id, name, is_reset_data)
-  use jcup_utils, only : put_log, IntToStr
-  use jcup_data_buffer, only : get_data, reset_data_buffer
-  use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr, dec_num_of_data, &
-                               get_num_of_data, reset_time_buffer
-  implicit none
-  real(kind=8), intent(INOUT) :: dt(:,:)
-  integer, intent(IN) :: component_id, data_id
-  type(time_type), intent(IN) :: time  
-  character(len=*), intent(IN) :: name
-  logical, optional, intent(IN) :: is_reset_data
-
-  logical :: is_reset
-  integer :: status
-
-  if (present(is_reset_data)) then
-    is_reset = is_reset_data
-  else
-    is_reset = .true.
-  end if
-
-  call put_log("Get data, data name = "//trim(name)//", data id = "//trim(IntToStr(data_id)),1)
-  call search_time_buffer(recv_buffer, time)
-
-  call get_data(dt, component_id, data_id, name, get_start_data_ptr(recv_buffer), status)
-  call dec_num_of_data(recv_buffer)
-
-  if (is_reset) then
-    call reset_data_buffer(get_start_data_ptr(recv_buffer), data_id, status)
-    if (get_num_of_data(recv_buffer) == 0) then
-      call reset_time_buffer(recv_buffer, time, component_id)
-    end if
-  end if
-
-end subroutine get_recv_data_double_2d
-
-!=======+=========+=========+=========+=========+=========+=========+=========+
-
-subroutine get_recv_data_double_3d(dt, time, component_id, data_id, name, is_reset_data)
-  use jcup_utils, only : put_log, IntToStr
-  use jcup_data_buffer, only : get_data, reset_data_buffer
-  use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr, dec_num_of_data, &
-                               get_num_of_data, reset_time_buffer
-  implicit none
-  real(kind=8), intent(INOUT) :: dt(:,:,:)
-  integer, intent(IN) :: component_id, data_id
-  type(time_type), intent(IN) :: time  
-  character(len=*), intent(IN) :: name
-  logical, optional, intent(IN) :: is_reset_data
-
-  logical :: is_reset
-  integer :: status
-
-  if (present(is_reset_data)) then
-    is_reset = is_reset_data
-  else
-    is_reset = .true.
-  end if
-
-  call put_log("Get data, data name = "//trim(name)//", data id = "//trim(IntToStr(data_id)),1)
-
-  call search_time_buffer(recv_buffer, time)
-  call get_data(dt, component_id, data_id, name, get_start_data_ptr(recv_buffer), status)
-  call dec_num_of_data(recv_buffer)
-
-  if (is_reset) then
-    call reset_data_buffer(get_start_data_ptr(recv_buffer), data_id, status)
-    if (get_num_of_data(recv_buffer) == 0) then
-      call reset_time_buffer(recv_buffer, time, component_id)
-    end if
-  end if
-
-end subroutine get_recv_data_double_3d
-
-!=======+=========+=========+=========+=========+=========+=========+=========+
-
-subroutine remove_recv_data(time, component_id, data_id, name)
-  use jcup_data_buffer, only : reset_data_buffer
-  use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr
-  implicit none 
-  type(time_type), intent(IN) :: time
-  integer, intent(IN) :: component_id, data_id
-  character(len=*), intent(IN) :: name
-  integer :: status
-
-  call search_time_buffer(recv_buffer, time, .false.)
-  call reset_data_buffer(get_start_data_ptr(recv_buffer), data_id, status)
-
-end subroutine remove_recv_data 
-  
-!=======+=========+=========+=========+=========+=========+=========+=========+
-
-subroutine remove_recv_time(time, component_id)
-  use jcup_time_buffer, only : reset_time_buffer
-  implicit none
-  type(time_type), intent(IN) :: time
-  integer, intent(IN) :: component_id
-
-  call reset_time_buffer(recv_buffer, time, component_id)
-
-end subroutine remove_recv_time
+end subroutine remove_past_data
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 integer function get_num_of_time(buffer_ptr)
   use jcup_time_buffer, only : get_next_ptr
   implicit none
-  type(time_buffer), pointer :: buffer_ptr
+  type(time_buffer_type), pointer :: buffer_ptr
   integer :: num_of_time
-  type(time_buffer), pointer :: start_ptr
-  type(time_buffer), pointer :: current_ptr
+  type(time_buffer_type), pointer :: start_ptr
+  type(time_buffer_type), pointer :: current_ptr
 
   start_ptr => buffer_ptr
   current_ptr => buffer_ptr
@@ -1854,53 +1687,30 @@ end function get_num_of_time
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-
-subroutine buffer_check_write()
-  use jcup_utils, only : put_log
+subroutine check_write_buffer(tb)
   use jcup_time_buffer, only : get_next_ptr, write_time_buffer_info
   implicit none
+  type(time_buffer_type), pointer :: tb
+  type(time_buffer_type), pointer :: start_ptr
 
-  type(time_buffer), pointer :: send_start
-
-  call put_log("Check send buffer")
-  send_start => send_buffer
-
-  do 
-    if (.not.associated(send_buffer)) exit
-    call write_time_buffer_info(send_buffer)
-    send_buffer => get_next_ptr(send_buffer)
-    if (associated(send_buffer, send_start)) exit
-  end do
-
-  call put_log("Check recv buffer")
-  send_start => recv_buffer
+  start_ptr => tb
 
   do 
-    if (.not.associated(recv_buffer)) exit
-    call write_time_buffer_info(recv_buffer)
-    recv_buffer => get_next_ptr(recv_buffer)
-    if (associated(recv_buffer, send_start)) exit
+    if (.not.associated(tb)) exit
+    call write_time_buffer_info(tb)
+    tb => get_next_ptr(tb)
+    if (associated(tb, start_ptr)) exit
   end do
-  
-end subroutine buffer_check_write
+
+end subroutine check_write_buffer
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-function get_send_buffer_ptr() result (send_buffer_ptr)
-  implicit none
-  type(time_buffer), pointer :: send_buffer_ptr
-
-  send_buffer_ptr => send_buffer
-
-end function get_send_buffer_ptr
-
-!=======+=========+=========+=========+=========+=========+=========+=========+
-
-subroutine restore_buffer(dt, time, component_id, data_id, name, data_type, data_dim)
-  use jcup_utils, only : put_log, IntToStr
+subroutine restore_buffer_base(tb, dt, time, component_id, data_id, name, data_type, data_dim)
   use jcup_data_buffer, only : restore_data_buffer
   use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr, inc_num_of_data
   implicit none
+  type(time_buffer_type), pointer :: tb
   real(kind=8), intent(IN) :: dt(:)
   type(time_type), intent(IN) :: time  
   integer, intent(IN) :: component_id, data_id
@@ -1908,23 +1718,22 @@ subroutine restore_buffer(dt, time, component_id, data_id, name, data_type, data
   integer, intent(IN) :: data_type
   integer, intent(IN) :: data_dim
 
-  call put_log("restore send data : name = "//trim(name)//", data id = "//trim(IntToStr(data_id)))
-  call search_time_buffer(send_buffer, time)
-  call restore_data_buffer(dt, component_id, data_id, name, data_type, data_dim, get_start_data_ptr(send_buffer))
-  call inc_num_of_data(send_buffer)
+  call search_time_buffer(tb, time)
+  call restore_data_buffer(dt, component_id, data_id, name, data_type, data_dim, get_start_data_ptr(tb))
+  call inc_num_of_data(tb)
 
-end subroutine restore_buffer
+end subroutine restore_buffer_base
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-end module
+end module jcup_buffer_base
 
 !program test
 !  use jcup_data_container
 !  implicit none
 
   
-!  call init_data_buffer()
+!  call init_data_buffern()
 !  call set_step(1)
 !  call set_step(2)
 

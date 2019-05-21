@@ -1,14 +1,14 @@
 JCUPLIBDIR    = ${JCUPDIR}/lib
 JCUPINCDIR    = ${JCUPDIR}/include
 
-MPIDIR = /usr/local/openmpi-1.4.4
-MPILIBDIR = ${MPIDIR}/lib
-MPIINCDIR = ${MPIDIR}/include
-MPIBINDIR = ${MPIDIR}/bin
-MPILINK   = 
+#MPIDIR = /usr/local/openmpi-1.4.4
+#MPILIBDIR = ${MPIDIR}/lib
+#MPIINCDIR = ${MPIDIR}/include
+#MPIBINDIR = ${MPIDIR}/bin
+#MPILINK   = 
 
-FC              = ${MPIBINDIR}/mpif90
-CC		= ${MPIBINDIR}/mpicc
+FC              = mpif90
+CC		= mpicc
 
 DEFMPI = MPI2
 ##DEFINES = -DNEW_MPI -D$(DEFMPI) -DNO_OUTPUT_LOG -DNO_OUTPUT_STDERR -DNOPUTPUT_STDOUT
@@ -19,7 +19,7 @@ DEFINES =
 #OPTIONS = -cpp  -mcmodel medium -shared-intel -check all -g
 #OPTIONS = -g -cpp -C -ladebug
 #OPTIONS = -check all
-OPTIONS = -cpp  -mcmodel medium -shared-intel  -check all -g
+OPTIONS = -Cpp  -mcmodel medium -shared-intel  -check all -g
 #OPTIONS = -cpp -g -O
 
 INCDIRS = -I${MPIINCDIR}

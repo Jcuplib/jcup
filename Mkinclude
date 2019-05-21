@@ -1,7 +1,7 @@
 #
 # Set TOPDIR here or as a environmental variable.
 # 
-JCUPDIR = ${HOME}/jcup
+JCUPDIR = /data1/data/arakawa/Jcup4
 TOPDIR = $(JCUPDIR)
 
 
@@ -11,8 +11,8 @@ TOPDIR = $(JCUPDIR)
 ###SYSTEM         = ES
 #SYSTEM               = Oakleaf.cross
 #SYSTEM          = Linux-IFC.mpich
-#SYSTEM          = Linux-IFC.openmpi
-SYSTEM          = Linux-GNU.openmpi
+SYSTEM          = Linux-IFC.openmpi
+#SYSTEM          = Linux-GNU.openmpi
 
 ################ Directory Specification ###############
 

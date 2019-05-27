@@ -1215,4 +1215,19 @@ srcディレクトリにjcup_interface.f90を配置し、src/c.blackに従来の
 のインターフェースを変更。オプショナル引数time_intpl_tagを追加し、これが設定されている場合非同期通信
 を行うようにした。
 
+-----------------------------------------------------------------
+
+Version:4.020100
+Date:2019/05/27
+
+File:jcup_mpi_lib.f90
+
+
+Routines
+ jml_isend_double_1d_model  : mod
+ jml_irecv_double_1d_model  : mod
+
+Detail
+ if (is == ie) return をコメントアウト。
+ 
 

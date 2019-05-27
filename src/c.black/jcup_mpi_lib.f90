@@ -2809,7 +2809,7 @@ subroutine jml_isend_double_1d_model(comp, data,is,ie,dest_model,dest_pe, exchan
   integer :: data_size
   integer :: i
 
-  if (is == ie) return ! 2017/02/15
+  !!!!!!if (is == ie) return ! 2017/02/15  ! 2019/05/27 comment out
 
   if (present(exchange_tag)) then
     tag = exchange_tag
@@ -2852,7 +2852,7 @@ subroutine jml_irecv_double_1d_model(comp, data,is,ie,source_model,source_pe, ex
   integer :: request
   integer :: status(MPI_STATUS_SIZE)
   
-  if (is == ie) return ! 2017/02/15
+  !!!!!!!if (is == ie) return ! 2017/02/15 ! 2019/05/27 comment out
 
   if (present(exchange_tag)) then
     tag = exchange_tag

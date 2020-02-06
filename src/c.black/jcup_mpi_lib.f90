@@ -13,7 +13,9 @@ module jcup_mpi_lib
   integer,public :: JML_ROOTS_TAG = 120
   integer,public :: JML_ANY_SOURCE = MPI_ANY_SOURCE
 
-  public :: jml_init ! subroutine (isCallInit)
+  public :: jml_set_global_comm   ! subroutine (global_comm)
+  public :: jml_get_global_comm   ! integer function () 
+  public :: jml_init              ! subroutine (isCallInit)
   public :: jml_create_communicator
   public :: jml_finalize
   public :: jml_abort             ! subroutine () ! 2014/07/03 [ADD]
@@ -223,7 +225,8 @@ module jcup_mpi_lib
     module procedure jml_irecv_double_1d_model
   end interface
 
-
+  integer :: GLOBAL_COMM = MPI_COMM_WORLD
+  
   type comm_type
     integer :: group_id
     integer :: group
@@ -266,6 +269,27 @@ module jcup_mpi_lib
 contains
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
+! 2020/02/06 [NEW] set global caommunicator
+subroutine jml_set_global_comm(gcomm)
+  implicit none
+  integer, intent(IN) :: gcomm
+
+  GLOBAL_COMM = gcomm
+
+end subroutine jml_set_global_comm
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! 2020/02/06 [NEW] get global caommunicator
+function  jml_get_global_comm() result(res)
+  implicit none
+  integer :: res
+
+  res = GLOBAL_COMM
+
+end function jml_get_global_comm
+
+  
+!=======+=========+=========+=========+=========+=========+=========+=========+
 ! 2014/08/27 [MOD] add MPI_Initialized 
 subroutine jml_init()
     implicit none
@@ -275,10 +299,10 @@ subroutine jml_init()
     call MPI_initialized(is_initialized, ierror) ! 2014/08/27 [ADD]
     if (.not.is_initialized) call MPI_INIT(ierror)
 
-    call MPI_COMM_GROUP(MPI_COMM_WORLD,global%group,ierror)
-    call MPI_COMM_SIZE(MPI_COMM_WORLD,global%num_of_pe,ierror)
-    call MPI_COMM_RANK(MPI_COMM_WORLD,global%my_rank,ierror)
-    global%mpi_comm = MPI_COMM_WORLD
+    call MPI_COMM_GROUP(GLOBAL_COMM,global%group,ierror)
+    call MPI_COMM_SIZE(GLOBAL_COMM,global%num_of_pe,ierror)
+    call MPI_COMM_RANK(GLOBAL_COMM,global%my_rank,ierror)
+    global%mpi_comm = GLOBAL_COMM
     global%root_rank = 0
 
    ! set initialize flag

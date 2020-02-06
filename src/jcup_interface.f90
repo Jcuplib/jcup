@@ -9,6 +9,8 @@ module jcup_interface
   use jcup_constant, only : NUM_OF_EXCHANGE_DATA, NUM_OF_EXCHANGE_GRID, REAL_DATA, DOUBLE_DATA
   use jcup_constant, only : DATA_1D, DATA_2D, DATA_25D, DATA_3D
   use jcup_constant, only : NAME_LEN
+  use jcup_mpi_lib, only : jcup_set_world => jml_set_global_comm
+  use jcup_mpi_lib, only : jcup_get_world => jml_get_global_comm
   use jcup_mpi_lib, only : jcup_get_myrank_global => jml_GetMyrankGlobal
   use jcup_mpi_lib, only : jcup_get_leader_rank => jml_GetLeaderRank
   use jcup_mpi_lib, only : jcup_get_comm_size => jml_GetCommSizeLocal
@@ -47,6 +49,8 @@ module jcup_interface
 
 !--------------------------------   public  ----------------------------------!
 
+  public :: jcup_set_world    ! subroutine (global_comm)
+  public :: jcup_get_world    ! integer function()
   public :: jcup_set_new_comp ! subroutine (component_name)
   public :: jcup_initialize   ! subroutine (component_name, default_time_unit, log_level, log_stderr) ! 2014/07/11 [MOD]
   public :: jcup_coupling_end ! subroutine (time_array, is_call_mpi_finalize)

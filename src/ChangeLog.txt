@@ -1142,7 +1142,7 @@ Routines
  jml_isend_double_1d_local   : mod
  jml_irecv_double_1d_local   : mod
  jml_isend_double_1d_model   : mod
- jml_irecv_double_1d_model   : modc
+ jml_irecv_double_1d_model   : mod
 
 Detail
  送受信を行わない場合、isend_requestやirecv_requestのallocatable配列に大きさ０の配列をallocateするようにした。
@@ -1206,14 +1206,14 @@ Detail
 Version:4.020000
 Date:2019/05/21
 
-非同期データ交換ライブラリJAL(Jcup Asyncrhonous Library)を追加した。このため、ディレクトリ構造を変更。
-srcディレクトリにjcup_interface.f90を配置し、src/c.blackに従来のJcupファイルを、src/c.whiteにJALファイル
-を置くようにした。
-従来のjcupとjalの動作はjcup_interfaceのサブルーチン内部で切り分けられる。
-動作切り分けのため、
-サブルーチン　jcup_def_varg
-のインターフェースを変更。オプショナル引数time_intpl_tagを追加し、これが設定されている場合非同期通信
-を行うようにした。
+ 非同期データ交換ライブラリJAL(Jcup Asyncrhonous Library)を追加した。このため、ディレクトリ構造を変更。
+ srcディレクトリにjcup_interface.f90を配置し、src/c.blackに従来のJcupファイルを、src/c.whiteにJALファイル
+ を置くようにした。
+ 従来のjcupとjalの動作はjcup_interfaceのサブルーチン内部で切り分けられる。
+ 動作切り分けのため、
+ サブルーチン　jcup_def_varg
+ のインターフェースを変更。オプショナル引数time_intpl_tagを追加し、これが設定されている場合非同期通信
+ を行うようにした。
 
 -----------------------------------------------------------------
 
@@ -1229,5 +1229,24 @@ Routines
 
 Detail
  if (is == ie) return をコメントアウト。
+ 
+-----------------------------------------------------------------
+
+Version:4.030000
+Date:2020/02/06
+
+File:jcup_mpi_lib.f90, jcup_interface.f90
+
+
+Routines
+ jml_set_global_comm        : add
+ jml_get_global_comm        : add
+ jml_init                   : mod
+ jcup_set_world             : add
+ jcup_get_wold              : add
+
+Detail
+ Jcupの動作範囲を限定するためグローバルコミュニケータMPI_COMM_WORLDを廃止し、GLOBAL_COMMを外部から
+ 設定できるようにした。
  
 

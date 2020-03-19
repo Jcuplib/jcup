@@ -1025,7 +1025,7 @@ subroutine set_local_grid_mapping_1d(recv_comp_id, send_comp_id, mapping_tag, &
                                      send_grid_tag, recv_grid_tag, send_grid, recv_grid, send_pe_num)
   use jcup_pe_array, only : write_pe_array_info
   use jcup_grid_base, only : local_area_type, get_my_local_area_ptr
-  use jcup_utils, only : put_log
+  use jcup_utils, only : put_log, sort_int_1d, binary_search
   use jcup_mpi_lib, only : jml_GetMyrankGlobal
   implicit none
   integer, intent(IN) :: recv_comp_id
@@ -1036,6 +1036,7 @@ subroutine set_local_grid_mapping_1d(recv_comp_id, send_comp_id, mapping_tag, &
   integer, intent(IN) :: send_grid(:), recv_grid(:) ! send grid number and recv grid number on local operation
   integer, intent(IN) :: send_pe_num(:) ! send pe number on local operation 
   integer, allocatable :: pe_num_of_my_send_point(:)
+  integer, allocatable :: sort_grid(:), sort_index(:)
   integer :: i, j
   type(local_area_type), pointer :: local_area_ptr
 
@@ -1102,16 +1103,45 @@ subroutine set_local_grid_mapping_1d(recv_comp_id, send_comp_id, mapping_tag, &
 
   call put_log("set_local_grid_mapping_1d 4", 2)
 
-
-  do i = 1, peg%num_of_my_send_point
-    do j = 1, size(send_grid)
-      if (peg%global_index_of_my_send_point(i)==send_grid(j)) then
-        pe_num_of_my_send_point(i) = send_pe_num(j)
-        exit
-      end if
-    end do
+  !goto 8000
+  ! new
+  allocate(sort_grid(size(send_grid)))
+  allocate(sort_index(size(send_grid)))
+  do i = 1, size(send_grid)
+    sort_grid(i) = send_grid(i)
+    sort_index(i) = i
   end do
 
+  call sort_int_1d(size(send_grid), sort_grid, sort_index)
+  
+  ! binary seeach
+
+  do i = 1, peg%num_of_my_send_point
+     j = binary_search(sort_grid, peg%global_index_of_my_send_point(i))
+     if ((j<=0).or.(j>size(send_grid))) then
+        write(0, *) "ERROR of binary search ", i, peg%global_index_of_my_send_point(i) 
+        stop 9999
+     end if
+     if (j>0) then
+        pe_num_of_my_send_point(i) = send_pe_num(sort_index(j))
+     end if
+  end do
+
+  deallocate(sort_grid, sort_index)
+ 
+    
+  !8000 continue
+  !do i = 1, peg%num_of_my_send_point
+  !  do j = 1, size(send_grid)
+  !    if (peg%global_index_of_my_send_point(i)==send_grid(j)) then
+  !      pe_num_of_my_send_point(i) = send_pe_num(j)
+  !      exit
+  !    end if
+  !  end do
+  !end do
+
+  !write(900+jml_GetMyrankGlobal(), *) pe_num_of_my_send_point
+  
   call put_log("set_local_grid_mapping_1d 5", 2)
 
   peg%send_index_converter(:) = 0
@@ -1153,14 +1183,40 @@ subroutine set_local_grid_mapping_1d(recv_comp_id, send_comp_id, mapping_tag, &
   peg%local_index(:) = 0
   local_area_ptr => get_my_local_area_ptr(recv_comp_id, recv_grid_tag)
 
-  do i = 1, size(recv_grid)
-    do j = 1, size(local_area_ptr%grid_index)
-      if (recv_grid(i) == local_area_ptr%grid_index(j)) then
-        peg%local_index(i) = j
-        exit
-      end if
-    end do
+
+  allocate(sort_grid(size(local_area_ptr%grid_index)))
+  allocate(sort_index(size(sort_grid)))
+  do i = 1, size(sort_grid)
+    sort_grid(i) = local_area_ptr%grid_index(i)
+    sort_index(i) = i
   end do
+
+  call sort_int_1d(size(sort_grid), sort_grid, sort_index)
+  
+  ! binary seeach
+
+  do i = 1, size(recv_grid)
+     j = binary_search(sort_grid, recv_grid(i))
+     if ((j<=0).or.(j>size(sort_index))) then
+        write(0, *) "ERROR of binary search ", j, i, recv_grid(i)
+        stop 9999
+     end if
+     if (j>0) then
+        peg%local_index(i) = sort_index(j)
+     end if
+  end do
+
+  deallocate(sort_grid, sort_index)
+
+
+  !do i = 1, size(recv_grid)
+  !  do j = 1, size(local_area_ptr%grid_index)
+  !    if (recv_grid(i) == local_area_ptr%grid_index(j)) then
+  !      peg%local_index(i) = j
+  !      exit
+  !    end if
+  !  end do
+  !end do
 
   call put_log("set_local_grid_mapping_1d 8", 2)
 

@@ -1248,5 +1248,21 @@ Routines
 Detail
  Jcupの動作範囲を限定するためグローバルコミュニケータMPI_COMM_WORLDを廃止し、GLOBAL_COMMを外部から
  設定できるようにした。
+
+-----------------------------------------------------------------
+
+Version:4.030100
+Date:2020/03/19
+
+File:jcup_utils.f90, jcup_grid.f90
+
+
+Routines
+ soft_int_1d                : mod
+ binary_search              : add
+ set_local_grid_mapping_1d  : mod
+
+Detail
+ jcup_gridのset_local_grid_mapping_1dでO(n2)のサーチループをbinary searchに変更した。
  
 

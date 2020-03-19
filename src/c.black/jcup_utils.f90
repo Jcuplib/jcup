@@ -32,6 +32,7 @@ module jcup_utils
   public :: IDate2CDate
   public :: cdate_2_idate
   public :: sort_int_1d
+  public :: binary_search
   public :: split_string
   public :: TrimString
   public :: startsWith
@@ -514,31 +515,43 @@ end subroutine cdate_2_idate
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! 2017/01/09 [MOD] radix sort
-subroutine sort_int_1d(num_of_data, data)
+subroutine sort_int_1d(num_of_data, data, data2)
   implicit none
   integer, intent(IN) :: num_of_data
   integer, intent(INOUT) :: data(num_of_data)
+  integer, optional, intent(INOUT) :: data2(num_of_data)
   integer :: sindex(num_of_data)
+  integer :: sindex2(num_of_data)
   integer :: digit
   integer :: i
 
   digit = int(log10(float(maxval(data)))) + 1
 
-  do i = 1, digit
-    call radix_sort(i, num_of_data, data, sindex)
-    data(:) = sindex(:)
-  end do
+  if (present(data2)) then
+    do i = 1, digit
+      call radix_sort(i, num_of_data, data, sindex, data2, sindex2)
+      data(:) = sindex(:)
+      data2(:) = sindex2(:)
+    end do
+  else
+    do i = 1, digit
+      call radix_sort(i, num_of_data, data, sindex)
+      data(:) = sindex(:)
+    end do
+  end if
 
 end subroutine sort_int_1d
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! 2017/01/09 [NEW]
-subroutine radix_sort(fig, num_of_data, num1, num2)
+subroutine radix_sort(fig, num_of_data, num1, num2, num3, num4)
   implicit none
   integer, intent(IN) :: fig
   integer, intent(IN) :: num_of_data
   integer, intent(IN) :: num1(:)
   integer, intent(INOUT) :: num2(:)
+  integer, optional, intent(IN) :: num3(:)
+  integer, optional, intent(INOUT) :: num4(:)
   integer :: num_of_radix(0:9) ! 0, 9
   integer :: offset(0:9)
   integer :: radix_counter(0:9)
@@ -571,9 +584,39 @@ subroutine radix_sort(fig, num_of_data, num1, num2)
     spos = offset(mod_rad) + radix_counter(mod_rad)
     num2(spos) = num1(i)
 
+    if (present(num3)) then
+      num4(spos) = num3(i)
+    end if
+
   end do
 
 end subroutine radix_sort
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+function binary_search(data, key) result(res)
+  implicit none
+  integer, intent(IN) :: data(:)
+  integer, intent(IN) :: key
+  integer :: middle, low, high
+  integer :: res
+
+  low = 1
+  high = size(data)
+
+  do while (low <= high)
+    middle = (low+high)/2
+    if (key == data(middle)) then
+      res = middle
+      return ;
+    else if (key < data(middle)) then
+      high = middle - 1
+    else
+      low = middle + 1
+    end if
+  end do
+  res = - 1
+end function binary_search
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 

@@ -2711,15 +2711,18 @@ subroutine jml_set_num_of_isend(num_of_isend)
   implicit none
   integer, intent(IN) :: num_of_isend
 
-  if (num_of_isend<=0) then ! 2017/02/15
-    allocate(isend_request(0))
-    allocate(isend_status(MPI_STATUS_SIZE, 0))
-    return
-  end if
-
   if (associated(isend_request)) then
     if (size(isend_request) >= num_of_isend) return
   end if
+
+  if (num_of_isend<=0) then ! 2017/02/15
+    if (.not.associated(isend_request)) then
+      allocate(isend_request(1))
+      allocate(isend_status(MPI_STATUS_SIZE, 1))
+      return
+    end if
+  end if
+
 
   if (associated(isend_request)) deallocate(isend_request)
   if (associated(isend_status))  deallocate(isend_status)
@@ -2736,14 +2739,16 @@ subroutine jml_set_num_of_irecv(num_of_irecv)
   implicit none
   integer, intent(IN) :: num_of_irecv
 
-  if (num_of_irecv<=0) then ! 2017/02/15
-    allocate(irecv_request(0))
-    allocate(irecv_status(MPI_STATUS_SIZE, 0))
-    return
-  end if
-
   if (associated(irecv_request)) then
     if (size(irecv_request) >= num_of_irecv) return
+  end if
+  
+  if (num_of_irecv<=0) then ! 2017/02/15
+    if (.not.associated(irecv_request)) then
+      allocate(irecv_request(1))
+      allocate(irecv_status(MPI_STATUS_SIZE, 1))
+      return
+    end if
   end if
 
   if (associated(irecv_request)) deallocate(irecv_request)

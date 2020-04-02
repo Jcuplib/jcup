@@ -368,10 +368,13 @@ subroutine jcup_coupling_end(time_array, isCallFinalize)
   call put_log("!!!!!!!!!!!!!!!!   COUPLER FINALIZE  !!!!!!!!!!!!!!! ", 1)
   call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
 
-  call jal_finish()
   
   call send_final_step_data()
-  
+
+  if (is_assync_exchange) then
+    call jal_finish()
+  end if
+ 
   call destruct_buffer()
 
   call destruct_all_time()

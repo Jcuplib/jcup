@@ -1264,5 +1264,34 @@ Routines
 
 Detail
  jcup_gridのset_local_grid_mapping_1dでO(n2)のサーチループをbinary searchに変更した。
+
+-----------------------------------------------------------------
+
+Version:4.030101
+Date:2020/04/01
+
+File:jcup_mpi_lib.f90
+
+
+Routines
+ jml_set_num_of_isend       : mod
+ jml_set_num_of_irecv       : mod
+
+Detail
+ set_num_of_isend, irecvで引数に０が渡されたとき、それまでの大きさを上書きするバグを修正。
+
+-----------------------------------------------------------------
+
+Version:4.030102
+Date:2020/04/02
+
+File:jcup_interface.f90
+
+
+Routines
+ jcup_coupling_end          : mod
+
+Detail
+ 直列結合でsend_final_step_dataの前にjal_finishが呼ばれてデッドロックするバグを修正。
  
 

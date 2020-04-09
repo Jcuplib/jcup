@@ -30,7 +30,8 @@ module jcup_interface
   use jcup_intercomm, only : jcup_init_advanced_exchange => init_advanced_exchange
   use jcup_exchange, only : jcup_send_data_immediately, jcup_recv_data_immediately, &
                             jcup_put_data_1d_double, jcup_put_data_25d_double, &
-                            jcup_get_data_1d_double, jcup_get_data_25d_double
+                            jcup_get_data_1d_double, jcup_get_data_25d_double, &
+                            jcup_set_fill_value => set_fill_value
   use jcup_interpolation, only : interpolate_data
   use jcup_interpolation_interface, only : jcup_get_local_operation_index  => get_local_operation_index
   use jcup_interpolation_interface, only : jcup_get_send_grid_index => get_send_grid_index 
@@ -72,12 +73,13 @@ module jcup_interface
   public :: jcup_def_grid          ! subroutine (grid_index, model_name, grid_name, num_of_vgrid)
   public :: jcup_end_grid_def      ! subroutine ()
   public :: jcup_get_grid_info     ! subroutine (comp_name, grid_name, num_of_index, min_index, max_index) 2013.09.20 [ADD]
-  public :: jcup_set_default_configuration ! subroutine (my_comp_name, send_comp_name, recv_mode, interval, time_lag, mapping_tag, exchange_tag)
+  public :: jcup_set_default_configuration ! subroutine (my_comp_name, send_comp_name,
+                                           !             recv_mode, interval, time_lag, mapping_tag, exchange_tag)
   public :: jcup_def_varp          ! subroutine (data_type_ptr, comp_name, data_name, grid_name, num_of_data)
-  public :: jcup_def_varg ! subroutine (data_type_ptr, comp_name, data_name, grid_name, num_of_data, 
-                          ! send_model_name, send_data_name, recv_mode, interval, time_lag, mapping_tag, exchange_tag)
+  public :: jcup_def_varg          ! subroutine (data_type_ptr, comp_name, data_name, grid_name, num_of_data, 
+                                   ! send_model_name, send_data_name, recv_mode, interval, time_lag, mapping_tag, exchange_tag)
   public :: jcup_end_var_def       ! subroutine ()
-
+  public :: jcup_set_fill_value    ! subroutine (fill_value) 
   public :: jcup_init_time         ! subroutine (time_array) :: integer time_array(6)
   public :: jcup_set_time          ! subroutine (component_name, time_array, delta_t, is_exchange)
                                    ! subroutine (component_name, time_real, delta_t)  ! 2013.0910 [ADD]

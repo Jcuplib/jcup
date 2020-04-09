@@ -1293,5 +1293,20 @@ Routines
 
 Detail
  直列結合でsend_final_step_dataの前にjal_finishが呼ばれてデッドロックするバグを修正。
- 
+
+-----------------------------------------------------------------
+
+Version:4.040000
+Date:2020/04/09
+
+File:jcup_interface.f90, jcup_exchange.f90
+
+Routines
+ jcup_set_fill_value        : add
+ jcup_interpolate_data_1d   : mod
+ jcup_interpolate_data_25d  : mod
+
+Detail
+ 補間計算時に補間に関わらない格子点にfill_valueを与えるようにした。
+
 

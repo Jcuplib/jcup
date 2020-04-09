@@ -12,19 +12,20 @@ module jcup_exchange
 
 !--------------------------------   public  ----------------------------------!
 
-  public :: init_exchange     ! subroutine (num_of_comp)
-  public :: finalize_exchange ! subroutine ()
-  public :: allocate_recv_flag ! subroutine (flag_size)
-  public :: init_buffer_1d   ! subroutine (max_grid, max_data)
-  public :: init_buffer_25d  ! subroutine (max_data)
-  public :: set_step_flag    ! subroutine (step_flag)
-  public :: set_exchange_comp_id ! subroutine (comp_id)
-  public :: set_send_mapping_table ! subroutine (send_comp_id, recv_comp_id, grid_tag)
-  public :: set_recv_mapping_table ! subroutine (recv_comp_id, send_comp_id, grid_tag)
+  public :: init_exchange               ! subroutine (num_of_comp)
+  public :: finalize_exchange           ! subroutine ()
+  public :: allocate_recv_flag          ! subroutine (flag_size)
+  public :: init_buffer_1d              ! subroutine (max_grid, max_data)
+  public :: init_buffer_25d             ! subroutine (max_data)
+  public :: set_step_flag               ! subroutine (step_flag)
+  public :: set_exchange_comp_id        ! subroutine (comp_id)
+  public :: set_send_mapping_table      ! subroutine (send_comp_id, recv_comp_id, grid_tag)
+  public :: set_recv_mapping_table      ! subroutine (recv_comp_id, send_comp_id, grid_tag)
   public :: check_mapping_table_setting ! subroutine ()
-  public :: set_send_grid_tag ! subroutine (send_comp_id, recv_comp_id, map_num, grid_tag)
-  public :: set_recv_grid_tag ! subroutine (recv_comp_id, send_comp_id, map_num, grid_tag)
-  public :: send_final_step_data ! subroutine ()
+  public :: set_send_grid_tag           ! subroutine (send_comp_id, recv_comp_id, map_num, grid_tag)
+  public :: set_recv_grid_tag           ! subroutine (recv_comp_id, send_comp_id, map_num, grid_tag)
+  public :: send_final_step_data        ! subroutine ()
+  public :: set_fill_value              ! subroutine (fill_value)
   public :: jcup_exchange_data_parallel
   public :: jcup_exchange_data_serial
   public :: jcup_send_data_immediately
@@ -33,10 +34,12 @@ module jcup_exchange
   public :: jcup_put_data_25d_double
   public :: jcup_get_data_1d_double
   public :: jcup_get_data_25d_double
-  public :: write_all_scalar_data ! subroutine(fid, comp_id)
-  public :: recv_all_scalar_data ! subroutine()
+  public :: write_all_scalar_data       ! subroutine(fid, comp_id)
+  public :: recv_all_scalar_data        ! subroutine()
 
 !--------------------------------   private  ---------------------------------!
+
+  real(kind=8), private :: fill_value = 0.d0 
 
   integer :: max_grid_size
   integer :: max_data_num
@@ -1612,8 +1615,20 @@ subroutine jcup_exchange_data_25d_double(dest_model_name, data_name, average_dat
 
 end subroutine jcup_exchange_data_25d_double
 
+
 !=======+=========+=========+=========+=========+=========+=========+=========+
-! 2014/10/31 [MOD] add is_immediate_recv
+
+subroutine set_fill_value(fill_v)
+  implicit none
+  real(kind=8), intent(IN) :: fill_v
+
+  fill_value = fill_v
+
+end subroutine set_fill_value
+
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
 subroutine jcup_interpolate_data_1d_double(source_model_name, data_name, num_of_data, exchange_data_id, is_immediate_recv)
   use jcup_utils, only : error, put_log
   use jcup_mpi_lib, only : jml_GetMyrankGlobal
@@ -1666,7 +1681,7 @@ subroutine jcup_interpolate_data_1d_double(source_model_name, data_name, num_of_
   call interpolate_data_1d(current_comp_id, source_comp_id, recv_mapping_tag(current_comp_id, source_comp_id), &
                            DOUBLE_DATA, num_of_data, exchange_tag)
 
-  buffer_double1d = 0.d0
+  buffer_double1d = fill_value
 
   call get_data(current_comp_id, source_comp_id, recv_mapping_tag(current_comp_id, source_comp_id), &
                 buffer_double1d(:,:), num_of_data)
@@ -1686,7 +1701,7 @@ subroutine jcup_interpolate_data_1d_double(source_model_name, data_name, num_of_
 end subroutine jcup_interpolate_data_1d_double
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-! 2014/10/31 [MOD] add is_immediate_recv
+
 subroutine jcup_interpolate_data_25d_double(source_model_name, data_name, num_of_data, exchange_data_id, is_immediate_recv)
   use jcup_utils, only : error, put_log
   use jcup_grid_base, only : get_my_local_area
@@ -1731,7 +1746,7 @@ subroutine jcup_interpolate_data_25d_double(source_model_name, data_name, num_of
   call interpolate_data_1d(current_comp_id, source_comp_id, recv_mapping_tag(current_comp_id, source_comp_id), &
                            DOUBLE_DATA, num_of_data, exchange_tag)
 
-  buffer_double25d = 0.d0
+  buffer_double25d = fill_value
 
   call get_data(current_comp_id, source_comp_id, recv_mapping_tag(current_comp_id, source_comp_id), &
                 buffer_double25d(:,:), num_of_data)

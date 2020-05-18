@@ -1309,4 +1309,45 @@ Routines
 Detail
  補間計算時に補間に関わらない格子点にfill_valueを与えるようにした。
 
+-----------------------------------------------------------------
+
+Version:4.040001
+Date:2020/05/14
+
+File:jcup_utils.f90
+
+Routines
+ sort_int_1d                : mod
+ radix_sort                 : mod
+
+Detail
+ num_of_data=0の時にソートルーチンを抜けるよう修正。また桁数が多いときに
+ 桁落ちを防ぐ修正を施した。
+
+-----------------------------------------------------------------
+
+Version:4.050000
+Date:2020/05/14
+
+File:jcup_interpolation_interface.f90
+
+Routines
+ jcup_recv_array            : mod
+
+Detail
+ 受信した後Bcastするかどうかのフラグを追加。
+
+-----------------------------------------------------------------
+
+Version:4.050100
+Date:2020/05/14
+
+File:jcup_grid_base.f90
+
+Routines
+ global_index_to_local_index : mod
+
+Detail
+ if (num_of_point <= 0) returnを追加
+
 

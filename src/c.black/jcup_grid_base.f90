@@ -529,6 +529,8 @@ subroutine global_index_to_local_index(comp_id, grid_num, global_area, local_ind
 
   local_index = NO_GRID
 
+  !!!if (comp_area(comp_id)%local_area(grid_num)%num_of_point <= 0) return !!!! 20200514
+
   do i = 1, comp_area(comp_id)%local_area(grid_num)%num_of_point
     if (global_area == comp_area(comp_id)%local_area(grid_num)%grid_index(i)) then
       local_index = i

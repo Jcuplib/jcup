@@ -214,13 +214,17 @@ end subroutine send_array_to_recv_model_str
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine recv_array_from_send_model_str(my_comp_name, send_comp_name, array)
+subroutine recv_array_from_send_model_str(my_comp_name, send_comp_name, array, bcast_flag)
   use jcup_mpi_lib, only : jml_isLocalLeader, jml_RecvLeader, jml_BcastLocal
   use jcup_comp, only : get_comp_id_from_name
   implicit none
   character(len=*), intent(IN) :: my_comp_name, send_comp_name
   character(len=*), intent(INOUT) :: array
+  logical, optional, intent(IN) :: bcast_flag
   integer  :: send_model
+  logical :: is_bcast = .true.
+
+  if (present(bcast_flag)) is_bcast = bcast_flag
 
   my_model = get_comp_id_from_name(my_comp_name)
   send_model = get_comp_id_from_name(send_comp_name)
@@ -229,7 +233,7 @@ subroutine recv_array_from_send_model_str(my_comp_name, send_comp_name, array)
     call jml_RecvLeader(array, send_model-1)
   end if
 
-  call jml_BcastLocal(my_model, array)
+  if (is_bcast) call jml_BcastLocal(my_model, array)
 
 end subroutine recv_array_from_send_model_str
 
@@ -255,13 +259,18 @@ end subroutine send_array_to_recv_model_int
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine recv_array_from_send_model_int(my_comp_name, send_comp_name, array)
+subroutine recv_array_from_send_model_int(my_comp_name, send_comp_name, array, bcast_flag)
   use jcup_mpi_lib, only : jml_isLocalLeader, jml_RecvLeader, jml_BcastLocal
   use jcup_comp, only : get_comp_id_from_name
   implicit none
   character(len=*), intent(IN) :: my_comp_name, send_comp_name
   integer, intent(INOUT) :: array(:)
+  logical, optional, intent(IN) :: bcast_flag
   integer  :: send_model
+  logical :: is_bcast = .true.
+
+  if (present(bcast_flag)) is_bcast = bcast_flag
+
 
   my_model = get_comp_id_from_name(my_comp_name)
   send_model = get_comp_id_from_name(send_comp_name)
@@ -270,7 +279,7 @@ subroutine recv_array_from_send_model_int(my_comp_name, send_comp_name, array)
     call jml_RecvLeader(array, 1, size(array), send_model-1)
   end if
 
-  call jml_BcastLocal(my_model, array, 1, size(array))
+  if (is_bcast) call jml_BcastLocal(my_model, array, 1, size(array))
 
 end subroutine recv_array_from_send_model_int
 
@@ -296,13 +305,18 @@ end subroutine send_array_to_recv_model_real
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine recv_array_from_send_model_real(my_comp_name, send_comp_name, array)
+subroutine recv_array_from_send_model_real(my_comp_name, send_comp_name, array, bcast_flag)
   use jcup_mpi_lib, only : jml_isLocalLeader, jml_RecvLeader, jml_BcastLocal
   use jcup_comp, only : get_comp_id_from_name
   implicit none
   character(len=*), intent(IN) :: my_comp_name, send_comp_name
   real(kind=4), intent(INOUT) :: array(:)
+  logical, optional, intent(IN) :: bcast_flag
   integer :: send_model
+  logical :: is_bcast = .true.
+
+  if (present(bcast_flag)) is_bcast = bcast_flag
+
 
   my_model = get_comp_id_from_name(my_comp_name)
   send_model = get_comp_id_from_name(send_comp_name)
@@ -311,7 +325,7 @@ subroutine recv_array_from_send_model_real(my_comp_name, send_comp_name, array)
     call jml_RecvLeader(array, 1, size(array), send_model-1)
   end if
 
-  call jml_BcastLocal(my_model, array, 1, size(array))
+  if (is_bcast) call jml_BcastLocal(my_model, array, 1, size(array))
 
 end subroutine recv_array_from_send_model_real
 
@@ -337,13 +351,18 @@ end subroutine send_array_to_recv_model_dbl
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine recv_array_from_send_model_dbl(my_comp_name, send_comp_name, array)
+subroutine recv_array_from_send_model_dbl(my_comp_name, send_comp_name, array, bcast_flag)
   use jcup_mpi_lib, only : jml_isLocalLeader, jml_RecvLeader, jml_BcastLocal
   use jcup_comp, only : get_comp_id_from_name
   implicit none
   character(len=*), intent(IN) :: my_comp_name, send_comp_name
   real(kind=8), intent(INOUT) :: array(:)
+  logical, optional, intent(IN) :: bcast_flag
   integer  :: send_model
+  logical :: is_bcast = .true.
+
+  if (present(bcast_flag)) is_bcast = bcast_flag
+
 
   my_model = get_comp_id_from_name(my_comp_name)
   send_model = get_comp_id_from_name(send_comp_name)
@@ -352,7 +371,7 @@ subroutine recv_array_from_send_model_dbl(my_comp_name, send_comp_name, array)
     call jml_RecvLeader(array, 1, size(array), send_model-1)
   end if
 
-  call jml_BcastLocal(my_model, array, 1, size(array))
+  if (is_bcast) call jml_BcastLocal(my_model, array, 1, size(array))
 
 end subroutine recv_array_from_send_model_dbl
 

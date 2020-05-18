@@ -338,6 +338,10 @@ subroutine jcup_initialize(model_name, default_time_unit, log_level, log_stderr)
 
   my_model_name = model_name
 
+  !!!!!!
+  return   !!!!! 20200514
+  !!!!!!
+
   call jal_init(my_model_name)
   
 end subroutine jcup_initialize

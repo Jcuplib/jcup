@@ -254,7 +254,7 @@ module jcup_mpi_lib
 
   integer :: size_int, size_real, size_double
 
-  integer :: buffer_size = 10000
+  integer :: buffer_size = 1000000
   real(kind=8), pointer :: local_buffer(:)
 
 

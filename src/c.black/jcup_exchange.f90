@@ -5,7 +5,7 @@
 module jcup_exchange
   use jcup_constant, only : NUM_OF_EXCHANGE_DATA, NUM_OF_EXCHANGE_GRID, REAL_DATA, DOUBLE_DATA
   use jcup_constant, only : DATA_1D, DATA_2D, DATA_25D, DATA_3D
-  use jcup_constant, only : NAME_LEN
+  use jcup_constant, only : STR_SHORT
   use jcup_time, only : time_type
   implicit none
   private
@@ -346,7 +346,7 @@ subroutine send_final_step_data()
   use jcup_utils, only : put_log
   use jcup_comp, only : get_num_of_total_component, get_component_name, is_my_component
   implicit none
-  character(len=NAME_LEN) :: component_name
+  character(len=STR_SHORT) :: component_name
   integer :: i, j
 
   do i = 1, get_num_of_total_component()
@@ -373,7 +373,7 @@ end subroutine send_final_step_data
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine jcup_exchange_data_send(send_comp_id, recv_comp_id, is_final_step)
-  use jcup_constant, only : STRING_LEN
+  use jcup_constant, only : STR_LONG
   use jcup_utils, only : put_log, IntToStr, error, NO_OUTPUT_LOG, get_log_level
   use jcup_config, only : get_num_of_recv_data, get_recv_data_conf_ptr, &
                           recv_data_conf_type, is_source_model, &
@@ -390,12 +390,12 @@ subroutine jcup_exchange_data_send(send_comp_id, recv_comp_id, is_final_step)
   integer :: my_model
   integer :: d, dd
   type(recv_data_conf_type), pointer :: rd, rrdd
-  character(len=NAME_LEN) :: data_name(NUM_OF_EXCHANGE_DATA)
-  character(len=NAME_LEN) :: average_data_name(NUM_OF_EXCHANGE_DATA)
+  character(len=STR_SHORT) :: data_name(NUM_OF_EXCHANGE_DATA)
+  character(len=STR_SHORT) :: average_data_name(NUM_OF_EXCHANGE_DATA)
   logical :: is_average(NUM_OF_EXCHANGE_DATA)
   integer :: num_of_data
   integer :: num_of_2d_array
-  character(len=STRING_LEN) :: log_str
+  character(len=STR_LONG) :: log_str
   integer :: exchange_data_id
 
   my_model = send_comp_id
@@ -959,7 +959,7 @@ end subroutine jcup_exchange_data_serial_old
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, is_final_step)
-  use jcup_constant, only : STRING_LEN
+  use jcup_constant, only : STR_LONG
   use jcup_mpi_lib, only : jml_GetMyrankGlobal, jml_GetCommSizeLocal
   use jcup_utils, only : put_log, IntToStr, error, NO_OUTPUT_LOG, get_log_level
   use jcup_config, only : set_current_conf, get_num_of_recv_data, get_recv_data_conf_ptr, &
@@ -978,13 +978,13 @@ subroutine jcup_exchange_data_local(send_comp_id, recv_comp_id, c_time, is_final
 
   integer :: d, dd
   type(recv_data_conf_type), pointer :: rd, rrdd
-  character(len=NAME_LEN) :: send_data_name(NUM_OF_EXCHANGE_DATA)
-  character(len=NAME_LEN) :: average_send_data_name(NUM_OF_EXCHANGE_DATA)
-  character(len=NAME_LEN) :: recv_data_name(NUM_OF_EXCHANGE_DATA)
+  character(len=STR_SHORT) :: send_data_name(NUM_OF_EXCHANGE_DATA)
+  character(len=STR_SHORT) :: average_send_data_name(NUM_OF_EXCHANGE_DATA)
+  character(len=STR_SHORT) :: recv_data_name(NUM_OF_EXCHANGE_DATA)
   logical :: is_average(NUM_OF_EXCHANGE_DATA)
   integer :: num_of_data
   integer :: num_of_2d_array
-  character(len=STRING_LEN) :: log_str
+  character(len=STR_LONG) :: log_str
   integer :: exchange_data_id
   integer :: target_comp
   integer :: data_dimension
@@ -1156,7 +1156,7 @@ end subroutine jcup_exchange_data_local
 !> @param[in] time_lag time_lag setting
 ! 2014/10/31 [MOD] get_current_time -> get_before_time
 subroutine jcup_send_data_immediately(send_comp_name, recv_comp_name, time_lag) !dest_task, c_time, is_final_step)
-  use jcup_constant, only : STRING_LEN
+  use jcup_constant, only : STR_LONG
   use jcup_utils, only : put_log, IntToStr, error, NO_OUTPUT_LOG, get_log_level
   use jcup_config, only : set_current_conf, get_num_of_recv_data, get_recv_data_conf_ptr, &
                           recv_data_conf_type, is_source_model, get_current_comp_id, &
@@ -1175,12 +1175,12 @@ subroutine jcup_send_data_immediately(send_comp_name, recv_comp_name, time_lag) 
   integer :: send_comp_id, recv_comp_id
   integer :: d, dd
   type(recv_data_conf_type), pointer :: rd, rrdd
-  character(len=NAME_LEN) :: data_name(NUM_OF_EXCHANGE_DATA)
-  character(len=NAME_LEN) :: average_data_name(NUM_OF_EXCHANGE_DATA)
+  character(len=STR_SHORT) :: data_name(NUM_OF_EXCHANGE_DATA)
+  character(len=STR_SHORT) :: average_data_name(NUM_OF_EXCHANGE_DATA)
   logical :: is_average(NUM_OF_EXCHANGE_DATA)
   integer :: num_of_data
   integer :: num_of_2d_array
-  character(len=STRING_LEN) :: log_str
+  character(len=STR_LONG) :: log_str
   character(len=20) :: time_str
   integer :: exchange_data_id
   integer :: target_comp, target_comp_id
@@ -1310,7 +1310,7 @@ end subroutine jcup_send_data_immediately
 ! 2014/07/08 [MOD] len=14 -> len=20
 ! 2014/10/31 [MOD] get_current_time -> get_before_time
 subroutine jcup_recv_data_immediately(send_comp_name, recv_comp_name)
-  use jcup_constant, only : STRING_LEN
+  use jcup_constant, only : STR_LONG
   use jcup_utils, only : put_log, IntToStr, error, NO_OUTPUT_LOG, get_log_level
   use jcup_config, only : set_current_conf, get_num_of_recv_data, get_recv_data_conf_ptr, &
                           recv_data_conf_type, is_source_model, get_current_comp_id, &
@@ -1330,13 +1330,13 @@ subroutine jcup_recv_data_immediately(send_comp_name, recv_comp_name)
   integer :: send_comp_id, recv_comp_id
   integer :: d, dd
   type(recv_data_conf_type), pointer :: rd, rrdd
-  character(len=NAME_LEN) :: send_data_name(NUM_OF_EXCHANGE_DATA)
-  character(len=NAME_LEN) :: average_send_data_name(NUM_OF_EXCHANGE_DATA)
-  character(len=NAME_LEN) :: recv_data_name(NUM_OF_EXCHANGE_DATA)
+  character(len=STR_SHORT) :: send_data_name(NUM_OF_EXCHANGE_DATA)
+  character(len=STR_SHORT) :: average_send_data_name(NUM_OF_EXCHANGE_DATA)
+  character(len=STR_SHORT) :: recv_data_name(NUM_OF_EXCHANGE_DATA)
   logical :: is_average(NUM_OF_EXCHANGE_DATA)
   integer :: num_of_data
   integer :: num_of_2d_array
-  character(len=STRING_LEN) :: log_str
+  character(len=STR_LONG) :: log_str
   character(len=20) :: time_str
   integer :: exchange_data_id
   integer :: target_comp, target_comp_id
@@ -1482,8 +1482,8 @@ subroutine jcup_exchange_data_1d_double(dest_model_name, data_name, average_data
   use jcup_config, only : GetMappingTag, get_send_data_id
   implicit none
   character(len=*), intent(IN) :: dest_model_name
-  character(len=NAME_LEN), intent(IN) :: data_name(:)
-  character(len=NAME_LEN), intent(IN) :: average_data_name(:)
+  character(len=STR_SHORT), intent(IN) :: data_name(:)
+  character(len=STR_SHORT), intent(IN) :: average_data_name(:)
   integer, intent(IN) :: num_of_data
   integer, intent(IN) :: exchange_data_id
   logical, intent(IN) :: is_average(:)
@@ -1561,8 +1561,8 @@ subroutine jcup_exchange_data_25d_double(dest_model_name, data_name, average_dat
   use jcup_mpi_lib, only : jml_GetMyrankGlobal
   implicit none
   character(len=*), intent(IN) :: dest_model_name
-  character(len=NAME_LEN), intent(IN) :: data_name
-  character(len=NAME_LEN), intent(IN) :: average_data_name
+  character(len=STR_SHORT), intent(IN) :: data_name
+  character(len=STR_SHORT), intent(IN) :: average_data_name
   integer, intent(IN) :: num_of_data
   integer, intent(IN) :: exchange_data_id
   logical, intent(IN) :: is_average
@@ -1640,7 +1640,7 @@ subroutine jcup_interpolate_data_1d_double(source_model_name, data_name, num_of_
   use jcup_config, only : GetRecvMappingTag, GetExchangeTag, get_recv_data_id_from_data_name
   implicit none
   character(len=*), intent(IN) :: source_model_name
-  character(len=NAME_LEN), intent(IN) :: data_name(:)
+  character(len=STR_SHORT), intent(IN) :: data_name(:)
   integer, intent(IN) :: num_of_data
   integer, intent(IN) :: exchange_data_id
   logical, optional, intent(IN) :: is_immediate_recv
@@ -1712,7 +1712,7 @@ subroutine jcup_interpolate_data_25d_double(source_model_name, data_name, num_of
   use jcup_config, only : GetRecvMappingTag, GetExchangeTag, get_recv_data_id_from_data_name
   implicit none
   character(len=*), intent(IN) :: source_model_name
-  character(len=NAME_LEN), intent(IN) :: data_name
+  character(len=STR_SHORT), intent(IN) :: data_name
   integer, intent(IN) :: num_of_data
   integer, intent(IN) :: exchange_data_id
   logical, optional, intent(IN) :: is_immediate_recv
@@ -1819,7 +1819,7 @@ logical function jcup_isPutOK(data_type, time)
   implicit none
   type(varp_type), pointer :: data_type
   type(time_type), intent(IN) :: time
-  character(len=NAME_LEn) :: name
+  character(len=STR_SHORT)    :: name
  
   name = get_data_name(data_type)
 
@@ -1879,13 +1879,13 @@ subroutine jcup_put_data_1d_double(data_type, data, data_vector)
   real(kind=8), optional, intent(IN) :: data_vector(:)
 
   type(time_type)   :: time, next_time
-  character(NAME_LEN) :: average_data_name
+  character(STR_SHORT) :: average_data_name
   type(send_data_conf_type), pointer :: sd
   real(kind=8) :: averaging_weight
   integer :: delta_t
   integer :: my_comp_id
   integer :: i
-  character(len=NAME_LEN) :: data_name
+  character(len=STR_SHORT) :: data_name
   logical :: is_average
 
   call put_log("--------------------------------- jcup_put_data ------------------------------------")
@@ -1988,13 +1988,13 @@ subroutine jcup_put_data_25d_double(data_type, data, data_vector)
   real(kind=8), intent(IN) :: data(:,:)
   real(kind=8), optional, intent(IN) :: data_vector(:)
   type(time_type)   :: time, next_time
-  character(NAME_LEN) :: average_data_name
+  character(STR_SHORT) :: average_data_name
   type(send_data_conf_type), pointer :: sd
   real(kind=8) :: averaging_weight
   integer :: delta_t
   integer :: my_comp_id
   integer :: i
-  character(len=NAME_LEN) :: data_name
+  character(len=STR_SHORT) :: data_name
   logical :: is_average
 
   call put_log("--------------------------------- jcup_put_data ------------------------------------")
@@ -2076,7 +2076,7 @@ logical function jcup_isGetOK(data_type, time)
   implicit none
   type(varg_type), pointer :: data_type
   type(time_type), intent(IN) :: time
-  character(len=NAME_LEN) :: name
+  character(len=STR_SHORT) :: name
 
 
   jcup_isGetOK = .false.
@@ -2126,8 +2126,8 @@ subroutine jcup_get_data_1d_double(data_type, data, data_vector, is_recv_ok)
   type(time_type) :: time
   logical :: is_data_reset
   integer :: my_comp_id
-  character(len=NAME_LEN) :: send_data_name
-  character(len=NAME_LEN) :: data_name
+  character(len=STR_SHORT) :: send_data_name
+  character(len=STR_SHORT) :: data_name
   type(recv_data_conf_type), pointer :: rd
   real(kind=8) :: scalar_data
   
@@ -2206,8 +2206,8 @@ subroutine jcup_get_data_25d_double(data_type, data, data_vector, is_recv_ok)
   type(time_type) :: time
   logical :: is_data_reset
   integer :: my_comp_id
-  character(len=NAME_LEN) :: send_data_name
-  character(len=NAME_LEN) :: data_name
+  character(len=STR_SHORT) :: send_data_name
+  character(len=STR_SHORT) :: data_name
   type (recv_data_conf_type), pointer :: rd
   real(kind=8) :: scalar_data
   
@@ -2275,8 +2275,8 @@ subroutine jcup_put_send_data_1d_double(sd, rd, data)
   integer :: is, ie, js, je, ks, ke
   integer :: ni, nj
   integer :: d
-  character(len=NAME_LEN) :: data_name
-  character(len=NAME_LEN) :: recv_data_name
+  character(len=STR_SHORT) :: data_name
+  character(len=STR_SHORT) :: recv_data_name
   type(time_type) :: time
   integer :: exchange_tag(1)
 
@@ -2401,8 +2401,8 @@ subroutine jcup_put_send_data_25d_double(sd, rd, data)
   integer :: is, ie, js, je, ks, ke
   integer :: ni, nj
   integer :: d
-  character(len=NAME_LEN) :: data_name
-  character(len=NAME_LEN) :: recv_data_name
+  character(len=STR_SHORT) :: data_name
+  character(len=STR_SHORT) :: recv_data_name
   type(time_type) :: time
   integer :: exchange_tag(1)
   integer :: num_of_data
@@ -2532,8 +2532,8 @@ subroutine jcup_recv_get_data_1d_double(send_comp_id, rd, data)
   integer :: ni, nj
   integer :: d
   integer :: exchange_tag(NUM_OF_EXCHANGE_DATA)
-  character(len=NAME_LEN) :: data_name
-  character(len=NAME_LEN) :: send_data_name
+  character(len=STR_SHORT) :: data_name
+  character(len=STR_SHORT) :: send_data_name
   type(time_type) :: time
 
   data_name = rd%name
@@ -2682,8 +2682,8 @@ subroutine jcup_recv_get_data_25d_double(send_comp_id, rd, data)
   integer :: ni, nj
   integer :: d
   integer :: exchange_tag(NUM_OF_EXCHANGE_DATA)
-  character(len=NAME_LEN) :: data_name
-  character(len=NAME_LEN) :: send_data_name
+  character(len=STR_SHORT) :: data_name
+  character(len=STR_SHORT) :: send_data_name
   type(time_type) :: time
   integer :: num_of_data
 
@@ -2836,7 +2836,7 @@ end subroutine check_put_array_size
 ! 2015/05/18 [MOD] add call jml_ReduceMeanLocal
 ! 2015/06/22 [MOD] jml_ReduceMeanLocal -> jml_ReduceSumLocal
 subroutine send_data_scalar(varp, data)
-  use jcup_constant, only : NAME_LEN
+  use jcup_constant, only : STR_SHORT
   use jcup_data, only : varp_type, get_data_name
   use jcup_config, only : send_data_conf_type, get_send_data_conf_ptr
   use jcup_mpi_lib, only : jml_SendLeader, jml_isLocalLeader, jml_ReduceSumLocal
@@ -2846,7 +2846,7 @@ subroutine send_data_scalar(varp, data)
   type(varp_type), pointer :: varp
   real(kind=8), intent(IN) :: data
   type(send_data_conf_type), pointer :: sd
-  character(len=NAME_LEN) :: data_name
+  character(len=STR_SHORT) :: data_name
   real(kind=8) :: data_array(1)
   integer :: dest
   integer :: tag
@@ -2885,7 +2885,7 @@ end subroutine send_data_scalar
 !> @param[in] data 
 ! 2018/02/07 [NEW]
 subroutine send_data_vector(varp, data)
-  use jcup_constant, only : NAME_LEN
+  use jcup_constant, only : STR_SHORT
   use jcup_data, only : varp_type, get_data_name
   use jcup_config, only : send_data_conf_type, get_send_data_conf_ptr
   use jcup_mpi_lib, only : jml_SendLeader, jml_isLocalLeader, jml_ReduceSumLocal
@@ -2895,7 +2895,7 @@ subroutine send_data_vector(varp, data)
   type(varp_type), pointer :: varp
   real(kind=8), intent(IN) :: data(:)
   type(send_data_conf_type), pointer :: sd
-  character(len=NAME_LEN) :: data_name
+  character(len=STR_SHORT) :: data_name
   integer :: dest
   integer :: tag
   integer :: i
@@ -2931,7 +2931,7 @@ end subroutine send_data_vector
 !> @param[in] data 
 ! 2015/04/01 [NEW]
 subroutine recv_data_scalar(varg, data)
-  use jcup_constant, only : NAME_LEN, NO_DATA
+  use jcup_constant, only : STR_SHORT, NO_DATA
   use jcup_mpi_lib, only : jml_ProbeLeader, jml_RecvLeader
   use jcup_data, only : varg_type, get_data_name
   use jcup_config, only : recv_data_conf_type, get_recv_data_conf_ptr
@@ -2939,7 +2939,7 @@ subroutine recv_data_scalar(varg, data)
   implicit none
   type(varg_type), pointer :: varg
   real(kind=8), intent(INOUT) :: data
-  character(len=NAME_LEN) :: data_name
+  character(len=STR_SHORT) :: data_name
   real(kind=8) :: data_array(1)
   type(recv_data_conf_type), pointer :: rd
   integer :: source, tag
@@ -2971,7 +2971,7 @@ end subroutine recv_data_scalar
 !> @param[in] data 
 ! 2018/02/07 [NEW]
 subroutine recv_data_vector(varg, data)
-  use jcup_constant, only : NAME_LEN, NO_DATA
+  use jcup_constant, only : STR_SHORT, NO_DATA
   use jcup_mpi_lib, only : jml_ProbeLeader, jml_RecvLeader
   use jcup_data, only : varg_type, get_data_name
   use jcup_config, only : recv_data_conf_type, get_recv_data_conf_ptr
@@ -2979,7 +2979,7 @@ subroutine recv_data_vector(varg, data)
   implicit none
   type(varg_type), pointer :: varg
   real(kind=8), intent(INOUT) :: data(:)
-  character(len=NAME_LEN) :: data_name
+  character(len=STR_SHORT) :: data_name
   type(recv_data_conf_type), pointer :: rd
   integer :: source, tag
 
@@ -3007,7 +3007,7 @@ end subroutine recv_data_vector
 ! 2015/04/06 [NEW]
 subroutine write_all_scalar_data(fid, comp_id)
   use jcup_utils, only : put_log, IntToStr
-  use jcup_constant, only : NAME_LEN
+  use jcup_constant, only : STR_SHORT
   use jcup_comp, only : get_num_of_total_component, is_my_component, get_component_name
   use jcup_config, only : recv_data_conf_type, get_num_of_recv_data, get_recv_data_conf_ptr_from_id
   use jcup_mpi_lib, only : jml_GetLeaderRank, jml_ProbeLeader, jml_RecvLeader
@@ -3016,7 +3016,7 @@ subroutine write_all_scalar_data(fid, comp_id)
   integer, intent(IN) :: comp_id
   type(recv_data_conf_type), pointer :: rd
   real(kind=8) :: data_array(1)
-  character(len=NAME_LEN) :: comp_name
+  character(len=STR_SHORT) :: comp_name
   integer :: source, tag
   integer :: j
 

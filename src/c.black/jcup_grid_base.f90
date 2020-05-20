@@ -6,7 +6,7 @@
 !All rights reserved.
 !
 module jcup_grid_base
-  use jcup_constant, only : MAX_GRID, MAX_MODEL, NO_GRID, NAME_LEN
+  use jcup_constant, only : MAX_GRID, MAX_MODEL, NO_GRID, STR_SHORT
   private
 
 !--------------------------------   public  ----------------------------------!
@@ -41,7 +41,7 @@ module jcup_grid_base
     integer :: num_of_point
     integer, pointer :: grid_index(:)
     integer :: min_index, max_index
-    character(len=NAME_LEN) :: grid_name 
+    character(len=STR_SHORT) :: grid_name 
     integer :: grid_num
   end type
 
@@ -50,7 +50,7 @@ module jcup_grid_base
     integer :: num_of_index
     integer :: min_index, max_index
     integer, pointer :: index2pe(:) ! mapping table of grid index to pe number
-    character(len=NAME_LEN) :: grid_name
+    character(len=STR_SHORT) :: grid_name
     integer :: grid_num 
   end type
 
@@ -58,7 +58,7 @@ module jcup_grid_base
     integer :: num_of_grid
     type(local_area_type) :: local_area(MAX_GRID) ! number of grid of the component
     type(global_area_type) :: global_area(MAX_GRID) 
-    character(len=NAME_LEN) :: comp_name
+    character(len=STR_SHORT) :: comp_name
     integer :: comp_num ! component number
     integer :: num_of_pe
   end type
@@ -309,7 +309,7 @@ subroutine exchange_grid_info()
   integer :: local_leader_pe
   integer :: cmp, grd
   integer :: int_buffer(6)
-  character(len=NAME_LEN) :: name_buffer
+  character(len=STR_SHORT) :: name_buffer
 
   do cmp = 1, get_num_of_component()
 
@@ -431,7 +431,7 @@ end function get_num_of_point
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-character(len=NAME_LEN) function get_comp_name_from_grid_name(grid_name)
+character(len=STR_SHORT) function get_comp_name_from_grid_name(grid_name)
   use jcup_utils, only : error
   implicit none
   character(len=*), intent(IN) :: grid_name

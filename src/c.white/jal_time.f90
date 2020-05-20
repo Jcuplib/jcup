@@ -1,7 +1,7 @@
 !====================================================================================================
 
 module jal_time
-  use jcup_constant, only : NAME_LEN, STRING_LEN
+  use jcup_constant, only : STR_SHORT, STR_LONG
   use jcup_time, only : time_type
   implicit none
   private
@@ -29,7 +29,7 @@ module jal_time
   integer :: my_comp_id
 
   type comp_time_type
-    character(len=NAME_LEN) :: comp_name
+    character(len=STR_SHORT) :: comp_name
     type(time_type), pointer :: current_time
     type(time_type), pointer :: before_time
     integer(kind=8) :: current_sec
@@ -96,8 +96,7 @@ subroutine jal_time_init()
     send_sec(i) = -1
     recv_sec(i) = -1
     
- end do
-
+  end do
   
   call jal_init_window(my_comp_id, 1)
 
@@ -136,7 +135,7 @@ subroutine jal_set_time(delta_t)
   real(kind=8) :: time_array(2), send_time_array(2)
   integer :: loop_length
   logical :: recv_flag
-  character(len=STRING_LEN) :: log_str
+  character(len=STR_LONG) :: log_str
 
   if (is_first_step) call jal_init_exchange(my_comp_id)
 
@@ -317,7 +316,7 @@ subroutine jal_time_end()
   real(kind=8) :: time_array(2)
   integer :: i, j
   integer :: data(1)
-  character(len=STRING_LEN) :: log_str
+  character(len=STR_LONG) :: log_str
   
   write(log_str,*) "/////////////////////////////// jal_time_end start //////////////////////////////// ", &
              my_comp_id, step_counter
@@ -385,7 +384,7 @@ function is_send_time_org(my_before_sec, my_current_sec, my_next_sec,  &
   integer(kind=8), intent(IN) :: recv_sec
   integer(kind=8), intent(INOUT) :: send_sec
   logical :: res
-  character(len=STRING_LEN) :: log_str
+  character(len=STR_LONG) :: log_str
 
   write(log_str, *) "is_send_time ", my_before_sec, my_current_sec, my_next_sec, &
            target_before_sec, target_current_sec, target_next_sec, recv_sec, send_sec
@@ -449,7 +448,7 @@ function is_send_time(my_before_sec, my_current_sec, my_next_sec,  &
   integer(kind=8), intent(IN) :: recv_sec
   integer(kind=8), intent(INOUT) :: send_sec
   logical :: res
-  character(len=STRING_LEN) :: log_str
+  character(len=STR_LONG) :: log_str
 
   write(log_str, *) "is_send_time ", my_before_sec, my_current_sec, my_next_sec, &
            target_before_sec, target_current_sec, target_next_sec, recv_sec, send_sec
@@ -502,7 +501,7 @@ logical function is_recv_time(my_before_sec, my_current_sec, my_next_sec,  &
   integer(kind=8), intent(IN) :: target_current_sec
   integer(kind=8), intent(IN) :: target_next_sec
   integer(kind=8), intent(INOUT) :: recv_sec
-  character(len=STRING_LEN) :: log_str
+  character(len=STR_LONG) :: log_str
 
   write(log_str, *) "is_recv_time ", my_before_sec, my_current_sec, my_next_sec, &
            target_before_sec, target_current_sec, target_next_sec, recv_sec
@@ -527,7 +526,7 @@ integer function cal_num_of_recv(my_before_sec, my_current_sec, target_current_s
   integer(kind=8), intent(IN) :: target_current_sec
   integer(kind=8), intent(IN) :: target_next_sec
   integer(kind=8), intent(INOUT) :: recv_sec
-  character(len=STRING_LEN) :: log_str
+  character(len=STR_LONG) :: log_str
   
   write(log_str, *) "cal_num_of_recv ", my_before_sec, my_current_sec, target_current_sec, target_next_sec, recv_sec
   call put_log(trim(log_str))

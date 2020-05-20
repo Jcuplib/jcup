@@ -8,7 +8,7 @@
 !All rights reserved.
 !
 module jcup_data_buffer
-  use jcup_constant, only : NAME_LEN, REAL_DATA, DOUBLE_DATA, DATA_1D, DATA_2D, DATA_3D
+  use jcup_constant, only : STR_SHORT, REAL_DATA, DOUBLE_DATA, DATA_1D, DATA_2D, DATA_3D
   private
 
 !--------------------------------   public  ----------------------------------!
@@ -38,7 +38,7 @@ module jcup_data_buffer
     integer :: component_id
     integer :: data_id
     real(kind=8), pointer :: double_d(:)
-    character(len=NAME_LEN) :: name
+    character(len=STR_SHORT) :: name
     logical :: is_using
     integer :: data_type ! real, double 
     integer :: data_dim  ! 2D or 3D
@@ -78,7 +78,7 @@ subroutine init_data_buffer(db)
   allocate(db)
   db%before_ptr => db
   db%next_ptr => db
-  db%name = repeat(" ",NAME_LEN)
+  db%name = repeat(" ",STR_SHORT)
   db%is_using = .false.
   nullify(db%double_d)
 
@@ -510,7 +510,7 @@ end subroutine put_data_double_3d
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine get_data_double_1d(dt, component_id, data_id, name, db_start, status)
-  use jcup_constant, only : NAME_LEN
+  use jcup_constant, only : STR_SHORT
   use jcup_utils, only : put_log, error, IntToStr
   implicit none
   real(kind=8), intent(INOUT) :: dt(:)
@@ -554,7 +554,7 @@ end subroutine get_data_double_1d
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine get_data_double_2d(dt, component_id, data_id, name, db_start, status)
-  use jcup_constant, only : NAME_LEN
+  use jcup_constant, only : STR_SHORT
   use jcup_utils, only : put_log, error, IntToStr
   implicit none
   real(kind=8), intent(INOUT) :: dt(:,:)
@@ -596,7 +596,7 @@ end subroutine get_data_double_2d
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine get_data_double_3d(dt, component_id, data_id, name, db_start, status)
-  use jcup_constant, only : NAME_LEN
+  use jcup_constant, only : STR_SHORT
   use jcup_utils, only : put_log, error, IntToStr
   implicit none
   real(kind=8), intent(INOUT) :: dt(:,:,:)
@@ -679,7 +679,7 @@ subroutine reset_data_buffer(db_start, data_id, status)
       db_current%data_id = 0
       db_current%component_id = 0
       db_current%is_using = .false.
-      db_current%name = repeat(" ",NAME_LEN)
+      db_current%name = repeat(" ",STR_SHORT)
       status = 0 ; 
       return
     end if
@@ -713,7 +713,7 @@ subroutine reset_all_data_buffer(db_start)
     db_current%data_id = 0
     db_current%component_id = 0
     db_current%is_using = .false.
-    db_current%name = repeat(" ",NAME_LEN)
+    db_current%name = repeat(" ",STR_SHORT)
     if (associated(db_current%next_ptr, db_start)) return
     db_current => db_current%next_ptr
   end do
@@ -744,7 +744,7 @@ subroutine reset_comp_data_buffer(db_start, component_id)
       db_current%data_id = 0
       db_current%component_id = 0
       db_current%is_using = .false.
-      db_current%name = repeat(" ",NAME_LEN)
+      db_current%name = repeat(" ",STR_SHORT)
     end if
     if (associated(db_current%next_ptr, db_start)) return
     db_current => db_current%next_ptr
@@ -782,7 +782,7 @@ end function get_num_of_using_data_buffer
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-character(len=NAME_LEN) function get_name(db)
+character(len=STR_SHORT) function get_name(db)
   implicit none
   type(data_buffer_type), pointer :: db
 
@@ -824,11 +824,11 @@ end function get_next_ptr
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine write_data_buffer_info(db)
-  use jcup_constant, only : STRING_LEN
+  use jcup_constant, only : STR_MID
   use jcup_utils, only : put_log
   implicit none
   type(data_buffer_type), pointer :: db
-  character(len=STRING_LEN) :: log_str
+  character(len=STR_MID) :: log_str
 
   write(log_str,'("  Data buffer info : ",A,L2,I8)') trim(db%name)//", ", db%is_using, size(db%double_d,1)
 
@@ -1290,14 +1290,14 @@ end function is_using
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! 2014/07/08 [MOD] len=14 -> len=20
 subroutine write_time_buffer_info(tb)
-  use jcup_constant, only : STRING_LEN
+  use jcup_constant, only : STR_LONG
   use jcup_time, only : DateToTimeStr
   use jcup_utils, only : put_log
   use jcup_data_buffer, only : write_data_buffer_info, get_next_ptr, get_num_of_using_data_buffer
   implicit none
   type(time_buffer_type), pointer :: tb
   character(len=20) :: time_str
-  character(len=STRING_LEN) :: log_str
+  character(len=STR_LONG) :: log_str
 
   call DateToTimeStr(time_str, tb%time)
 

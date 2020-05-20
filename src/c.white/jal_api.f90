@@ -1,7 +1,7 @@
 !====================================================================================================
 
 module jal_api
-  use jcup_constant, only : NAME_LEN
+  use jcup_constant, only : STR_SHORT
   use jal_time, only : jal_set_time
   implicit none
   private
@@ -24,7 +24,7 @@ module jal_api
      module procedure jal_get_data_1d, jal_get_data_2d
   end interface jal_get_data
   
-  character(len=NAME_LEN) :: my_name
+  character(len=STR_SHORT) :: my_name
   integer :: my_comp_id
 
   logical :: is_init_exchange = .false.
@@ -73,7 +73,7 @@ subroutine jal_put_data_1d(varp, dt)
   implicit none
   type(varp_type), pointer :: varp
   real(kind=8), intent(IN) :: dt(:)
-  character(len=NAME_LEN) :: data_name
+  character(len=STR_SHORT) :: data_name
   type(time_type), pointer :: time_ptr
 
   if (.not.is_init_exchange) then
@@ -106,7 +106,7 @@ subroutine jal_put_data_2d(varp, dt)
   implicit none
   type(varp_type), pointer :: varp
   real(kind=8), intent(IN) :: dt(:,:)
-  character(len=NAME_LEN) :: data_name
+  character(len=STR_SHORT) :: data_name
   type(time_type), pointer :: time_ptr
 
   if (.not.is_init_exchange) then
@@ -140,7 +140,7 @@ subroutine jal_get_data_1d(varg, dt)
   implicit none
   type(varg_type), pointer :: varg
   real(kind=8), intent(INOUT) :: dt(:)
-  character(len=NAME_LEN) :: data_name
+  character(len=STR_SHORT) :: data_name
   type(time_type), pointer :: time_ptr
 
   if (.not.is_init_exchange) then
@@ -173,7 +173,7 @@ subroutine jal_get_data_2d(varg, dt)
   implicit none
   type(varg_type), pointer :: varg
   real(kind=8), intent(INOUT) :: dt(:,:)
-  character(len=NAME_LEN) :: data_name
+  character(len=STR_SHORT) :: data_name
   type(time_type), pointer :: time_ptr
 
   if (.not.is_init_exchange) then

@@ -3,7 +3,7 @@
 !All rights reserved.
 !
 module jcup_data
-  use jcup_constant, only : NAME_LEN
+  use jcup_constant, only : STR_SHORT
   use jcup_grid_base, only : local_area_type
   use jcup_config, only : send_data_conf_type, recv_data_conf_type
   use jcup_time, only : time_type
@@ -28,7 +28,7 @@ module jcup_data
   public :: get_num_of_exchange_recv_data ! integer function (comp_id, data_name) ! return num_of_data ( = num_of_vgrid) of the data
   public :: is_data_defined
   public :: get_comp_id   ! integer function (varp_type or varg_type)
-  public :: get_data_name ! character(len=NAME_LEN) function (varp_type or varg_type)
+  public :: get_data_name ! character(len=STR_SHORT) function (varp_type or varg_type)
   public :: set_time ! subroutine (varp_type or varg_type, current_time)
   public :: get_time ! type(time_type) function (varp_type or varg_type)
   public :: get_varp_data_dim ! integer function (varp_type) ! 2015/02/23 [ADD]
@@ -53,7 +53,7 @@ module jcup_data
 
   type varp_type
     type(varp_type), pointer :: next_ptr
-    character(len=NAME_LEN) :: name
+    character(len=STR_SHORT) :: name
     integer :: grid_index
     type(local_area_type), pointer :: my_grid
     type(send_data_conf_type), pointer :: sd => null()
@@ -69,15 +69,15 @@ module jcup_data
 
   type varg_type
     type(varg_type), pointer :: next_ptr
-    character(len=NAME_LEN) :: name
+    character(len=STR_SHORT) :: name
     character(len=3) :: recv_mode ! "SNP" or "AVR"
     integer :: interval  ! exchange interval
     integer :: time_lag
     integer :: mapping_tag
     integer :: exchange_tag
     integer :: time_intpl_tag ! time interpolation tag 2018/07/25
-    character(len=NAME_LEN) :: send_model_name
-    character(len=NAME_LEN) :: send_data_name
+    character(len=STR_SHORT) :: send_model_name
+    character(len=STR_SHORT) :: send_data_name
     integer :: grid_index
     type(local_area_type), pointer :: my_grid
     type(recv_data_conf_type), pointer :: rd => null()
@@ -709,7 +709,7 @@ end function get_varg_comp_id
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-character(len=NAME_LEN) function get_varp_data_name(data_type)
+character(len=STR_SHORT) function get_varp_data_name(data_type)
   use jcup_utils, only : error
   implicit none
   type(varp_type), pointer :: data_type
@@ -722,7 +722,7 @@ end function get_varp_data_name
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-character(len=NAME_LEN) function get_varg_data_name(data_type)
+character(len=STR_SHORT) function get_varg_data_name(data_type)
   use jcup_utils, only : error
   implicit none
   type(varg_type), pointer :: data_type

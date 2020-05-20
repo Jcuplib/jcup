@@ -6,7 +6,7 @@
 !
 
 module jcup_comp
-  use jcup_constant, only : NAME_LEN, STRING_LEN, MAX_MODEL, MAX_DOMAIN, CONF_FILE
+  use jcup_constant, only : STR_SHORT, STR_MID, MAX_MODEL, MAX_DOMAIN, CONF_FILE
   implicit none
   private 
 
@@ -36,11 +36,11 @@ module jcup_comp
   integer, private :: num_of_task
 
   integer, private :: num_of_my_component = 0! the number of my component
-  character(len=NAME_LEN) :: my_component_name(MAX_MODEL)
+  character(len=STR_SHORT) :: my_component_name(MAX_MODEL)
   integer, private :: num_of_total_component = 0 ! the number of total component
 
   type component_def_type
-    character(len=NAME_LEN) :: component_name
+    character(len=STR_SHORT) :: component_name
     integer :: component_id
     integer :: leader_rank ! global rank of my leader proessor
     integer :: num_of_pe
@@ -71,8 +71,8 @@ end subroutine set_my_component
 subroutine set_global_component(total_comp_name)
   use jcup_mpi_lib, only : jml_BcastGlobal
   implicit none
-  character(len=NAME_LEN), pointer :: total_comp_name(:)
-  character(len=NAME_LEN) :: name_buffer(MAX_MODEL)
+  character(len=STR_SHORT), pointer :: total_comp_name(:)
+  character(len=STR_SHORT) :: name_buffer(MAX_MODEL)
   integer :: int_buffer(1)
   integer :: num_of_comp
   integer :: current_process
@@ -100,11 +100,11 @@ subroutine search_next_process(current_process, comp_name, num_of_comp, next_pro
   use jcup_mpi_lib, only : jml_BcastGlobal, jml_AllReduceMin
   implicit none
   integer, intent(IN) :: current_process
-  character(len=NAME_LEN), intent(INOUT) :: comp_name(MAX_MODEL)
+  character(len=STR_SHORT), intent(INOUT) :: comp_name(MAX_MODEL)
   integer, intent(INOUT) :: num_of_comp
   integer, intent(INOUT) :: next_process
   integer :: int_buffer(1)
-  character(len=NAME_LEN), pointer :: name_buffer(:)
+  character(len=STR_SHORT), pointer :: name_buffer(:)
   integer :: i, j
   integer :: same_index
   logical :: same_flag
@@ -120,12 +120,12 @@ subroutine search_next_process(current_process, comp_name, num_of_comp, next_pro
     do i = 1, int_buffer(1)
       name_buffer(i) = trim(comp_name(i))
     end do
-    call jml_BcastGlobal(name_buffer, NAME_LEN, current_process)
+    call jml_BcastGlobal(name_buffer, STR_SHORT, current_process)
   else
     call jml_BcastGlobal(int_buffer, 1, 1, current_process)
     num_of_comp = int_buffer(1)
     allocate(name_buffer(num_of_comp))
-    call jml_BcastGlobal(name_buffer, NAME_LEN, current_process)
+    call jml_BcastGlobal(name_buffer, STR_SHORT, current_process)
     do i = 1, num_of_comp
       comp_name(i) = trim(name_buffer(i))
     end do
@@ -158,7 +158,7 @@ subroutine add_comp_name(current_process, comp_name, num_of_comp)
   use jcup_mpi_lib, only : jml_SendGlobal, jml_RecvGlobal
   implicit none
   integer, intent(IN) :: current_process
-  character(len=NAME_LEN), intent(INOUT) :: comp_name(MAX_MODEL)
+  character(len=STR_SHORT), intent(INOUT) :: comp_name(MAX_MODEL)
   integer, intent(INOUT) :: num_of_comp
   integer :: num_of_new_name
   logical :: same_flag
@@ -191,7 +191,7 @@ subroutine init_my_component_info(total_comp_name)
   use jcup_mpi_lib, only : jml_AllreduceMax
   use jcup_utils, only : error
   implicit none
-  character(len=NAME_LEN), intent(IN) :: total_comp_name(:)
+  character(len=STR_SHORT), intent(IN) :: total_comp_name(:)
   integer :: num_of_config_comp
   integer :: counter, local_counter
   integer :: i, j
@@ -287,7 +287,7 @@ end subroutine init_my_component_info
 subroutine set_component_info()
   use jcup_mpi_lib, only : jml_GetLeaderRank, jml_GetCommSizeLocal  
   implicit none
-  character(len=NAME_LEN) :: name_buffer
+  character(len=STR_SHORT) :: name_buffer
   integer :: comp_id
   integer :: i
 
@@ -303,8 +303,8 @@ end subroutine set_component_info
 ! 2014/12/12 [NEW}
 subroutine sort_component_name(comp_name)
   implicit none
-  character(len=NAME_LEN), intent(INOUT) :: comp_name(:)
-  character(len=NAME_LEN), pointer :: name_buffer(:)
+  character(len=STR_SHORT), intent(INOUT) :: comp_name(:)
+  character(len=STR_SHORT), pointer :: name_buffer(:)
   integer :: i, j
   integer :: index
 
@@ -334,7 +334,7 @@ subroutine init_model_process()
   use jcup_time, only : init_all_time
   implicit none
   integer, allocatable :: my_comp_id(:)
-  character(len=NAME_LEN), pointer :: total_comp_name(:)
+  character(len=STR_SHORT), pointer :: total_comp_name(:)
   integer :: p
 
   call jml_init() 
@@ -377,7 +377,7 @@ end function get_num_of_total_component
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-character(len=NAME_LEN) function get_component_name(component_id)
+character(len=STR_SHORT) function get_component_name(component_id)
   implicit none
   integer, intent(IN) :: component_id
  

@@ -133,7 +133,7 @@ end module jcup_exchange_grid
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 module jcup_grid
-  use jcup_constant, only : NUM_OF_EXCHANGE_DATA, NUM_OF_EXCHANGE_GRID, MAX_MODEL, MAX_GRID, NAME_LEN
+  use jcup_constant, only : NUM_OF_EXCHANGE_DATA, NUM_OF_EXCHANGE_GRID, MAX_MODEL, MAX_GRID, STR_SHORT
   use jcup_pe_array, only : pe_array_type
   use jcup_exchange_grid, only : exchange_grid_type
 
@@ -209,8 +209,8 @@ module jcup_grid
     module procedure get_data_double_1d
   end interface
 
-  character(len=NAME_LEN), private, dimension(MAX_GRID) :: my_grid_name
-  character(len=NAME_LEN), private, dimension(MAX_MODEL) :: my_component_name
+  character(len=STR_SHORT), private, dimension(MAX_GRID) :: my_grid_name
+  character(len=STR_SHORT), private, dimension(MAX_MODEL) :: my_component_name
   integer, private :: my_grid_counter
 
 contains
@@ -334,7 +334,7 @@ integer function get_my_grid_num(grid_name)
   implicit none
   character(len=*), intent(IN) :: grid_name
   integer :: i
-  character(len=NAME_LEN) :: component_name
+  character(len=STR_SHORT) :: component_name
 
   component_name = get_comp_name_from_grid_name(grid_name)
 

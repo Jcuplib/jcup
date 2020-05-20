@@ -208,7 +208,6 @@ module jcup_mpi_lib
     module procedure jml_recv_real_2d_model, jml_recv_double_2d_model
     module procedure jml_recv_real_3d_model, jml_recv_double_3d_model
   end interface
-
   interface jml_ISendLocal
     module procedure jml_isend_double_1d_local
   end interface
@@ -254,7 +253,10 @@ module jcup_mpi_lib
 
   integer :: size_int, size_real, size_double
 
-  integer :: buffer_size = 1000000
+  integer :: buffer_byte  = 8       ! 8 byte
+  integer :: buffer_count = 10      ! 10 data
+  integer :: buffer_data  = 1000000 ! size of the data array sent by MPI_BSEND
+  integer :: buffer_size  ! byte size of local_buffer = buffer_count*buffer_data*buffer_byte + MPI_BSEND_OVERHEAD
   real(kind=8), pointer :: local_buffer(:)
 
 
@@ -313,8 +315,9 @@ subroutine jml_init()
    call MPI_Type_size(MPI_DOUBLE_PRECISION, size_double, ierror)
 
    if (.not.associated(local_buffer)) then
-     allocate(local_buffer(buffer_size))
-     call mpi_buffer_attach(local_buffer, 8*size(local_buffer), ierror)
+     buffer_size  = buffer_count*buffer_data*buffer_byte + MPI_BSEND_OVERHEAD
+     allocate(local_buffer(buffer_size/buffer_byte + 1))
+     call mpi_buffer_attach(local_buffer, buffer_byte*size(local_buffer), ierror)
    end if
 
 end subroutine jml_init
@@ -2983,18 +2986,27 @@ end subroutine jml_RecvAll
 subroutine check_buffer_size(bsize)
   implicit none
   integer, intent(IN) :: bsize
+  real(kind=8), pointer :: buffer_ptr
+  integer :: detach_size
 
-  return
-
-  if (bsize>buffer_size) then
-    call mpi_buffer_detach(local_buffer, 8*size(local_buffer), ierror)
-
-    deallocate(local_buffer, STAT = ierror)
-
-    allocate(local_buffer(bsize*2))
-    call mpi_buffer_attach(local_buffer, 8*size(local_buffer*2), ierror)
-    buffer_size = bsize
+  if (bsize > buffer_data) then
+     call mpi_buffer_detach(buffer_ptr, detach_size, ierror)
+     buffer_data = bsize
+     buffer_size  = buffer_count*buffer_data*buffer_byte + MPI_BSEND_OVERHEAD
+     deallocate(local_buffer, STAT = ierror)
+     allocate(local_buffer(buffer_size/buffer_byte + 1))
+     call mpi_buffer_attach(local_buffer, buffer_byte*size(local_buffer), ierror)
   end if
+  
+  !if (bsize>buffer_size) then
+  !  call mpi_buffer_detach(local_buffer, 8*size(local_buffer), ierror)
+
+  !  deallocate(local_buffer, STAT = ierror)
+
+  !  allocate(local_buffer(bsize*2))
+  !  call mpi_buffer_attach(local_buffer, 8*size(local_buffer*2), ierror)
+  !  buffer_size = bsize
+  !end if
 
 end subroutine check_buffer_size
 

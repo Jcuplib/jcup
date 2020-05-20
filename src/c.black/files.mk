@@ -9,6 +9,7 @@ COBJS	= 	jcup_mpi_lib.o\
 		jcup_intercomm.o\
 		jcup_grid_base.o\
 		jcup_grid.o\
+		jcup_grid_checker.o\
                 jcup_data.o\
 		jcup_exchange.o\
 		jcup_io_base.o\

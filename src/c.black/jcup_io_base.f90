@@ -1,5 +1,5 @@
 module jcup_io_base
-  use jcup_constant, only : NAME_LEN
+  use jcup_constant, only : STR_SHORT
   include "mpif.h"
   private
 
@@ -159,7 +159,7 @@ end subroutine search_file_type
 ! 2015/04/06 [MOD] call set_master_file_name
 subroutine jcup_write_restart_base(fid, comp_id, end_time)
   use jcup_mpi_lib, only : jml_isLocalLeader
-  use jcup_constant, only : STRING_LEN
+  use jcup_constant, only : STR_MID
   use jcup_buffer, only : get_num_of_time, get_send_buffer_ptr
   use jcup_time_buffer, only : time_buffer_type, get_start_data_ptr, get_next_time_ptr => get_next_ptr
   use jcup_data_buffer, only : data_buffer_type, get_next_data_ptr => get_next_ptr, write_data_buffer
@@ -171,7 +171,7 @@ subroutine jcup_write_restart_base(fid, comp_id, end_time)
   integer, intent(IN) :: fid ! file id
   integer, intent(IN) :: comp_id ! component id
   integer, intent(IN) :: end_time(:) ! integration end time
-  character(len=STRING_LEN) :: master_file_name
+  character(len=STR_MID) :: master_file_name
   logical :: is_opened
   type(time_buffer_type), pointer :: tb
   type(data_buffer_type), pointer :: db
@@ -179,7 +179,7 @@ subroutine jcup_write_restart_base(fid, comp_id, end_time)
   integer :: i
   integer(kind=8) :: time_array(8) ! 2014/07/14 [MOD], 2014/11/04 [MOD] integer -> integer(kind=8)
   logical :: write_flag
-  character(len=NAME_LEN) :: data_name
+  character(len=STR_SHORT) :: data_name
   real(kind=8), pointer :: data_ptr(:)
   type(send_data_conf_type), pointer :: send_data_conf_ptr
   integer :: file_handler
@@ -256,7 +256,7 @@ end subroutine jcup_write_restart_base
 ! 2014/11/05 [MOD] integer :: int_buffer(12) -> integer(kind=8) :: int_buffer(12)
 ! 2015/04/06 [MOD] call set_master_file_name
 subroutine jcup_read_restart_base(fid, comp_id, end_time)
-  use jcup_constant, only : NAME_LEN, STRING_LEN
+  use jcup_constant, only : STR_SHORT, STR_MID
   use jcup_buffer, only : get_num_of_time, get_send_buffer_ptr
   use jcup_buffer, only : restore_buffer
   use jcup_comp, only : get_component_name, is_my_component
@@ -267,12 +267,12 @@ subroutine jcup_read_restart_base(fid, comp_id, end_time)
   integer, intent(IN) :: fid ! file id
   integer, intent(IN) :: comp_id ! component id
   integer, intent(IN) :: end_time(:) ! integration end time ! 2014/07/14 [MOD]
-  character(len=STRING_LEN) :: master_file_name
+  character(len=STR_MID) :: master_file_name
   logical :: is_opened
   integer :: num_of_time
   integer(kind=8) :: time_array(8) ! 2014/07/14 [MOD] time_array(6) -> time_array(8)
   integer :: component_id, data_id, data_type, data_dim
-  character(len=NAME_LEN) :: data_name
+  character(len=STR_SHORT) :: data_name
   integer :: file_handler
   integer(kind=8) :: int_buffer(8+1+1+1+1) ! 2014/07/14 [MOD] int_buffer(6+1+1+1+1) -> int_buffer(8+1+1+1+1), 
                                            ! 2014/11/05 [MOD] integer -> integer(kind=8)
@@ -383,7 +383,7 @@ subroutine jcup_read_restart_data(out_dir, comp_id, data_name, data_time, data_p
   integer :: num_of_vgrid
   integer :: num_of_point
   integer :: file_handler
-  character(len=NAME_LEN) :: data_name_new
+  character(len=STR_SHORT) :: data_name_new
 
   call set_current_conf(comp_id)
 
@@ -415,7 +415,7 @@ end subroutine jcup_read_restart_data
 subroutine jcup_io_open_file(out_dir, comp_id, data_name, data_time, grid_id, num_of_vgrid, file_handler)
   use jcup_comp, only : get_component_name
   use jcup_mpi_lib, only : jml_GetComm
-  use jcup_constant, only : STRING_LEN
+  use jcup_constant, only : STR_MID
   use jcup_utils, only : error
   use jcup_time, only : get_time_unit, TU_SEC, TU_MIL, TU_MCR
   implicit none
@@ -430,7 +430,7 @@ subroutine jcup_io_open_file(out_dir, comp_id, data_name, data_time, grid_id, nu
   character(len=32) :: datarep
   integer :: ierror = 0
   integer(kind=MPI_OFFSET_KIND) :: offset
-  character(len=STRING_LEN) :: file_name
+  character(len=STR_MID) :: file_name
   type(ft_type), pointer :: ftp
 
   my_comm = jml_GetComm(comp_id)
@@ -581,7 +581,7 @@ end subroutine jcup_io_read_data
 ! 2015/04/14 [MOD] add is_barrier_finish 
 subroutine jcup_write_restart_gmean(fid, comp_id, end_time)
   use jcup_mpi_lib, only : jml_isLocalLeader, jml_BarrierLeader
-  use jcup_constant, only : STRING_LEN
+  use jcup_constant, only : STR_MID
   use jcup_comp, only : get_component_name, get_num_of_total_component
   use jcup_utils, only : error
   use jcup_time, only : get_time_unit, TU_SEC, TU_MIL, TU_MCR
@@ -590,7 +590,7 @@ subroutine jcup_write_restart_gmean(fid, comp_id, end_time)
   integer, intent(IN) :: fid ! file id
   integer, intent(IN) :: comp_id ! component id
   integer, intent(IN) :: end_time(:) ! integration end time
-  character(len=STRING_LEN) :: gmean_file_name
+  character(len=STR_MID) :: gmean_file_name
   logical :: is_opened
   logical, save :: is_barrier_finish = .false. ! 2015/04/14 [ADD]
 
@@ -631,16 +631,16 @@ end subroutine jcup_write_restart_gmean
 ! 2015/11/24 [MOD] 200 continue
 subroutine jcup_read_restart_gmean(fid, comp_id, end_time)
   use jcup_utils, only  : error, put_log, IntToStr
-  use jcup_constant, only : STRING_LEN, NAME_LEN
+  use jcup_constant, only : STR_MID, STR_SHORT
   use jcup_mpi_lib, only : jml_isLocalLeader, jml_SendLeader
   use jcup_comp, only : get_num_of_total_component, get_component_name
   implicit none
   integer, intent(IN) :: fid ! file id
   integer, intent(IN) :: comp_id ! component id
   integer, intent(IN) :: end_time(:) ! integration end time
-  character(len=STRING_LEN) :: gmean_file_name
-  character(len=NAME_LEN) :: source_comp_name
-  character(len=NAME_LEN) :: my_comp_name
+  character(len=STR_MID) :: gmean_file_name
+  character(len=STR_SHORT) :: source_comp_name
+  character(len=STR_SHORT) :: my_comp_name
   integer :: tag
   real(kind=8) :: gmean(1)
   logical :: is_opened

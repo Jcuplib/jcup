@@ -8,7 +8,7 @@
 module jcup_interface 
   use jcup_constant, only : NUM_OF_EXCHANGE_DATA, NUM_OF_EXCHANGE_GRID, REAL_DATA, DOUBLE_DATA
   use jcup_constant, only : DATA_1D, DATA_2D, DATA_25D, DATA_3D
-  use jcup_constant, only : NAME_LEN
+  use jcup_constant, only : STR_SHORT
   use jcup_mpi_lib, only : jcup_set_world => jml_set_global_comm
   use jcup_mpi_lib, only : jcup_get_world => jml_get_global_comm
   use jcup_mpi_lib, only : jcup_get_myrank_global => jml_GetMyrankGlobal
@@ -105,9 +105,9 @@ module jcup_interface
 
   public :: jcup_get_comp_num_from_name ! integer function (component_name)
   public :: jcup_get_num_of_send_data ! integer function (compnent_id or component_name or current_component)
-  public :: jcup_get_send_data_name   ! character(len=NAME_LEN) function (component_name, data_index)
+  public :: jcup_get_send_data_name   ! character(len=STR_SHORT) function (component_name, data_index)
   public :: jcup_get_num_of_recv_data ! integer function (compnent_id or component_name or current_component)
-  public :: jcup_get_recv_data_name   ! character(len=NAME_LEN) function (component_name, data_index)
+  public :: jcup_get_recv_data_name   ! character(len=STR_SHORT) function (component_name, data_index)
   
   public :: jcup_varp_type
   public :: jcup_varg_type
@@ -170,10 +170,12 @@ module jcup_interface
 
   integer :: max_num_of_exchange_data
 
-  character(len=NAME_LEN) :: my_model_name
+  character(len=STR_SHORT) :: my_model_name
 
   logical, save, private :: is_sync_exchange = .false.
   logical, save, private :: is_assync_exchange = .false.
+
+  logical, save, private :: is_first_step = .true.
   
 contains
 
@@ -198,7 +200,7 @@ end subroutine jcup_set_new_comp
 ! 2014/07/11 [MOD] add default_time_unit
 ! 2014/08/27 [MOD] delete argument isCallInit
 ! 2014/12/10 [MOD] add component allocation check
-subroutine jcup_initialize(model_name, default_time_unit, log_level, log_stderr)
+subroutine jcup_initialize(model_name, default_time_unit, log_level, log_stderr, grid_checker)
   use jcup_config, only : init_conf
   use jcup_comp, only : init_model_process, get_num_of_total_component, is_my_component, get_component_name
   use jcup_utils, only : set_log_level, init_log, put_log, IntToStr
@@ -207,6 +209,7 @@ subroutine jcup_initialize(model_name, default_time_unit, log_level, log_stderr)
                         set_time_unit, get_time_unit
   use jcup_data, only : init_data_def
   use jcup_grid, only : init_grid
+  use jcup_grid_checker, only : init_checker
   use jcup_mpi_lib, only : jml_abort, jml_AllreduceMin, jml_AllreduceMax, jml_AllreduceMaxLocal
   use jcup_exchange, only : init_exchange
   use jal_api, only : jal_init
@@ -215,6 +218,7 @@ subroutine jcup_initialize(model_name, default_time_unit, log_level, log_stderr)
   character(len=3), optional, intent(IN) :: default_time_unit ! 2014/07/03 [ADD]
   integer, optional, intent(IN) :: log_level ! 0, 1, 2
   logical, optional, intent(IN) :: log_stderr 
+  logical, optional, intent(IN) :: grid_checker
   integer :: num_of_comp 
   type(time_type) :: time
   integer :: mdl
@@ -338,8 +342,14 @@ subroutine jcup_initialize(model_name, default_time_unit, log_level, log_stderr)
 
   my_model_name = model_name
 
+  if (present(grid_checker)) then
+     call init_checker(grid_checker)
+  else
+     call init_checker(.false.)
+  end if
+  
   !!!!!!
-  return   !!!!! 20200514
+  !return   !!!!! 20200514
   !!!!!!
 
   call jal_init(my_model_name)
@@ -527,6 +537,7 @@ end subroutine jcup_get_model_id
 !> @param[in] num_of_vgrid number of data or number of vertical grid
 subroutine jcup_def_grid(grid_index, model_name, grid_name, num_of_vgrid)
   use jcup_comp, only : get_num_of_my_component, is_my_component
+  use jcup_grid_checker, only : check_grid_index
   use jcup_grid, only : def_grid
   use jcup_utils, only : error, put_log, IntToStr
   implicit none
@@ -544,6 +555,9 @@ subroutine jcup_def_grid(grid_index, model_name, grid_name, num_of_vgrid)
     call error("jcup_def_grid", "grid index must be >= 1")
   end if
 
+  ! check grid index 2020/05/20
+  call check_grid_index(grid_index, model_name, grid_name)
+  
   if (present(num_of_vgrid)) then
     if (num_of_vgrid > max_num_of_exchange_data) then
       max_num_of_exchange_data = num_of_vgrid
@@ -601,7 +615,7 @@ end subroutine jcup_end_grid_def
 !> @param[in] grid_name name of grid 
 !> @param[in] num_of_data number of data
 subroutine jcup_def_varp(data_type_ptr, comp_name, data_name, grid_name, num_of_data)
-  use jcup_constant, only : NO_GRID, STRING_LEN
+  use jcup_constant, only : NO_GRID, STR_MID
   use jcup_utils, only : error, IntToStr
   use jcup_data, only : varp_type, def_varp
   use jcup_grid, only : get_my_grid_num, is_my_grid
@@ -613,7 +627,7 @@ subroutine jcup_def_varp(data_type_ptr, comp_name, data_name, grid_name, num_of_
   character(len=*), intent(IN) :: data_name
   character(len=*), intent(IN) :: grid_name
   integer, optional, intent(IN) :: num_of_data
-  character(len=STRING_LEN) :: logstr
+  character(len=STR_MID) :: logstr
   integer :: grid_id
 
   if (index(data_name, "__") > 0) then
@@ -692,7 +706,7 @@ end subroutine jcup_set_default_configuration
 subroutine jcup_def_varg(data_type_ptr, comp_name, data_name, grid_name, num_of_data, &
      send_model_name, send_data_name, recv_mode, interval, time_lag, &
      mapping_tag, exchange_tag, time_intpl_tag)
-  use jcup_constant, only : NO_GRID, STRING_LEN
+  use jcup_constant, only : NO_GRID, STR_MID
   use jcup_utils, only : error, IntToStr
   use jcup_data, only : varg_type, def_varg
   use jcup_grid, only : get_my_grid_num, is_my_grid
@@ -712,7 +726,7 @@ subroutine jcup_def_varg(data_type_ptr, comp_name, data_name, grid_name, num_of_
   integer, optional, intent(IN) :: mapping_tag
   integer, optional, intent(IN) :: exchange_tag
   integer, optional, intent(IN) :: time_intpl_tag ! time interpolation tag 2018/07/25
-  character(len=STRING_LEN) :: logstr
+  character(len=STR_MID) :: logstr
   integer :: num_of_25d_data
   integer :: grid_id
 
@@ -873,7 +887,6 @@ end subroutine jcup_init_time_int
 !> @param[in] mapping_tag tag number of this mapping table
 !> @param[in] send_grid array of send grid indexes
 !> @param[in] recv_grid array of recv grid indexes
-! 2016/12/22 [MOD] add call set_pe_num
 subroutine jcup_set_mapping_table(my_model_name, &
                                   send_model_name, send_grid_name, recv_model_name,  recv_grid_name, mapping_tag, &
                                   send_grid, recv_grid)
@@ -886,6 +899,7 @@ subroutine jcup_set_mapping_table(my_model_name, &
   use jcup_grid_base, only : set_pe_num, & ! 2016/12/22
                              get_grid_num, send_index2pe, recv_index2pe, get_grid_min_index, get_grid_max_index
   use jcup_comp, only : get_comp_id_from_name,is_my_component
+  use jcup_grid_checker, only : check_mapping_table
   use jcup_exchange, only : set_send_grid_tag, set_recv_grid_tag, set_send_mapping_table, set_recv_mapping_table
   implicit none
   character(len=*), intent(IN)  :: my_model_name
@@ -913,6 +927,16 @@ subroutine jcup_set_mapping_table(my_model_name, &
     call jcup_abnormal_end("jcup_set_mapping_table","jcup_set_varp, jcup_set_varg, jcup_end_var_def not called")
   end if
 
+  ! check mapping table 2020/05/20
+  if (present(send_grid)) then
+     call check_mapping_table(my_model_name, send_model_name, send_grid_name, &
+                                             recv_model_name, recv_grid_name, &
+                                             send_grid, recv_grid)
+  else
+     call check_mapping_table(my_model_name, send_model_name, send_grid_name, &
+                                             recv_model_name, recv_grid_name)
+  end if
+  
   map_num = mapping_tag
 
   send_grid_num = get_grid_num(send_model_name, send_grid_name)
@@ -1440,6 +1464,7 @@ subroutine jcup_set_date_time_int(component_name, time_array, delta_t, is_exchan
   use jcup_buffer, only : remove_past_send_data, remove_past_recv_data
   use jcup_comp, only : get_comp_id_from_name, get_num_of_total_component, is_my_component, get_component_name
   use jcup_config, only : set_current_conf, get_comp_exchange_type
+  use jcup_grid_checker, only : finalize_checker
   use jcup_mpi_lib, only : jml_GetMyrankGlobal
   use jcup_exchange, only : set_exchange_comp_id, jcup_exchange_data_parallel, jcup_exchange_data_serial
   use jal_api, only : jal_set_time
@@ -1457,6 +1482,12 @@ subroutine jcup_set_date_time_int(component_name, time_array, delta_t, is_exchan
   integer :: comp
   integer :: my_rank
 
+  if (is_first_step) then
+     call put_log("------------------------------------------------------------------------------------")
+     call finalize_checker()
+     is_first_step = .false.
+  end if
+  
   call put_log("------------------------------------------------------------------------------------")
   call put_log("--------------------------------- jcup_set_time ------------------------------------")
   call put_log("------------------------------------------------------------------------------------")

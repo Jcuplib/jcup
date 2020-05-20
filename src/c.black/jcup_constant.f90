@@ -10,11 +10,13 @@ module jcup_constant
 
   integer,public :: NUM_OF_EXCHANGE_DATA = 40
 
+  integer,public,parameter :: STR_SHORT = 64 ! 2014/11/12 [MOD] 32 -> 64
+  integer,public,parameter :: STR_MID   = 256
+  integer,public,parameter :: STR_LONG  = 1024
+
   character(len=*), public, parameter :: NO_NAME = "NO_NAME_ASSIGNED"
   integer,public,parameter :: NO_DATA = -999999  
   integer,public,parameter :: NO_GRID = -999999
-  integer,public,parameter :: NAME_LEN = 64 ! 2014/11/12 [MOD] 32 -> 64
-  integer,public,parameter :: STRING_LEN = 256
   integer,public,parameter :: MAX_MODEL  = 8
   integer,public,parameter :: MAX_DOMAIN = 5
   integer,public,parameter :: MAX_GRID   = 8

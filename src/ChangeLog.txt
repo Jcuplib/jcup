@@ -1350,4 +1350,62 @@ Routines
 Detail
  if (num_of_point <= 0) returnを追加
 
+-----------------------------------------------------------------
 
+Version:4.050200
+Date:2020/05/19
+
+File:jcup_mpi_lib.f90
+
+Routines
+ check_buffer_size          : mod
+
+Detail
+ mpi_buffer_attachが正しく動作するようlocal_bufferの計算方法を変更。
+
+-----------------------------------------------------------------
+
+Version:4.050300
+Date:2020/05/19
+
+File:jcup_constant.f90他多数
+
+Routines
+ NAME_LEN, STRING_LEN       : STR_SHORT, STR_MID, STR_LONG
+
+Detail
+ 文字列の長さ定数をNAME_LEN, STRING_LENからSTR_SHORT, STR_MID, STR_LONGに変更。
+ 
+-----------------------------------------------------------------
+
+Version:4.050400
+Date:2020/05/19
+
+File:jcup_utils.f90
+
+Routines
+ radix_sort                 : [mod]
+
+Detail
+ radix sortでn桁目の数値を取り出すアルゴリズムを文字列を使うよう変更。
+
+-----------------------------------------------------------------
+
+Version:4.060000
+Date:2020/05/20
+
+Files:jcup_grid_checker.f90 jcup_interface.f90
+
+Routines
+ check_grid_index           : [add]
+ check_mapping_table        : [add]
+ jcup_initialize            : [mod]
+ jcup_def_grid              : [mod]
+ jcup_set_mapping_table     : [mod]
+ jcup_set_date_time_int     : [mod]
+
+Detail
+ 格子点番号の重複チェックとマッピングテーブルのチェックルーチンを作成。
+ jcup_initializeにoptional引数checker_flagとinit_checkerのコールを追加。
+ jcup_def_gridとjcup_set_mapping_tableにチェックルーチンコールを追加。
+ jcup_set_date_time_intにfinalize_checkerのコールを追加。

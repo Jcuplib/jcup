@@ -358,8 +358,9 @@ subroutine send_final_step_data()
       do j = 1, get_num_of_total_component()
         if (get_comp_exchange_type(i,j) == ADVANCE_SEND_RECV) then
           if (.not.is_my_component(j)) then ! 2014/12/08 [ADD]
-            call put_log("!!!!!!!!!!!!!! extra data send start !!!!!!!!!!!!!", 1)
+            call put_log("!!!!!!!!!!!!!!  extra data send start  !!!!!!!!!!!!!", 1)
             call jcup_exchange_data_send(i, j, .true.)  ! send final step data, if recv model time lag == 1
+            call put_log("!!!!!!!!!!!!!!  extra data send finish !!!!!!!!!!!!!", 1)
           end if
         end if
       end do

@@ -82,7 +82,7 @@ module jcup_config
   ! configuration id = component id
   ! configuration number = configuration id
 
-  integer, parameter, private :: WRITE_CONF_UNIT = 200
+  integer, private :: WRITE_CONF_UNIT = 200
 
   interface set_current_conf
     module procedure set_current_conf_name, set_current_conf_id
@@ -487,9 +487,9 @@ subroutine set_configuration()
      !if (is_my_component(i)) then
         call set_current_conf(i)
         !if (jml_isLocalLeader(i)) then
-          call open_log_file("./"//trim(get_comp_name_from_comp_id(i))//".conf.log", WRITE_CONF_UNIT+i)
-          call write_configure(current_conf, WRITE_CONF_UNIT+i)
-          call close_log_file(WRITE_CONF_UNIT+i)
+          call open_log_file("./"//trim(get_comp_name_from_comp_id(i))//".conf.log", WRITE_CONF_UNIT)
+          call write_configure(current_conf, WRITE_CONF_UNIT)
+          call close_log_file(WRITE_CONF_UNIT)
         !end if
       !end if
     end do
@@ -2675,9 +2675,9 @@ subroutine read_conf_file_2()
      !if (is_my_component(i)) then
         call set_current_conf(i)
         !if (jml_isLocalLeader(i)) then
-          call open_log_file("./"//trim(get_comp_name_from_comp_id(i))//".conf.log", WRITE_CONF_UNIT+i)
-          call write_configure(current_conf, WRITE_CONF_UNIT+i)
-          call close_log_file(WRITE_CONF_UNIT+i)
+          call open_log_file("./"//trim(get_comp_name_from_comp_id(i))//".conf.log", WRITE_CONF_UNIT)
+          call write_configure(current_conf, WRITE_CONF_UNIT)
+          call close_log_file(WRITE_CONF_UNIT)
         !end if
       !end if
     end do

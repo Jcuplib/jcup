@@ -1,6 +1,6 @@
 module jal_mpi_lib
+  use mpi
   implicit none
-  include "mpif.h"
 
 !--------------------------------   public  ----------------------------------!
 
@@ -32,7 +32,7 @@ contains
     integer, intent(IN) :: window_size
     integer :: ierror
     integer(kind=MPI_ADDRESS_KIND) :: size
-    integer(kind=MPI_ADDRESS_KIND) :: disp_unit
+    integer :: disp_unit
 
     my_comp = my_comp_id
     

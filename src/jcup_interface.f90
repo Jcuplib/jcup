@@ -53,7 +53,7 @@ module jcup_interface
   public :: jcup_set_world    ! subroutine (global_comm)
   public :: jcup_get_world    ! integer function()
   public :: jcup_set_new_comp ! subroutine (component_name)
-  public :: jcup_initialize   ! subroutine (component_name, default_time_unit, log_level, log_stderr) ! 2014/07/11 [MOD]
+  public :: jcup_initialize   ! subroutine (component_name, default_time_unit, log_level, log_stderr, grid_checker) 
   public :: jcup_coupling_end ! subroutine (time_array, is_call_mpi_finalize)
 
   public :: jcup_log          ! subroutine (sub_name, log_string, log_level)
@@ -332,7 +332,7 @@ subroutine jcup_initialize(model_name, default_time_unit, log_level, log_stderr,
 
   current_time%delta_t = 0
 
-  call put_log("coupler initialization compoleted ", 1)
+  call put_log("coupler initialization completed ", 1)
 
   do mdl = 1, get_num_of_total_component()
     if (is_my_component(mdl)) then
@@ -349,7 +349,7 @@ subroutine jcup_initialize(model_name, default_time_unit, log_level, log_stderr,
   end if
   
   !!!!!!
-  !return   !!!!! 20200514
+  !!!return   !!!!! 20200514
   !!!!!!
 
   call jal_init(my_model_name)
@@ -381,7 +381,7 @@ subroutine jcup_coupling_end(time_array, isCallFinalize)
   integer :: i
 
   call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
-  call put_log("!!!!!!!!!!!!!!!!   COUPLER FINALIZE  !!!!!!!!!!!!!!! ", 1)
+  call put_log("!!!!!!!!!!!!!   COUPLER FINALIZE  START !!!!!!!!!!!! ", 1)
   call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
 
   
@@ -391,21 +391,18 @@ subroutine jcup_coupling_end(time_array, isCallFinalize)
     call jal_finish()
   end if
  
+  call put_log("!!!!!!!!!!!!!!!!   FINALIZE  STEP 1  !!!!!!!!!!!!!!! ", 1)
+
   call destruct_buffer()
 
   call destruct_all_time()
 
-  call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
-  call put_log("!!!!!!!!!!!!!!!!  COUPLING COMPLETED !!!!!!!!!!!!!!! ", 1)
-  call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
 
-
-  if (is_final_send) then
-    call finalize_log()
-  end if
+  call put_log("!!!!!!!!!!!!!!!!   FINALIZE  STEP 2  !!!!!!!!!!!!!!! ", 1)
 
   call finalize_exchange()
 
+  call put_log("!!!!!!!!!!!!!!!!   FINALIZE  STEP 3  !!!!!!!!!!!!!!! ", 1)
 
   if (present(isCallFinalize)) then
     is_call_finalize = isCallFinalize
@@ -414,7 +411,18 @@ subroutine jcup_coupling_end(time_array, isCallFinalize)
   end if
 
   call recv_all_scalar_data() ! 2015/04/02 [ADD]
+
+  call put_log("!!!!!!!!!!!!!!!!   FINALIZE  STEP 4  !!!!!!!!!!!!!!! ", 1)
+
   call jml_finalize(is_call_finalize)
+
+  call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
+  call put_log("!!!!!!!!!!!!!!!!  COUPLING COMPLETED !!!!!!!!!!!!!!! ", 1)
+  call put_log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ", 1)
+
+  if (is_final_send) then
+    call finalize_log()
+  end if
 
 end subroutine jcup_coupling_end
 
@@ -1484,6 +1492,7 @@ subroutine jcup_set_date_time_int(component_name, time_array, delta_t, is_exchan
 
   if (is_first_step) then
      call put_log("------------------------------------------------------------------------------------")
+
      call finalize_checker()
      is_first_step = .false.
   end if

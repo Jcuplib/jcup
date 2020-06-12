@@ -71,14 +71,43 @@ module jcup_utils
   private :: write_error_message
   private :: is_trim_char
 
+  integer, parameter :: MIN_FID = 10
+  integer, parameter :: MAX_FID = 999
+
 contains
 
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine init_utils()
-  LogUnitID=STD_OUT
+  implicit none
+
 end subroutine init_utils
+
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine set_fid(fid)
+  implicit none
+  integer, intent(INOUT) :: fid
+  logical :: op
+  
+  fid = max(fid, MIN_FID)
+
+  do 
+    if (fid > MAX_FID) then
+      write(0, *) "[set_fid], fid exceeded MAX_FID"
+      stop
+    end if
+    inquire(unit = fid, OPENED = op)
+    if (op) then
+       fid = fid + 1
+    else
+      return
+    end if
+  end do
+
+end subroutine set_fid
 
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
@@ -175,7 +204,7 @@ subroutine init_log(my_model_name, log_dir)
 
   character(len=STR_MID) :: file_name
   character(len=STR_MID) :: dir_name
-  character(len=4) :: pe_num
+  character(len=5) :: pe_num
 
   model_name = my_model_name
 
@@ -183,8 +212,8 @@ subroutine init_log(my_model_name, log_dir)
 
   if (get_log_level() /= NO_OUTPUT_LOG) then
 
-    pe_num = '0000'
-    write(pe_num,'(I4.4)') jml_GetMyrankGlobal()
+    pe_num = '00000'
+    write(pe_num,'(I5.5)') jml_GetMyrankGlobal()
 
     file_name = trim(model_name)//".coupling.log.PE"//pe_num
 
@@ -192,7 +221,7 @@ subroutine init_log(my_model_name, log_dir)
     if (present(log_dir)) dir_name = trim(log_dir)
 
     call open_log_file(trim(dir_name)//"/"//trim(file_name), LogFileID)
-    call open_log_file(trim(dir_name)//"/C."//trim(file_name), LogFileID+1, "DIRECT")
+    !call open_log_file(trim(dir_name)//"/C."//trim(file_name), LogFileID+1, "DIRECT")
 
   end if
 
@@ -203,13 +232,12 @@ end subroutine init_log
 subroutine open_log_file(file_name, log_file_unit, access_mode)
   implicit none
   character(len=*), intent(IN) :: file_name
-  integer, intent(IN) :: log_file_unit
+  integer, intent(INOUT) :: log_file_unit
   character(len=*), optional, intent(IN) :: access_mode
 
   logical :: isopened
 
-  inquire(log_file_unit, opened = isopened)
-  if (isopened) close(log_file_unit)
+  call set_fid(log_file_unit)
 
   if (present(access_mode)) then
     if (trim(access_mode)=="DIRECT") then
@@ -239,7 +267,7 @@ subroutine finalize_log()
 
   if (max_log_level /= NO_OUTPUT_LOG) then
     call close_log_file(LogFileID)
-    call close_log_file(LogFileID+1)
+    !call close_log_file(LogFileID+1)
   end if
 
 end subroutine finalize_log
@@ -321,23 +349,23 @@ subroutine put_log_to_file(log_l, LogStr)
 
 
     if (get_log_level() == DETAIL_LOG) then
-      write(LogFileID,'(A19," :: ",A)') timestr,LogStr ! write message
+      write(LogFileID,'(A19," :: ",A)') timestr,trim(LogStr) ! write message
     else
       if (log_l==1) then
-        write(LogFileID,'(A19," :: ",A)') timestr,LogStr ! write message
+        write(LogFileID,'(A19," :: ",A)') timestr,trim(LogStr) ! write message
       end if
     end if
 
-    write(log_str,'(A19," :: ")') timestr ! write message
-    do i = 24,min(len(LogStr)+23,STR_MID) 
-      log_str(i:i) = LogStr(i-23:i-23)     
-    end do
-    do i=min(STR_MID,min(len(LogStr),STR_MID)+24),STR_MID-1
-      log_str(i:i) = ' '
-    end do
-    log_str(STR_MID:STR_MID) = char(10)
-    write(LogFileID+1,'(A)',rec=current_record+1) log_str ! write message
-    current_record = mod(current_record+1,1000)
+    !write(log_str,'(A19," :: ")') timestr ! write message
+    !do i = 24,min(len_trim(LogStr)+23,STR_MID) 
+    !  log_str(i:i) = LogStr(i-23:i-23)     
+    !end do
+    !do i=min(STR_MID,min(len_trim(LogStr),STR_MID)+24),STR_MID-1
+    !  log_str(i:i) = ' '
+    !end do
+    !log_str(STR_MID:STR_MID) = char(10)
+    !write(LogFileID+1,'(A)',rec=current_record+1) log_str ! write message
+    !current_record = mod(current_record+1,1000)
 
 end subroutine put_log_to_file
 
@@ -379,7 +407,7 @@ subroutine error(routine_name,message)
 
   call write_error_message(trim(message_str))
   call close_log_file(LogFileID)
-  call close_log_file(LogFileID+1)
+  !call close_log_file(LogFileID+1)
   call jml_abort()
   stop
 

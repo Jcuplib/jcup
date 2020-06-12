@@ -77,7 +77,7 @@ contains
     type(grid_checker_type), pointer :: cptr
     type(grid_checker_type), pointer :: bptr
     
-    if (check_flag == .false.) return
+    if (.not.check_flag) return
 
     cptr => checker
     bptr => null()
@@ -110,7 +110,7 @@ contains
     integer :: comp_id 
     integer :: i
 
-    if (check_flag == .false.) return
+    if (.not.check_flag) return
     
     if (size(grid_index) <= 0) return ! no check
     
@@ -269,7 +269,7 @@ contains
     integer, pointer :: grid_index(:)
     integer :: my_comp_id, send_comp_id, recv_comp_id
 
-    if (check_flag == .false.) return
+    if (.not.check_flag) return
 
     my_comp_id = get_comp_id_from_name(trim(my_name))
     if (.not.jml_isLocalLeader(my_comp_id)) return

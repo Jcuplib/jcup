@@ -3,8 +3,8 @@
 !All rights reserved.
 !
 module jcup_mpi_lib
+  use mpi
   implicit none
-  include "mpif.h"
 
   private
 

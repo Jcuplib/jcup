@@ -30,11 +30,12 @@ module jcup_data_buffer
   public :: write_data_buffer_info
   public :: write_data_buffer    ! subroutine (data_time, db, fid, comp_id, write_flag, data_name, data_ptr)
   public :: restore_data_buffer  ! subroutine (dt, component_id, data_id, name, data_type, data_dim, db_start) ! 2013.06.13 [ADD]
-
+  public :: dump_data_buffer_type    ! subroutine (self, fid)
+  public :: restore_data_buffer_type ! subroutine (self, fid)
+  
   integer, parameter, public :: NO_DATA = 9999999
 
   type data_buffer_type
-    private
     integer :: component_id
     integer :: data_id
     real(kind=8), pointer :: double_d(:)
@@ -912,7 +913,8 @@ subroutine restore_data_buffer(dt, component_id, data_id, name, data_type, data_
       db_current%is_using = .true.
       db_current%data_type = data_type
       db_current%data_dim  = data_dim
-      call put_log("reuse data buffer double 1d : name = "//trim(name)//", data id = "//trim(IntToStr(data_id)))  
+      call put_log("reuse data buffer double 1d : name = "//trim(name) &
+                    //", data id = "//trim(IntToStr(data_id)))  
       return
     end if
     if (associated(db_current%next_ptr, db_start)) exit
@@ -930,10 +932,82 @@ subroutine restore_data_buffer(dt, component_id, data_id, name, data_type, data_
   db_current%data_type = data_type
   db_current%data_dim  = data_dim
 
-  call put_log("allocate new data buffer double 1d : name = "//trim(name)//", data id = "//trim(IntToStr(data_id))// &
+  call put_log("allocate new data buffer double 1d : name = " &
+               //trim(name)//", data id = "//trim(IntToStr(data_id))// &
                     ", Size:"//trim(IntToStr(size(dt,1))))
 
 end subroutine restore_data_buffer
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! 2020/06/12 [NEW]
+
+subroutine dump_data_buffer_type(self, fid)
+  use jcup_constant, only : STR_MID
+  use jcup_utils, only : put_log
+  implicit none
+  type(data_buffer_type), pointer :: self
+  integer, intent(IN) :: fid
+  character(len=STR_MID) :: log_str
+
+  call put_log("------------------------------   data  buffer     ----------------------------------")
+
+  write(fid) self%component_id
+  write(fid) self%data_id
+  write(fid) size(self%double_d)
+  write(fid) self%double_d
+  write(fid) self%is_using
+  write(fid) self%data_type
+  write(fid) self%data_dim
+  
+
+  write(log_str, *) "   component_id = ", self%component_id
+  call put_log(trim(log_str))
+  write(log_str, *) "   data_id      = ", self%data_id
+  call put_log(trim(log_str))
+  write(log_str, *) "   data_size    = ", size(self%double_d)
+  call put_log(trim(log_str))
+  write(log_str, *) "   data_min     = ", minval(self%double_d)
+  call put_log(trim(log_str))
+  write(log_str, *) "   data_max     = ", maxval(self%double_d)
+  call put_log(trim(log_str))
+
+end subroutine dump_data_buffer_type
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! 2020/06/12 [NEW]
+
+subroutine restore_data_buffer_type(self, fid)
+  use jcup_constant, only : STR_MID
+  use jcup_utils, only : put_log
+  type(data_buffer_type), pointer :: self
+  integer, intent(IN) :: fid
+  integer :: data_size
+  character(len=STR_MID) :: log_str
+  
+  call put_log("------------------------------   data  buffer     ----------------------------------")
+
+ 
+  read(fid) self%component_id
+  read(fid) self%data_id
+  read(fid) data_size
+  allocate(self%double_d(data_size))
+  read(fid) self%double_d
+  read(fid) self%is_using
+  read(fid) self%data_type
+  read(fid) self%data_dim
+
+  write(log_str, *) "   component_id = ", self%component_id
+  call put_log(trim(log_str))
+  write(log_str, *) "   data_id      = ", self%data_id
+  call put_log(trim(log_str))
+  write(log_str, *) "   data_size    = ", data_size
+  call put_log(trim(log_str))
+  write(log_str, *) "   data_min     = ", minval(self%double_d)
+  call put_log(trim(log_str))
+  write(log_str, *) "   data_max     = ", maxval(self%double_d)
+  call put_log(trim(log_str))
+  
+end subroutine restore_data_buffer_type
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
@@ -970,7 +1044,9 @@ module jcup_time_buffer
   public :: dec_num_of_data
   public :: get_num_of_data
   public :: write_time_buffer_info
-
+  public :: dump_time_buffer_type     ! subroutine (self, fid)
+  public :: restore_time_buffer_type  ! subroutine (self, fid)
+  
   type time_buffer_type
     type(data_buffer_type), pointer :: dt_start, dt_current
     type(time_buffer_type), pointer :: before_ptr, next_ptr    
@@ -1317,6 +1393,100 @@ subroutine write_time_buffer_info(tb)
 end subroutine write_time_buffer_info
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
+! 2020/06/12 [NEW]
+subroutine dump_time_buffer_type(self, fid)
+  use jcup_constant, only : STR_MID
+  use jcup_utils, only : put_log
+  use jcup_data_buffer, only : dump_data_buffer_type
+  implicit none
+  type(time_buffer_type), pointer :: self
+  integer, intent(IN) :: fid
+  integer :: counter
+  character(len=STR_MID) :: log_str
+  
+  call put_log("------------------------------   time  buffer     ----------------------------------")
+  
+  write(fid) self%num_of_data
+  write(fid) self%time%yyyy
+  write(fid) self%time%mo
+  write(fid) self%time%dd
+  write(fid) self%time%hh
+  write(fid) self%time%mm
+  write(fid) self%time%ss
+  write(fid) self%time%milli_sec
+  write(fid) self%time%micro_sec
+  write(fid) self%time%delta_t
+  write(fid) self%is_using
+
+  write(log_str, *) "    time%num_of_data = ", self%num_of_data, ", ss = ", self%time%ss
+  call put_log(trim(log_str))
+
+  self%dt_current => self%dt_start
+
+  counter = 0
+  do while(associated(self%dt_current))
+     counter = counter + 1
+     if (counter > self%num_of_data) exit
+     if (associated(self%dt_current)) then
+        call dump_data_buffer_type(self%dt_current, fid)
+     end if
+
+     self%dt_current => self%dt_current%next_ptr
+     if (associated(self%dt_current,self%dt_start)) exit
+  end do
+  
+  
+end subroutine dump_time_buffer_type
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! 2020/06/12 [NEW]
+subroutine restore_time_buffer_type(self, fid)
+  use jcup_constant, only : STR_MID
+  use jcup_utils, only : put_log
+  use jcup_data_buffer, only : init_data_buffer, restore_data_buffer_type
+  implicit none
+  type(time_buffer_type), pointer :: self
+  integer, intent(IN) :: fid
+  character(len=STR_MID) :: log_str
+  integer :: i
+  
+  call put_log("------------------------------   time  buffer     ----------------------------------")
+  
+  read(fid) self%num_of_data
+  read(fid) self%time%yyyy
+  read(fid) self%time%mo
+  read(fid) self%time%dd
+  read(fid) self%time%hh
+  read(fid) self%time%mm
+  read(fid) self%time%ss
+  read(fid) self%time%milli_sec
+  read(fid) self%time%micro_sec
+  read(fid) self%time%delta_t
+  read(fid) self%is_using
+
+  write(log_str, *) "    time%num_of_data = ", self%num_of_data, ", ss = ", self%time%ss
+  call put_log(trim(log_str))
+  
+  if (self%num_of_data <= 0) then
+     call init_data_buffer(self%dt_start)
+     return
+  end if
+  
+  allocate(self%dt_start)
+  self%dt_start%before_ptr => null()
+  self%dt_current => self%dt_start
+  call restore_data_buffer_type(self%dt_current, fid)
+  do i = 2, self%num_of_data
+     allocate(self%dt_current%next_ptr)
+     self%dt_current%next_ptr%before_ptr => self%dt_current
+     self%dt_current => self%dt_current%next_ptr
+     call restore_data_buffer_type(self%dt_current, fid)
+  end do
+  self%dt_current%next_ptr => self%dt_start
+  
+end subroutine restore_time_buffer_type
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
 
 end module jcup_time_buffer
 
@@ -1344,12 +1514,14 @@ module jcup_buffer_base
 
   public :: get_recv_data_type
   public :: buffer_check_write
-  public :: get_num_of_time ! integer function (time_buffer_ptr) 2013.06.07 [ADD]
+  public :: get_num_of_time     ! integer function (time_buffer_ptr) 2013.06.07 [ADD]
   public :: get_send_buffer_ptr ! function () result (send_buffer_ptr) 2013.06.07 [ADD]
-  !public :: write_buffer ! subroutine (file_id) 2013.05.29 [ADD]
-  !public :: read_buffer  ! subroutine (file_id) 2013.05.29 [ADD]
-  public :: check_write_buffer ! subroutine () 2017/04/28 [ADD]
-  public :: restore_buffer_base ! subroutine (dt, time, component_id, data_id, name, data_type, data_dim) 2013.06.13 [ADD]
+  !public :: write_buffer       ! subroutine (file_id) 2013.05.29 [ADD]
+  !public :: read_buffer        ! subroutine (file_id) 2013.05.29 [ADD]
+  public :: dump_buffer_base    ! subroutine (self, fid)
+  public :: restore_buffer_base ! subroutine (self, fid)
+  public :: check_write_buffer  ! subroutine () 2017/04/28 [ADD]
+  public :: restore_buffer_base_org ! subroutine (dt, time, component_id, data_id, name, data_type, data_dim) 2013.06.13 [ADD]
 
 !--------------------------------   private  ---------------------------------!
 
@@ -1706,7 +1878,7 @@ end subroutine check_write_buffer
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine restore_buffer_base(tb, dt, time, component_id, data_id, name, data_type, data_dim)
+subroutine restore_buffer_base_org(tb, dt, time, component_id, data_id, name, data_type, data_dim)
   use jcup_data_buffer, only : restore_data_buffer
   use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr, inc_num_of_data
   implicit none
@@ -1722,9 +1894,69 @@ subroutine restore_buffer_base(tb, dt, time, component_id, data_id, name, data_t
   call restore_data_buffer(dt, component_id, data_id, name, data_type, data_dim, get_start_data_ptr(tb))
   call inc_num_of_data(tb)
 
-end subroutine restore_buffer_base
+end subroutine restore_buffer_base_org
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
+! 2020/06/12 [NEW]
+subroutine dump_buffer_base(self, fid)
+  use jcup_time_buffer, only : dump_time_buffer_type  
+  implicit none
+  type(time_buffer_type), pointer :: self
+  integer, intent(IN) :: fid
+  type(time_buffer_type), pointer :: start_ptr
+  type(time_buffer_type), pointer :: current_ptr
+  logical :: next_flag
+  
+  start_ptr => self
+  current_ptr => start_ptr
+
+  do
+     call dump_time_buffer_type(current_ptr, fid)
+     current_ptr => current_ptr%next_ptr
+     if (associated(current_ptr, start_ptr)) then
+        next_flag = .false.
+        write(fid) next_flag
+        exit
+     else
+        next_flag = .true.
+        write(fid) next_flag
+     end if
+     
+  end do
+  
+  
+end subroutine dump_buffer_base
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! 2020/06/12 [NEW]
+subroutine restore_buffer_base(self, fid)
+  use jcup_time_buffer, only : restore_time_buffer_type
+  implicit none
+  type(time_buffer_type), pointer :: self
+  integer, intent(IN) :: fid
+  type(time_buffer_type), pointer :: current_ptr
+  logical :: next_flag
+
+  next_flag = .true.
+  
+  allocate(self)
+  self%next_ptr => null()
+  current_ptr => self
+  
+  do while(next_flag)
+     call restore_time_buffer_type(current_ptr, fid)
+     read(fid) next_flag
+     if (next_flag) then
+        allocate(current_ptr%next_ptr)
+        current_ptr%next_ptr%before_ptr => current_ptr
+        current_ptr => current_ptr%next_ptr
+     else
+        current_ptr%next_ptr => self
+        exit
+     end if
+  end do
+  
+end subroutine restore_buffer_base
 
 end module jcup_buffer_base
 

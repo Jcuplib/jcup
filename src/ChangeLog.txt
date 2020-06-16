@@ -1483,3 +1483,33 @@ Routines
 Detail
  inlcude "mpif.h"をuse mpiに変更
  MPI_win_createの引数disp_unitの型をintegerに修正
+
+-----------------------------------------------------------------
+
+Version:4.0700000
+Date:2020/06/18
+
+Files:jcup_buffer_base.f90, jcup_buffer.f90, jcup_time.f90
+      jcup_exchange.f90, jcup_interface.f90
+
+Routines
+ dump_data_buffer_type      : [add]
+ restore_data_buffer_type   : [add]
+ dump_time_buffer_type      : [add]
+ restore_time_buffer_type   : [add]
+ dump_buffer_base           : [add]
+ restore_buffer_base        : [add]
+ dump_buffer                : [add]
+ restore_buffer             : [add]
+ dump_time                  : [add]
+ resotore_time              : [add]
+ set_restart_flag           : [add]
+ jcup_exchange_data_1d_double  : [mod]
+ jcup_exchange_data_25d_double : [mod]
+ jcup_write_restart         : [add]
+ jcup_read_restart          : [add]
+
+Detail
+ Jcupにリスタート機能を再作成
+ データバッファと時間情報をダンプして読み込む
+ jcup_exchangeにis_restartフラグを追加しデータ交換時の第一ステップ判定を一部修正

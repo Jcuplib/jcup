@@ -319,7 +319,7 @@ subroutine jcup_read_restart_base(fid, comp_id, end_time)
       data_time%hh   = time_array(4) ; data_time%mm = time_array(5) ; data_time%ss = time_array(6)
       data_time%milli_sec = time_array(7) ; data_time%micro_sec = time_array(8)
 
-      call restore_buffer(data_ptr, data_time, comp_id, data_id, data_name, data_type, data_dim)
+      !!!!call restore_buffer(data_ptr, data_time, comp_id, data_id, data_name, data_type, data_dim)
 
       deallocate(data_ptr)
     end do
@@ -350,7 +350,7 @@ subroutine jcup_read_restart_base(fid, comp_id, end_time)
       data_time%hh   = time_array(4) ; data_time%mm = time_array(5) ; data_time%ss = time_array(6)
       data_time%milli_sec = time_array(7) ; data_time%micro_sec = time_array(8)
       
-      call restore_buffer(data_ptr, data_time, comp_id, data_id, data_name, data_type, data_dim)
+      !call restore_buffer(data_ptr, data_time, comp_id, data_id, data_name, data_type, data_dim)
 
       deallocate(data_ptr)
     end do

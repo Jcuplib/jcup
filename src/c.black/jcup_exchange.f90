@@ -26,6 +26,7 @@ module jcup_exchange
   public :: set_recv_grid_tag           ! subroutine (recv_comp_id, send_comp_id, map_num, grid_tag)
   public :: send_final_step_data        ! subroutine ()
   public :: set_fill_value              ! subroutine (fill_value)
+  public :: set_restart_flag            ! subroutine (restart_flag) 
   public :: jcup_exchange_data_parallel
   public :: jcup_exchange_data_serial
   public :: jcup_send_data_immediately
@@ -63,8 +64,9 @@ module jcup_exchange
   integer, private :: current_grid_tag
 
   integer, private :: current_comp_id
-  logical, private :: step_flag = .true.
-
+  logical, save, private :: step_flag = .true.
+  logical, save, private :: is_restart = .false.  ! 2020/06/16 
+  
 contains
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
@@ -1509,8 +1511,13 @@ subroutine jcup_exchange_data_1d_double(dest_model_name, data_name, average_data
   if (is_my_component(current_comp_id)) then
 
     if ((is_first_step()).or.(trim(data_name(1)) /= trim(average_data_name(1)))) then
-      call get_current_time(current_comp_id, 1, time)
-      call put_log("get_current_time ", 1)
+      if (.not.is_restart) then ! 2020/06/16
+        call get_current_time(current_comp_id, 1, time)
+        call put_log("get_current_time ", 1)
+      else
+        call get_before_time(current_comp_id, 1, time)
+        call put_log("get_before_time ", 1)
+      end if
     else 
       call get_before_time(current_comp_id, 1, time)
       call put_log("get_before_time ", 1)
@@ -1586,7 +1593,11 @@ subroutine jcup_exchange_data_25d_double(dest_model_name, data_name, average_dat
   if (is_my_component(current_comp_id)) then
 
     if ((is_first_step()).or.(trim(data_name) /= trim(average_data_name))) then
-      call get_current_time(current_comp_id, 1, time)
+      if (.not.is_restart) then ! 2020/06/16
+        call get_current_time(current_comp_id, 1, time)
+      else
+        call get_before_time(current_comp_id, 1, time)
+      end if
     else 
       call get_before_time(current_comp_id, 1, time)
     end if
@@ -1626,6 +1637,16 @@ subroutine set_fill_value(fill_v)
   fill_value = fill_v
 
 end subroutine set_fill_value
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! 2020/06/16 [NEW]
+subroutine set_restart_flag(restart_flag)
+  implicit none
+  logical, intent(IN) :: restart_flag
+
+  is_restart = restart_flag
+
+end subroutine set_restart_flag
 
 
 !=======+=========+=========+=========+=========+=========+=========+=========+

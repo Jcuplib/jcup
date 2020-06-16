@@ -50,54 +50,54 @@ module jcup_interface
 
 !--------------------------------   public  ----------------------------------!
 
-  public :: jcup_set_world    ! subroutine (global_comm)
-  public :: jcup_get_world    ! integer function()
-  public :: jcup_set_new_comp ! subroutine (component_name)
-  public :: jcup_initialize   ! subroutine (component_name, default_time_unit, log_level, log_stderr, grid_checker) 
-  public :: jcup_coupling_end ! subroutine (time_array, is_call_mpi_finalize)
+  public :: jcup_set_world            ! subroutine (global_comm)
+  public :: jcup_get_world            ! integer function()
+  public :: jcup_set_new_comp         ! subroutine (component_name)
+  public :: jcup_initialize           ! subroutine (component_name, default_time_unit, log_level, log_stderr, grid_checker) 
+  public :: jcup_coupling_end         ! subroutine (time_array, is_call_mpi_finalize)
 
-  public :: jcup_log          ! subroutine (sub_name, log_string, log_level)
-  public :: jcup_error        ! subroutine (sub_name, error_string)
-  public :: jcup_suspend_log  ! subroutine ()
-  public :: jcup_get_mpi_parameter ! subroutine (com_name, my_comm, my_group, my_size, my_rank)
-  public :: jcup_get_model_id      ! subroutine (model_name, model_id)
+  public :: jcup_log                  ! subroutine (sub_name, log_string, log_level)
+  public :: jcup_error                ! subroutine (sub_name, error_string)
+  public :: jcup_suspend_log          ! subroutine ()
+  public :: jcup_get_mpi_parameter    ! subroutine (com_name, my_comm, my_group, my_size, my_rank)
+  public :: jcup_get_model_id         ! subroutine (model_name, model_id)
 
-  public :: jcup_get_myrank_global ! integer function (NONE)
-  public :: jcup_get_leader_rank   ! integer function (component_id)
-  public :: jcup_get_comm_size     ! integer function (component_id)
+  public :: jcup_get_myrank_global    ! integer function (NONE)
+  public :: jcup_get_leader_rank      ! integer function (component_id)
+  public :: jcup_get_comm_size        ! integer function (component_id)
   public :: jcup_get_num_of_component ! integer function (NONE)
   public :: jcup_is_model_running     ! logical function (COMP_NAME)
 
   public :: jcup_get_component_name   ! character(len=name_len) function (component_id)
-  public :: jcup_is_my_component ! logical function (component_id)
-  public :: jcup_def_grid          ! subroutine (grid_index, model_name, grid_name, num_of_vgrid)
-  public :: jcup_end_grid_def      ! subroutine ()
-  public :: jcup_get_grid_info     ! subroutine (comp_name, grid_name, num_of_index, min_index, max_index) 2013.09.20 [ADD]
+  public :: jcup_is_my_component      ! logical function (component_id)
+  public :: jcup_def_grid             ! subroutine (grid_index, model_name, grid_name, num_of_vgrid)
+  public :: jcup_end_grid_def         ! subroutine ()
+  public :: jcup_get_grid_info        ! subroutine (comp_name, grid_name, num_of_index, min_index, max_index) 2013.09.20 [ADD]
   public :: jcup_set_default_configuration ! subroutine (my_comp_name, send_comp_name,
                                            !             recv_mode, interval, time_lag, mapping_tag, exchange_tag)
-  public :: jcup_def_varp          ! subroutine (data_type_ptr, comp_name, data_name, grid_name, num_of_data)
-  public :: jcup_def_varg          ! subroutine (data_type_ptr, comp_name, data_name, grid_name, num_of_data, 
-                                   ! send_model_name, send_data_name, recv_mode, interval, time_lag, mapping_tag, exchange_tag)
-  public :: jcup_end_var_def       ! subroutine ()
-  public :: jcup_set_fill_value    ! subroutine (fill_value) 
-  public :: jcup_init_time         ! subroutine (time_array) :: integer time_array(6)
-  public :: jcup_set_time          ! subroutine (component_name, time_array, delta_t, is_exchange)
-                                   ! subroutine (component_name, time_real, delta_t)  ! 2013.0910 [ADD]
-  public :: jcup_set_mapping_table ! subroutine (my_comp_name, send_comp_name, send_grid_name, recv_comp_name, recv_grid_name, 
-                                   !             mapping_tag, send_grid_index, recv_grid_index)
+  public :: jcup_def_varp             ! subroutine (data_type_ptr, comp_name, data_name, grid_name, num_of_data)
+  public :: jcup_def_varg             ! subroutine (data_type_ptr, comp_name, data_name, grid_name, num_of_data, 
+                                      ! send_model_name, send_data_name, recv_mode, interval, time_lag, mapping_tag, exchange_tag)
+  public :: jcup_end_var_def          ! subroutine ()
+  public :: jcup_set_fill_value       ! subroutine (fill_value) 
+  public :: jcup_init_time            ! subroutine (time_array) :: integer time_array(6)
+  public :: jcup_set_time             ! subroutine (component_name, time_array, delta_t, is_exchange)
+                                      ! subroutine (component_name, time_real, delta_t)  ! 2013.0910 [ADD]
+  public :: jcup_set_mapping_table    ! subroutine (my_comp_name, send_comp_name, send_grid_name, recv_comp_name, recv_grid_name, 
+                                      !             mapping_tag, send_grid_index, recv_grid_index)
   public :: jcup_set_mapping_table_local ! subroutine (my_comp_name, send_comp_name, send_grid_name, recv_comp_name, recv_grid_name, 
-                                   !                   mapping_tag, num_of_grid, send_grid_index, send_pe_num, recv_grid_index) 
-  public :: jcup_inc_time          ! subroutine (component_name, time_array)
-  public :: jcup_inc_calendar      ! subroutine (time_array, delta_t) 2014/11/13 [ADD]
+                                      !                   mapping_tag, num_of_grid, send_grid_index, send_pe_num, recv_grid_index) 
+  public :: jcup_inc_time             ! subroutine (component_name, time_array)
+  public :: jcup_inc_calendar         ! subroutine (time_array, delta_t) 2014/11/13 [ADD]
 #ifndef NO_F2003
-  public :: jcup_put_value         ! subroutine (data_type, data) 2015/02/23 [ADD]
-  public :: jcup_get_value         ! subroutine (data_type, data) 2015/02/23 [ADD]
+  public :: jcup_put_value            ! subroutine (data_type, data) 2015/02/23 [ADD]
+  public :: jcup_get_value            ! subroutine (data_type, data) 2015/02/23 [ADD]
 #endif
-  public :: jcup_put_data          ! subroutien (data_type, data, num_of_data)
-  public :: jcup_get_data          ! subroutine (data_type, data, num_of_data, is_recv_ok)
+  public :: jcup_put_data             ! subroutien (data_type, data, num_of_data)
+  public :: jcup_get_data             ! subroutine (data_type, data, num_of_data, is_recv_ok)
 
-  public :: jcup_write_restart     ! subroutine (file_id, time_array) 2013.05.29 [ADD]
-  public :: jcup_read_restart      ! subroutine (file_id, time_array) 2013.05.29 [ADD]
+  public :: jcup_write_restart        ! subroutine (file_id, time_array) 2013.05.29 [ADD]
+  public :: jcup_read_restart         ! subroutine (file_id, time_array) 2013.05.29 [ADD]
 
   public :: jcup_init_advanced_exchange ! subroutine (num_of_family_members) 2017/02/14 [ADD]
   public :: jcup_send_data_immediately
@@ -113,15 +113,15 @@ module jcup_interface
   public :: jcup_varg_type
   public :: jcup_get_local_operation_index ! subroutine (recv_comp_name, send_comp_name, tag, num_of_operation, operation_index,  
                                            !             send_data_index, recv_data_index, send_coef_index, recv_coef_index)
-  public :: jcup_get_send_grid_index ! subroutine (recv_comp_id, send_cpmp_id, grid_tag, num_of_grid, grid_index) 2013.06.21 [ADD]
-  public :: jcup_get_recv_grid_index ! subroutine (recv_comp_id, send_cpmp_id, grid_tag, num_of_grid, grid_index) 2013.06.21 [ADD]
+  public :: jcup_get_send_grid_index  ! subroutine (recv_comp_id, send_cpmp_id, grid_tag, num_of_grid, grid_index) 2013.06.21 [ADD]
+  public :: jcup_get_recv_grid_index  ! subroutine (recv_comp_id, send_cpmp_id, grid_tag, num_of_grid, grid_index) 2013.06.21 [ADD]
   public :: jcup_get_num_of_send_grid
   public :: jcup_get_num_of_recv_grid
-  public :: jcup_send_array ! subroutine (my_comp_name, recv_comp_name, array)
-  public :: jcup_recv_array ! subroutine (my_comp_name, send_comp_name, array)
-  public :: jcup_send_coef  ! subroutine (my_comp_name, recv_comp_name, coef)
-  public :: jcup_recv_coef  ! subroutine (my_comp_name, send_comp_name, coef)
-  public :: jcup_set_local_coef ! subroutine (my_comp_name, send_comp_name, mapping_tag, global_coef, local_coef, operation_type)
+  public :: jcup_send_array           ! subroutine (my_comp_name, recv_comp_name, array)
+  public :: jcup_recv_array           ! subroutine (my_comp_name, send_comp_name, array)
+  public :: jcup_send_coef            ! subroutine (my_comp_name, recv_comp_name, coef)
+  public :: jcup_recv_coef            ! subroutine (my_comp_name, send_comp_name, coef)
+  public :: jcup_set_local_coef       ! subroutine (my_comp_name, send_comp_name, mapping_tag, global_coef, local_coef, operation_type)
   public :: jcup_set_coef_local_to_local ! subroutine (my_comp_name, my_grid_name, send_comp_name, mapping_tag, 
                                          !             local_array_coef, local_intpl_coef, coef_type)
   public :: OPERATION_COEF, SEND_COEF, RECV_COEF
@@ -1968,12 +1968,64 @@ end subroutine jcup_get_value
 
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
+! 2020/06/15 [NEW]
+subroutine jcup_write_restart(fid)
+  use jcup_constant, only : STR_MID
+  use jcup_utils, only : put_log
+  use jcup_time, only : dump_time
+  use jcup_buffer, only : dump_buffer
+  implicit none
+  integer, intent(IN) :: fid
+  character(len=STR_MID) :: log_str
+  
+  call put_log("------------------------------------------------------------------------------------")
+  call put_log("------------------------------ jcup_write_restart ----------------------------------")
+  call put_log("------------------------------------------------------------------------------------")
+  write(log_str, *) "    current_time  = ", current_time%ss
+  call put_log(trim(log_str))
+  
+  write(fid) current_time
+  call dump_time(fid)
+  call dump_buffer(fid)
+  
+end subroutine jcup_write_restart
+
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! 2020/06/15 [NEW]
+subroutine jcup_read_restart(fid)
+  use jcup_constant, only : STR_MID
+  use jcup_utils, only : put_log
+  use jcup_time, only : restore_time
+  use jcup_buffer, only : restore_buffer
+  use jcup_exchange, only : set_restart_flag
+  implicit none
+  integer, intent(IN) :: fid
+  character(len=STR_MID) :: log_str
+
+  call put_log("------------------------------------------------------------------------------------")
+  call put_log("------------------------------ jcup_read_restart  ----------------------------------")
+  call put_log("------------------------------------------------------------------------------------")
+
+  read(fid) current_time
+  write(log_str, *) "    current_time  = ", current_time%ss
+  call put_log(trim(log_str))
+
+  call restore_time(fid)
+  call restore_buffer(fid)
+
+  call set_restart_flag(.true.)
+  
+end subroutine jcup_read_restart
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
 ! 2014/07/14 [MOD] time_array(6) -> time_array(:)
 ! 2014/07/16 [MOD] 2.5D data
 ! 2014/12/08 [ADD} add jcup_send_final_step_data
 ! 2015/04/06 [ADD] add jcup_write_restart_gmean
 ! 2015/11/25 [MOD] time_array(:) -> optional
-subroutine jcup_write_restart(fid, time_array)
+subroutine jcup_write_restart_org(fid, time_array)
   use jcup_utils, only : put_log
   use jcup_buffer, only :  buffer_check_write
   use jcup_comp, only : get_num_of_total_component, is_my_component, get_component_name 
@@ -2027,19 +2079,20 @@ subroutine jcup_write_restart(fid, time_array)
 
   !!!call buffer_check_write()
 
-end subroutine jcup_write_restart
+end subroutine jcup_write_restart_org
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! 2014/07/14 [MOD] time_array(6) -> time_array(:)
 ! 2014/07/16 [MOD] 2.5D data
 ! 2015/04/06 [ADD] add jcup_read_restart_gmean
 ! 2015/11/24 [MOD] time_array(:) -> optional
-subroutine jcup_read_restart(fid, time_array)
+subroutine jcup_read_restart_org(fid, time_array)
   use jcup_buffer, only :  buffer_check_write
   use jcup_comp, only : get_num_of_total_component, is_my_component, get_component_name 
   use jcup_io_base, only : jcup_init_io, jcup_io_create_type, jcup_read_restart_base, jcup_read_restart_gmean
   use jcup_grid_base, only : local_area_type, get_num_of_grid, get_my_local_area_ptr
-  use jcup_config, only : get_num_of_recv_data, get_num_of_send_data, send_data_conf_type, get_send_data_conf_ptr_from_id
+  use jcup_config, only : get_num_of_recv_data, get_num_of_send_data, send_data_conf_type, &
+                          get_send_data_conf_ptr_from_id
   use jcup_utils, only : put_log  
   use jcup_exchange, only : allocate_recv_flag, set_step_flag
   implicit none
@@ -2093,7 +2146,7 @@ subroutine jcup_read_restart(fid, time_array)
   call set_step_flag(.false.)
   is_restart = .true.
 
-end subroutine jcup_read_restart
+end subroutine jcup_read_restart_org
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 

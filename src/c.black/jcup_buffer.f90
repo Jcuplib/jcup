@@ -26,11 +26,11 @@ module jcup_buffer
   public :: remove_recv_data
   public :: remove_recv_time
   public :: buffer_check_write
-  public :: get_num_of_time ! integer function (time_buffer_ptr) 2013.06.07 [ADD]
-  public :: get_send_buffer_ptr ! function () result (send_buffer_ptr) 2013.06.07 [ADD]
-  !!!public :: write_buffer ! subroutine (file_id) 2013.05.29 [ADD]
-  !!!public :: read_buffer  ! subroutine (file_id) 2013.05.29 [ADD]
-  public :: restore_buffer ! subroutine (dt, time, component_id, data_id, name, data_type, data_dim) 2013.06.13 [ADD]
+  public :: get_num_of_time         ! integer function (time_buffer_ptr) 2013.06.07 [ADD]
+  public :: get_send_buffer_ptr     ! function () result (send_buffer_ptr) 2013.06.07 [ADD]
+  public :: dump_buffer             ! subroutine (fid)
+  public :: restore_buffer          ! subroutine (fid)
+  !public :: restore_buffer          ! subroutine (dt, time, component_id, data_id, name, data_type, data_dim) 2013.06.13 [ADD]
 
 !--------------------------------   private  ---------------------------------!
 
@@ -440,9 +440,9 @@ end function get_send_buffer_ptr
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine restore_buffer(dt, time, component_id, data_id, name, data_type, data_dim)
+subroutine restore_buffer_org(dt, time, component_id, data_id, name, data_type, data_dim)
   use jcup_utils, only : put_log, IntToStr
-  use jcup_buffer_base, only : restore_buffer_base
+  use jcup_buffer_base, only : restore_buffer_base_org
   implicit none
   real(kind=8), intent(IN) :: dt(:)
   type(time_type), intent(IN) :: time  
@@ -452,11 +452,37 @@ subroutine restore_buffer(dt, time, component_id, data_id, name, data_type, data
   integer, intent(IN) :: data_dim
 
   call put_log("restore send data : name = "//trim(name)//", data id = "//trim(IntToStr(data_id)))
-  call restore_buffer_base(send_buffer, dt, time, component_id, data_id, name, data_type, data_dim)
+  call restore_buffer_base_org(send_buffer, dt, time, component_id, data_id, name, data_type, data_dim)
 
-end subroutine restore_buffer
+end subroutine restore_buffer_org
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
+! 2020/06/15
+subroutine dump_buffer(fid)
+  use jcup_buffer_base, only : dump_buffer_base
+  implicit none
+  integer, intent(IN) :: fid
+
+  call dump_buffer_base(send_buffer, fid)
+  call dump_buffer_base(recv_buffer, fid)
+  
+end subroutine dump_buffer
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! 2020/06/15
+subroutine restore_buffer(fid)
+  use jcup_utils, only : put_log
+  use jcup_buffer_base, only : restore_buffer_base
+  implicit none
+  integer, intent(IN) :: fid
+
+  call put_log("------------------------------  restore  buffer   ----------------------------------")
+  call put_log("------------------------------   send  buffer     ----------------------------------")
+  call restore_buffer_base(send_buffer, fid)
+  call put_log("------------------------------   recv  buffer     ----------------------------------")
+  call restore_buffer_base(recv_buffer, fid)
+  
+end subroutine restore_buffer
 
 end module
 

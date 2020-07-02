@@ -948,29 +948,43 @@ subroutine dump_data_buffer_type(self, fid)
   type(data_buffer_type), pointer :: self
   integer, intent(IN) :: fid
   character(len=STR_MID) :: log_str
-
+  integer :: data_size
+  
   call put_log("------------------------------   data  buffer     ----------------------------------")
 
   write(fid) self%component_id
   write(fid) self%data_id
-  write(fid) size(self%double_d)
-  write(fid) self%double_d
+
+  if (associated(self%double_d)) then
+
+    data_size = size(self%double_d)
+    write(fid) data_size
+    write(fid) self%double_d
+  else
+    data_size = 0
+    write(fid) data_size
+  end if
+ 
   write(fid) self%is_using
   write(fid) self%data_type
   write(fid) self%data_dim
   
 
-  write(log_str, *) "   component_id = ", self%component_id
+  write(log_str, *) "    component_id = ", self%component_id
   call put_log(trim(log_str))
-  write(log_str, *) "   data_id      = ", self%data_id
+  write(log_str, *) "    data_id      = ", self%data_id
   call put_log(trim(log_str))
-  write(log_str, *) "   data_size    = ", size(self%double_d)
+  write(log_str, *) "    is_using     = ", self%is_using
   call put_log(trim(log_str))
-  write(log_str, *) "   data_min     = ", minval(self%double_d)
+  write(log_str, *) "    data_size    = ", data_size
   call put_log(trim(log_str))
-  write(log_str, *) "   data_max     = ", maxval(self%double_d)
-  call put_log(trim(log_str))
-
+  if (associated(self%double_d)) then
+    write(log_str, *) "    data_min     = ", minval(self%double_d)
+    call put_log(trim(log_str))
+    write(log_str, *) "    data_max     = ", maxval(self%double_d)
+    call put_log(trim(log_str))
+ end if
+ 
 end subroutine dump_data_buffer_type
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
@@ -990,23 +1004,32 @@ subroutine restore_data_buffer_type(self, fid)
   read(fid) self%component_id
   read(fid) self%data_id
   read(fid) data_size
-  allocate(self%double_d(data_size))
-  read(fid) self%double_d
+  if (data_size > 0) then
+    allocate(self%double_d(data_size))
+    read(fid) self%double_d
+  else
+    self%double_d => null()
+  end if
+ 
   read(fid) self%is_using
   read(fid) self%data_type
   read(fid) self%data_dim
 
-  write(log_str, *) "   component_id = ", self%component_id
+  write(log_str, *) "    component_id = ", self%component_id
   call put_log(trim(log_str))
-  write(log_str, *) "   data_id      = ", self%data_id
+  write(log_str, *) "    data_id      = ", self%data_id
   call put_log(trim(log_str))
-  write(log_str, *) "   data_size    = ", data_size
+  write(log_str, *) "    is_using     = ", self%is_using
   call put_log(trim(log_str))
-  write(log_str, *) "   data_min     = ", minval(self%double_d)
+  write(log_str, *) "    data_size    = ", data_size
   call put_log(trim(log_str))
-  write(log_str, *) "   data_max     = ", maxval(self%double_d)
-  call put_log(trim(log_str))
-  
+  if (data_size > 0) then
+    write(log_str, *) "    data_min     = ", minval(self%double_d)
+    call put_log(trim(log_str))
+    write(log_str, *) "    data_max     = ", maxval(self%double_d)
+    call put_log(trim(log_str))
+ end if
+ 
 end subroutine restore_data_buffer_type
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
@@ -1401,11 +1424,22 @@ subroutine dump_time_buffer_type(self, fid)
   implicit none
   type(time_buffer_type), pointer :: self
   integer, intent(IN) :: fid
-  integer :: counter
+  integer :: num_of_data
   character(len=STR_MID) :: log_str
   
   call put_log("------------------------------   time  buffer     ----------------------------------")
+
+  self%dt_current => self%dt_start
+
+  num_of_data = 0
+  do while(associated(self%dt_current))
+     num_of_data = num_of_data + 1
+     self%dt_current => self%dt_current%next_ptr
+     if (associated(self%dt_current,self%dt_start)) exit
+  end do
   
+
+  write(fid) num_of_data
   write(fid) self%num_of_data
   write(fid) self%time%yyyy
   write(fid) self%time%mo
@@ -1418,23 +1452,24 @@ subroutine dump_time_buffer_type(self, fid)
   write(fid) self%time%delta_t
   write(fid) self%is_using
 
-  write(log_str, *) "    time%num_of_data = ", self%num_of_data, ", ss = ", self%time%ss
+  write(log_str, *) "    num_of_data      = ", num_of_data
+  call put_log(trim(log_str))
+  write(log_str, *) "    time%num_of_data = ", self%num_of_data
+  call put_log(trim(log_str))
+  write(log_str, *) "    time%ss          = ", self%time%ss
+  call put_log(trim(log_str))
+  write(log_str, *) "    is_using         = ", self%is_using
   call put_log(trim(log_str))
 
   self%dt_current => self%dt_start
 
-  counter = 0
   do while(associated(self%dt_current))
-     counter = counter + 1
-     if (counter > self%num_of_data) exit
      if (associated(self%dt_current)) then
         call dump_data_buffer_type(self%dt_current, fid)
      end if
-
      self%dt_current => self%dt_current%next_ptr
      if (associated(self%dt_current,self%dt_start)) exit
   end do
-  
   
 end subroutine dump_time_buffer_type
 
@@ -1448,10 +1483,12 @@ subroutine restore_time_buffer_type(self, fid)
   type(time_buffer_type), pointer :: self
   integer, intent(IN) :: fid
   character(len=STR_MID) :: log_str
+  integer :: num_of_data
   integer :: i
   
   call put_log("------------------------------   time  buffer     ----------------------------------")
-  
+
+  read(fid) num_of_data
   read(fid) self%num_of_data
   read(fid) self%time%yyyy
   read(fid) self%time%mo
@@ -1464,10 +1501,16 @@ subroutine restore_time_buffer_type(self, fid)
   read(fid) self%time%delta_t
   read(fid) self%is_using
 
-  write(log_str, *) "    time%num_of_data = ", self%num_of_data, ", ss = ", self%time%ss
+  write(log_str, *) "    num_of_data      = ", num_of_data
+  call put_log(trim(log_str))
+  write(log_str, *) "    time%num_of_data = ", self%num_of_data
+  call put_log(trim(log_str))
+  write(log_str, *) "    time%ss          = ", self%time%ss
+  call put_log(trim(log_str))
+  write(log_str, *) "    is_using         = ", self%is_using
   call put_log(trim(log_str))
   
-  if (self%num_of_data <= 0) then
+  if (num_of_data <= 0) then
      call init_data_buffer(self%dt_start)
      return
   end if
@@ -1476,13 +1519,14 @@ subroutine restore_time_buffer_type(self, fid)
   self%dt_start%before_ptr => null()
   self%dt_current => self%dt_start
   call restore_data_buffer_type(self%dt_current, fid)
-  do i = 2, self%num_of_data
+  do i = 2, num_of_data
      allocate(self%dt_current%next_ptr)
      self%dt_current%next_ptr%before_ptr => self%dt_current
      self%dt_current => self%dt_current%next_ptr
      call restore_data_buffer_type(self%dt_current, fid)
   end do
   self%dt_current%next_ptr => self%dt_start
+  self%dt_start%before_ptr => self%dt_current
   
 end subroutine restore_time_buffer_type
 
@@ -1952,6 +1996,7 @@ subroutine restore_buffer_base(self, fid)
         current_ptr => current_ptr%next_ptr
      else
         current_ptr%next_ptr => self
+        self%before_ptr => current_ptr
         exit
      end if
   end do

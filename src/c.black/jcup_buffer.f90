@@ -464,7 +464,7 @@ subroutine dump_buffer(fid)
   integer, intent(IN) :: fid
 
   call dump_buffer_base(send_buffer, fid)
-  call dump_buffer_base(recv_buffer, fid)
+  !call dump_buffer_base(recv_buffer, fid)
   
 end subroutine dump_buffer
 
@@ -479,8 +479,8 @@ subroutine restore_buffer(fid)
   call put_log("------------------------------  restore  buffer   ----------------------------------")
   call put_log("------------------------------   send  buffer     ----------------------------------")
   call restore_buffer_base(send_buffer, fid)
-  call put_log("------------------------------   recv  buffer     ----------------------------------")
-  call restore_buffer_base(recv_buffer, fid)
+  !call put_log("------------------------------   recv  buffer     ----------------------------------")
+  !call restore_buffer_base(recv_buffer, fid)
   
 end subroutine restore_buffer
 

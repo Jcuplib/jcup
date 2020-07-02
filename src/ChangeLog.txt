@@ -1486,7 +1486,7 @@ Detail
 
 -----------------------------------------------------------------
 
-Version:4.0700000
+Version:4.070000
 Date:2020/06/18
 
 Files:jcup_buffer_base.f90, jcup_buffer.f90, jcup_time.f90
@@ -1513,3 +1513,17 @@ Detail
  Jcupにリスタート機能を再作成
  データバッファと時間情報をダンプして読み込む
  jcup_exchangeにis_restartフラグを追加しデータ交換時の第一ステップ判定を一部修正
+
+-----------------------------------------------------------------
+
+Version:4.070100
+Date:2020/07/02
+
+Files:jcup_exchange.f90
+
+Routines
+ jcup_exchange_data_1d_double  : [mod]
+ jcup_exchange_data_25d_double : [mod]
+
+Detail
+ 時刻取得判定のif文ロジックが不必要にわかりにくかったので再構成

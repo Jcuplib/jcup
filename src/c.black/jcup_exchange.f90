@@ -1504,30 +1504,35 @@ subroutine jcup_exchange_data_1d_double(dest_model_name, data_name, average_data
 
   recv_comp_id = get_comp_id_from_name(trim(dest_model_name))
 
-  !!!write(0,*) "jcup_exchange_data_1d_double_new ", current_comp_id, recv_comp_id
-
   call set_current_mapping_tag(current_comp_id, recv_comp_id, GetMappingTag(recv_comp_id, data_name(1)))
 
   if (is_my_component(current_comp_id)) then
 
-    if ((is_first_step()).or.(trim(data_name(1)) /= trim(average_data_name(1)))) then
-      if (.not.is_restart) then ! 2020/06/16
+    if (is_first_step()) then 
+      if (is_restart) then
+        if (trim(data_name(1)) /= trim(average_data_name(1))) then ! if average data
+          call get_current_time(current_comp_id, 1, time)
+          call put_log("get_current_time ", 1)
+        else
+          call get_before_time(current_comp_id, 1, time)
+          call put_log("get_before_time ", 1)
+        end if
+      else
+        call get_current_time(current_comp_id, 1, time)
+        call put_log("get_current_time ", 1)
+      end if
+    else
+      if (trim(data_name(1)) /= trim(average_data_name(1))) then ! if average data
         call get_current_time(current_comp_id, 1, time)
         call put_log("get_current_time ", 1)
       else
         call get_before_time(current_comp_id, 1, time)
         call put_log("get_before_time ", 1)
       end if
-    else 
-      call get_before_time(current_comp_id, 1, time)
-      call put_log("get_before_time ", 1)
     end if
 
-    !!!write(0,*) "jcup_exchange_Data_1d_double_new 2 ", current_comp_id, current_grid_tag
     call get_my_local_area(current_comp_id, current_grid_tag, is, ie, js, je, ks, ke)
     ni = ie-is+1
-
-    !!!write(0,*) "jcup_exchange_Data_1d_double_new 3 "
 
     if (is_first_step()) then
       do d = 1, num_of_data
@@ -1592,14 +1597,27 @@ subroutine jcup_exchange_data_25d_double(dest_model_name, data_name, average_dat
 
   if (is_my_component(current_comp_id)) then
 
-    if ((is_first_step()).or.(trim(data_name) /= trim(average_data_name))) then
-      if (.not.is_restart) then ! 2020/06/16
+    if (is_first_step()) then 
+      if (is_restart) then
+        if (trim(data_name(1)) /= trim(average_data_name(1))) then ! if average data
+          call get_current_time(current_comp_id, 1, time)
+          call put_log("get_current_time ", 1)
+        else
+          call get_before_time(current_comp_id, 1, time)
+          call put_log("get_before_time ", 1)
+        end if
+      else
         call get_current_time(current_comp_id, 1, time)
+        call put_log("get_current_time ", 1)
+      end if
+    else
+      if (trim(data_name(1)) /= trim(average_data_name(1))) then ! if average data
+        call get_current_time(current_comp_id, 1, time)
+        call put_log("get_current_time ", 1)
       else
         call get_before_time(current_comp_id, 1, time)
+        call put_log("get_before_time ", 1)
       end if
-    else 
-      call get_before_time(current_comp_id, 1, time)
     end if
 
     call get_my_local_area(current_comp_id, current_grid_tag, is, ie, js, je, ks, ke)

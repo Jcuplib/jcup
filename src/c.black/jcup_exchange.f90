@@ -1599,7 +1599,7 @@ subroutine jcup_exchange_data_25d_double(dest_model_name, data_name, average_dat
 
     if (is_first_step()) then 
       if (is_restart) then
-        if (trim(data_name(1)) /= trim(average_data_name(1))) then ! if average data
+        if (trim(data_name) /= trim(average_data_name)) then ! if average data
           call get_current_time(current_comp_id, 1, time)
           call put_log("get_current_time ", 1)
         else
@@ -1611,7 +1611,7 @@ subroutine jcup_exchange_data_25d_double(dest_model_name, data_name, average_dat
         call put_log("get_current_time ", 1)
       end if
     else
-      if (trim(data_name(1)) /= trim(average_data_name(1))) then ! if average data
+      if (trim(data_name) /= trim(average_data_name)) then ! if average data
         call get_current_time(current_comp_id, 1, time)
         call put_log("get_current_time ", 1)
       else

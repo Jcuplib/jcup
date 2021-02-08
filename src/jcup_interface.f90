@@ -373,6 +373,9 @@ subroutine jcup_coupling_end(time_array, isCallFinalize)
   use jcup_utils, only : finalize_log, put_log
   use jcup_buffer, only : buffer_check_write, destruct_buffer
   use jcup_exchange, only : recv_all_scalar_data, finalize_exchange, send_final_step_data
+#ifdef EXCHANGE_BY_MPI_RMA
+  use jcup_grid, only : finalize_mpi_rma
+#endif
   use jal_api, only : jal_finish
   implicit none
   integer, optional, intent(IN) :: time_array(:) ! 2014/07/08
@@ -411,6 +414,10 @@ subroutine jcup_coupling_end(time_array, isCallFinalize)
   end if
 
   call recv_all_scalar_data() ! 2015/04/02 [ADD]
+
+#ifdef EXCHANGE_BY_MPI_RMA
+  call finalize_mpi_rma()
+#endif
 
   call put_log("!!!!!!!!!!!!!!!!   FINALIZE  STEP 4  !!!!!!!!!!!!!!! ", 1)
 
@@ -789,6 +796,9 @@ subroutine jcup_end_var_def()
   use jcup_config, only : exchange_send_config_info, exchange_recv_config_info, &
                           set_configuration, get_comp_exchange_type
   use jcup_data, only : end_def_varp, end_def_varg, check_data_definition, set_exchange_type
+#ifdef EXCHANGE_BY_MPI_RMA
+  use jcup_grid, only : init_mpi_rma
+#endif
   implicit none
   integer :: i, j
 
@@ -821,6 +831,9 @@ subroutine jcup_end_var_def()
      end if
   end do
   
+#ifdef EXCHANGE_BY_MPI_RMA
+  call init_mpi_rma()
+#endif
   is_EndVarDef = .true.
 
 end subroutine jcup_end_var_def

@@ -1,16 +1,16 @@
 JCUPLIBDIR    = ${JCUPDIR}/lib
 JCUPINCDIR    = ${JCUPDIR}/include
 
-MPIDIR = 
-# MPILIBDIR = ${MPIDIR}/lib
-# MPIINCDIR = ${MPIDIR}/include
-# MPIBINDIR = ${MPIDIR}/bin
-# MPILINK   = 
+#MPIDIR = /usr/local/openmpi-1.4.4
+#MPILIBDIR = ${MPIDIR}/lib
+#MPIINCDIR = ${MPIDIR}/include
+#MPIBINDIR = ${MPIDIR}/bin
+#MPILINK   = 
 
 FC              = mpif90
 CC		= mpicc
 
-##DEFMPI = MPI2
+DEFMPI = MPI2
 ##DEFINES = -DNEW_MPI -D$(DEFMPI) -DNO_OUTPUT_LOG -DNO_OUTPUT_STDERR -DNOPUTPUT_STDOUT
 ##DEFINES = -F -DNO_OUTPUT_LOG -DNO_OUTPUT_STDERR -DNO_OUTPUT_STDOUT 
 ##DEFINES =  -DNO_OUTPUT_LOG -DNO_OUTPUT_STDERR
@@ -19,11 +19,16 @@ DEFINES =
 #OPTIONS = -cpp  -mcmodel medium -shared-intel -check all -g
 #OPTIONS = -g -cpp -C -ladebug
 #OPTIONS = -check all
-#OPTIONS = -cpp  -mcmodel medium -shared-intel  -check all -g
+OPTIONS = -fpp -m64 -O0 -free                  \
+               -assume byterecl -convert big_endian \
+               -fpe0 -fp-model source               \
+               -check all -warn all -g -traceback   \
+               -mcmodel=medium -shared-intel        \
+               -heap-arrays        
+#OPTIONS = -Cpp  -mcmodel medium -shared-intel  -check all -g
 #OPTIONS = -cpp -g -O
-OPTIONS = -cpp -O3 -ffree-line-length-none -fPIC
 
-INCDIRS = 
+INCDIRS = -I${MPIINCDIR}
 
 FFLAGS = ${DEFINES} ${INCDIRS} ${OPTIONS}
 
@@ -41,3 +46,12 @@ MKDIR           = mkdir -p
 .SUFFIXES	:.o .f90 .a
 .f90.o	:
 	${COMPILE.F} $<
+
+
+
+
+
+
+
+
+

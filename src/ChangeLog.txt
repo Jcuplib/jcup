@@ -1527,3 +1527,23 @@ Routines
 
 Detail
  時刻取得判定のif文ロジックが不必要にわかりにくかったので再構成
+
+-----------------------------------------------------------------
+
+Version:4.080000
+Date:2021/02/08
+
+Files:jcup_interface.f90, jcup_grid.f90, jcup_mpi_lib.f90 
+
+Routines
+ jcup_initialize               : [mod]
+ jcup_coupling_end             : [mod]
+ jcup_end_var_def              : [mod]
+ send_data_1d_nowait           : [mod]
+ recv_data                     : [mod]
+ exchange_data_comp            : [mod]
+ 他多数                        : [add]
+
+Detail
+ RMAによるデータ交換を実装。
+ コンパイルオプションEXCHANGE_MY_MPI_RMAを定義するとRMAモードでデータ交換を行う。

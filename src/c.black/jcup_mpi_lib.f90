@@ -42,6 +42,7 @@ module jcup_mpi_lib
   public :: jml_ReduceMeanLocal ! subroutine (comp, d, mean) ! 2015/05/18 [NEW]
   public :: jml_ReduceMinLocal
   public :: jml_ReduceMaxLocal
+  public :: jml_AllReduceSum
   public :: jml_AllReduceMaxLocal
   public :: jml_AllReduceMinLocal ! 2015/04/28 [NEW]
   public :: jml_AllReduceSumLocal
@@ -69,6 +70,21 @@ module jcup_mpi_lib
 
   public :: jml_ProbeAll ! logical function (source) ! 2015/06/17 [NEW]
   public :: jml_RecvAll  ! subroutine(source) ! 2015/06/17 [NEW]
+#ifdef EXCHANGE_BY_MPI_RMA
+  public :: jml_WinCreateModel
+  public :: jml_WinFreeModel
+  public :: jml_WinFenceModel
+  public :: jml_PutModel
+  public :: jml_GetModel
+  public :: jml_WinLock
+  public :: jml_WinUnLock
+  public :: jml_WinLock_all
+  public :: jml_WinUnLock_all
+  public :: jml_Alloc_MemWindow
+  public :: jml_Dealloc_MemWindow
+  public :: jml_WinAllocate
+  public :: jml_barrier
+#endif
 
   !public :: jml_set_send_recv_buffer ! subroutine (buffer_size)
 
@@ -95,7 +111,7 @@ module jcup_mpi_lib
   end interface
   
   interface jml_AllReduceSum
-    module procedure jml_allreduce_sumint1d
+    module procedure jml_allreduce_sumint1d, jml_allreduce_sumint1dar
   end interface
 
   interface jml_AllReduceMax
@@ -143,6 +159,7 @@ module jcup_mpi_lib
     module procedure jml_bcast_string_local
     module procedure jml_bcast_int_1d_local, jml_bcast_real_1d_local, jml_bcast_double_1d_local
     module procedure jml_bcast_long_1d_local ! 2014/11/05 [ADD]
+    module procedure jml_bcast_int_local
   end interface
 
   interface jml_GatherLocal
@@ -218,11 +235,36 @@ module jcup_mpi_lib
 
   interface jml_ISendModel
     module procedure jml_isend_double_1d_model
+    module procedure jml_isend_int_1d_model
   end interface
 
   interface jml_IRecvModel
     module procedure jml_irecv_double_1d_model
+    module procedure jml_irecv_int_1d_model
   end interface
+
+#ifdef EXCHANGE_BY_MPI_RMA
+  interface jml_WinCreateModel
+    module procedure jml_win_create_double_1d_model
+    module procedure jml_win_create_double_1d_model_recreate
+  end interface
+
+  interface jml_WinFreeModel
+    module procedure jml_win_free_double_1d_model
+  end interface
+
+  interface jml_WinFenceModel
+    module procedure jml_win_fence_double_1d_model
+  end interface
+
+  interface jml_PutModel
+    module procedure jml_put_double_1d_model
+  end interface
+
+  interface jml_GetModel
+    module procedure jml_get_double_1d_model
+  end interface
+#endif
 
   integer :: GLOBAL_COMM = MPI_COMM_WORLD
   
@@ -267,6 +309,21 @@ module jcup_mpi_lib
   integer, private          :: irecv_counter
   integer, private, pointer :: irecv_request(:)
   integer, private, pointer :: irecv_status(:,:)
+
+#ifdef EXCHANGE_BY_MPI_RMA
+  type mem_window_type
+    real(kind=8), pointer :: mem_window_ptr
+    integer :: mem_window
+    integer :: mem_window_size
+    type(mem_window_type), pointer :: previous,next
+  end type
+
+  type mem_window_type_array
+    type(mem_window_type), pointer :: root
+  end type
+
+  type(mem_window_type_array), private, allocatable :: mem_windows(:,:)
+#endif
 
 contains
 
@@ -962,6 +1019,16 @@ subroutine jml_allreduce_sumint1d(d ,sum)
 
 end subroutine jml_allreduce_sumint1d
 
+subroutine jml_allreduce_sumint1dar(nd,d ,sum)
+  implicit none
+  integer, intent(in)  :: nd
+  integer, intent(IN)  :: d(nd)
+  integer, intent(INOUT) :: sum(nd)
+
+  call MPI_ALLREDUCE(d, sum, nd, MPI_INTEGER,MPI_SUM,global%mpi_comm,ierror)
+
+end subroutine jml_allreduce_sumint1dar
+
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! bugfix 2014/06/18
 !!subroutine jml_allreduce_maxint1d(data,is,ie,res)
@@ -1141,6 +1208,24 @@ subroutine jml_bcast_int_1d_local(comp, data,is,ie,source)
   call MPI_Bcast(data(is:),ie-is+1,MPI_INTEGER,source_rank,local(comp)%mpi_comm,ierror)
 
 end subroutine jml_bcast_int_1d_local
+
+subroutine jml_bcast_int_local(comp, data,source)
+  implicit none
+  integer, intent(IN)    :: comp
+  integer, intent(INOUT) :: data
+  integer, intent(IN), optional :: source
+
+  integer :: source_rank
+
+  if (present(source)) then
+    source_rank = source
+  else
+    source_rank = local(comp)%root_rank
+  end if
+
+  call MPI_Bcast(data,1,MPI_INTEGER,source_rank,local(comp)%mpi_comm,ierror)
+
+end subroutine jml_bcast_int_local
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! 2014/11/05 [NEW]
@@ -2872,6 +2957,49 @@ end subroutine jml_isend_double_1d_model
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
+subroutine jml_isend_int_1d_model(comp, data,is,ie,dest_model,dest_pe, exchange_tag)
+  implicit none
+  integer, intent(IN) :: comp
+  integer, pointer :: data
+  integer, intent(IN) :: is, ie
+  integer, intent(IN) :: dest_model, dest_pe
+  integer, optional, intent(IN) :: exchange_tag
+  integer :: dest_rank
+  integer :: tag
+  integer :: data_size
+  integer :: i
+
+  !!!!!!if (is == ie) return ! 2017/02/15  ! 2019/05/27 comment out
+
+  if (present(exchange_tag)) then
+    tag = exchange_tag
+  else 
+    tag = 0
+  end if
+
+  dest_rank = dest_pe + local(comp)%inter_comm(dest_model)%pe_offset
+  data_size = ie-is+1
+
+  if (dest_rank == jml_GetMyrankModel(comp, dest_model)) then !local(comp)%my_rank) then
+    !write(0,*) "mpi_IBsend called ", comp, dest_model, dest_pe, exchange_tag
+    call check_buffer_size(data_size)
+    call MPI_BSEND(data,data_size,MPI_INTEGER,dest_rank,tag,local(comp)%inter_comm(dest_model)%mpi_comm,ierror)
+  else
+    isend_counter = isend_counter + 1
+
+    if (size(isend_request) < isend_counter) then
+      write(0, *) "jml_isend_int_1d_model, isend_counter > size(isend_request)"
+      stop 9999
+    end if
+
+    call MPI_ISEND(data,data_size,MPI_INTEGER,dest_rank,tag, &
+                   local(comp)%inter_comm(dest_model)%mpi_comm, isend_request(isend_counter),ierror)
+  end if
+
+end subroutine jml_isend_int_1d_model
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
 subroutine jml_irecv_double_1d_model(comp, data,is,ie,source_model,source_pe, exchange_tag)
   implicit none
   integer, intent(IN) :: comp
@@ -2909,11 +3037,46 @@ end subroutine jml_irecv_double_1d_model
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
+subroutine jml_irecv_int_1d_model(comp, data,is,ie,source_model,source_pe, exchange_tag)
+  implicit none
+  integer, intent(IN) :: comp
+  integer, pointer :: data
+  integer, intent(IN) :: is, ie
+  integer, intent(IN) :: source_model, source_pe
+  integer, optional, intent(IN) :: exchange_tag
+  integer :: source_rank
+  integer :: tag
+  integer :: request
+  integer :: status(MPI_STATUS_SIZE)
+  
+  !!!!!!!if (is == ie) return ! 2017/02/15 ! 2019/05/27 comment out
+
+  if (present(exchange_tag)) then
+    tag = exchange_tag
+  else
+    tag = 0
+  end if
+
+  irecv_counter = irecv_counter + 1
+
+  source_rank = source_pe + local(comp)%inter_comm(source_model)%pe_offset
+
+    if (size(irecv_request) < irecv_counter) then
+      write(0, *) "jml_irecv_int_1d_model, irecv_counter > size(irecv_request)"
+      stop 9999
+    end if
+  call MPI_IRECV(data,ie-is+1,MPI_INTEGER,source_rank,tag, &
+                 local(comp)%inter_comm(source_model)%mpi_comm, irecv_request(irecv_counter),ierror)
+
+
+end subroutine jml_irecv_int_1d_model
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
 subroutine jml_send_waitall()
   implicit none
   
   if (isend_counter==0) return
-
   call mpi_WaitAll(isend_counter, isend_request, isend_status, ierror)
   isend_counter = 0
   isend_request(:) = 0
@@ -2980,6 +3143,291 @@ end subroutine jml_RecvAll
 !  call check_buffer_size(bsize)
 
 !end subroutine jml_set_send_recv_buffer
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+#ifdef EXCHANGE_BY_MPI_RMA
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine jml_Alloc_MemWindow(numcomponents)
+  implicit none
+  integer, intent(IN) :: numcomponents
+  integer :: i, j
+  allocate(mem_windows(numcomponents, numcomponents))
+  do j=1, numcomponents 
+    do i=1, numcomponents
+      mem_windows(i,j)%root => NULL()
+    enddo
+  enddo
+end subroutine jml_Alloc_MemWindow
+
+subroutine jml_Dealloc_MemWindow()
+  deallocate(mem_windows)
+end subroutine jml_Dealloc_MemWindow
+
+function jml_get_last_mem_window_type(comp, target_model) result(wintype)
+  implicit none
+  integer, intent(IN) :: comp, target_model
+  type(mem_window_type), pointer :: wintype, next
+  next => mem_windows(comp, target_model)%root
+  if (.not.associated(next)) then
+    wintype => mem_windows(comp, target_model)%root
+    return
+  endif
+  do
+    if(.not.associated(next%next)) then
+      wintype => next
+      return
+    endif
+    next => next%next
+  enddo
+end function jml_get_last_mem_window_type
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+function jml_find_mem_window_type(comp, target_model, winsize, winptr) result(wintype)
+  implicit none
+  integer, intent(IN) :: comp, target_model
+  integer, intent(IN) :: winsize
+  real(kind=8), pointer :: winptr
+  type(mem_window_type), pointer :: wintype, next
+  next => mem_windows(comp, target_model)%root
+  do
+    if (.not. associated(next)) then
+      wintype => NULL()
+      return
+    endif
+    if (winsize == next%mem_window_size .and. &
+        associated(next%mem_window_ptr, winptr)) then
+      wintype => next
+      return
+    endif
+    next => next%next
+  enddo
+
+end function jml_find_mem_window_type
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine jml_add_mem_window_type(comp, target_model, base, memwin_l, memsize)
+  implicit none
+  integer, intent(IN) :: comp, target_model
+  real(kind=8), pointer, intent(IN) :: base
+  integer, intent(IN) :: memwin_l
+  integer, intent(IN) :: memsize
+  type(mem_window_type), pointer :: memwin, memwin_new
+  allocate(memwin_new)
+  memwin_new%mem_window_ptr  => base
+  memwin_new%mem_window_size =  memsize
+  memwin_new%mem_window      =  memwin_l
+  memwin_new%next            => NULL()
+  memwin                     => jml_get_last_mem_window_type(comp, target_model)
+  if (.not.associated(memwin)) then
+    mem_windows(comp, target_model)%root => memwin_new
+  else
+    memwin_new%previous => memwin
+    memwin%next         => memwin_new
+  end if
+end subroutine jml_add_mem_window_type
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine jml_win_create_double_1d_model(comp,base,is,ie,target_model,mem_window_out)
+  implicit none
+  integer, intent(IN) :: comp
+  real(kind=8), pointer, intent(IN) :: base
+  integer, intent(IN) :: is, ie
+  integer, intent(IN) :: target_model
+  integer, intent(INOUT) :: mem_window_out
+  integer(kind=MPI_ADDRESS_KIND) lowerbound, disp_unit, dsize
+  integer :: disp
+  type(mem_window_type), pointer :: memwin, memwin_new
+  integer :: memwin_l
+  memwin => jml_find_mem_window_type(comp, target_model, (ie-is+1), base)
+  if(associated(memwin)) then
+    mem_window_out = memwin%mem_window
+    return
+  endif
+  call MPI_TYPE_GET_EXTENT(MPI_DOUBLE_PRECISION, lowerbound, disp_unit, ierror)
+  dsize = disp_unit*(ie-is+1)
+  disp = disp_unit
+  call MPI_WIN_CREATE(base, dsize, disp, MPI_INFO_NULL, &
+       local(comp)%inter_comm(target_model)%mpi_comm,   &
+!       memwin_l, ierror)
+       mem_window_out, ierror)
+  call jml_add_mem_window_type(comp, target_model, base, mem_window_out, (ie-is+1))
+!  mem_window_out = memwin_l
+end subroutine jml_win_create_double_1d_model
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine jml_barrier(comp,target_model)
+  integer, intent(IN) :: comp
+  integer, intent(IN) :: target_model
+  call mpi_barrier(local(comp)%inter_comm(target_model)%mpi_comm,ierror)
+end subroutine jml_barrier
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine jml_WinAllocate(comp,base,is,ie,target_model,mem_window_out)
+  implicit none
+  integer, intent(IN) :: comp
+  real(kind=8), pointer, intent(INOUT) :: base(:)
+  integer, intent(IN) :: is, ie
+  integer, intent(IN) :: target_model
+  integer, intent(INOUT) :: mem_window_out
+  integer(kind=MPI_ADDRESS_KIND) lowerbound, disp_unit, dsize
+  integer :: disp
+  type(mem_window_type), pointer :: memwin, memwin_new
+  integer :: memwin_l
+!  memwin => jml_find_mem_window_type(comp, target_model, (ie-is+1), base)
+!  if(associated(memwin)) then
+!    mem_window_out = memwin%mem_window
+!    return
+!  endif
+!  call MPI_TYPE_GET_EXTENT(MPI_DOUBLE_PRECISION, lowerbound, disp_unit, ierror)
+!  dsize = disp_unit*(ie-is+1)
+!  disp = disp_unit
+!  call MPI_WIN_ALLOCATE(dsize, disp, MPI_INFO_NULL, local(comp)%inter_comm(target_model)%mpi_comm,base, mem_window_out, ierror)
+!!  call MPI_WIN_CREATE(base, dsize, disp, MPI_INFO_NULL, &
+!       local(comp)%inter_comm(target_model)%mpi_comm,   &
+!       memwin_l, ierror)
+!       mem_window_out, ierror)
+!  call jml_add_mem_window_type(comp, target_model, base, mem_window_out, (ie-is+1))
+!  mem_window_out = memwin_l
+end subroutine jml_WinAllocate
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine jml_win_create_double_1d_model_recreate(comp,base,is,ie,target_model,mem_window_out,recreate)
+  implicit none
+  integer, intent(IN) :: comp
+  real(kind=8), pointer, intent(IN) :: base
+  integer, intent(IN) :: is, ie
+  integer, intent(IN) :: target_model
+  integer, intent(OUT) :: mem_window_out
+  logical, intent(IN) :: recreate
+  integer(kind=MPI_ADDRESS_KIND) lowerbound, disp_unit, dsize
+  integer :: disp
+  type(mem_window_type), pointer :: memwin, memwin_new
+  integer :: memwin_l
+  if(.not.recreate) then
+    memwin => jml_find_mem_window_type(comp, target_model, (ie-is+1), base)
+    if(associated(memwin)) then
+      mem_window_out = memwin%mem_window
+      return
+    endif
+  endif
+  call MPI_TYPE_GET_EXTENT(MPI_DOUBLE_PRECISION, lowerbound, disp_unit, ierror)
+  dsize = disp_unit*(ie-is+1)
+  disp = disp_unit
+  call MPI_WIN_CREATE(base, dsize, disp, MPI_INFO_NULL, &
+       local(comp)%inter_comm(target_model)%mpi_comm,   &
+       mem_window_out, ierror)
+  if(.not.recreate) then
+    call jml_add_mem_window_type(comp, target_model, base, mem_window_out, (ie-is+1))
+  endif
+!  mem_window_out = memwin_l
+end subroutine jml_win_create_double_1d_model_recreate
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine jml_win_free_double_1d_model(i, j)
+  implicit none
+  integer, intent(in) :: i, j
+!  if (associated(mem_window_ptr(i,j)%mem_window_ptr)) then
+!    call MPI_WIN_FREE(mem_window(i,j), ierror)
+!  endif
+end subroutine jml_win_free_double_1d_model
+
+subroutine jml_win_fence_double_1d_model(memwin)
+  implicit none
+  integer, intent(IN) :: memwin
+  call MPI_WIN_FENCE(0, memwin, ierror)
+end subroutine jml_win_fence_double_1d_model
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine jml_put_double_1d_model(comp,origin_addr,is,ie,td,dest_model,dest_pe,memwin)
+  implicit none
+  integer, intent(IN) :: comp
+  integer, intent(IN) :: is, ie, td
+  real(kind=8), intent(INOUT), pointer :: origin_addr
+  integer, intent(IN) :: dest_model, dest_pe
+  integer, intent(IN) :: memwin
+  integer :: origin_count, target_count, target_rank
+  integer(kind=MPI_ADDRESS_KIND) :: target_disp
+  target_disp = td
+  origin_count = ie-is+1;target_count = origin_count
+  target_rank = dest_pe + local(comp)%inter_comm(dest_model)%pe_offset
+  call MPI_PUT(origin_addr, origin_count, MPI_DOUBLE_PRECISION, &
+       target_rank, target_disp, target_count, MPI_DOUBLE_PRECISION, &
+       memwin, ierror)
+end subroutine jml_put_double_1d_model
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine jml_get_double_1d_model(comp,origin_addr,is,ie,td,dest_model,dest_pe,memwin)
+  implicit none
+  integer, intent(IN) :: comp
+  integer, intent(IN) :: is, ie, td
+  real(kind=8), intent(INOUT), pointer :: origin_addr
+  integer, intent(IN) :: dest_model, dest_pe
+  integer, intent(IN) :: memwin
+  integer :: origin_count, target_count, target_rank
+  integer(kind=MPI_ADDRESS_KIND) :: target_disp
+  target_disp = td
+  origin_count = ie-is+1;target_count = origin_count
+  target_rank = dest_pe + local(comp)%inter_comm(dest_model)%pe_offset
+  call MPI_GET(origin_addr, origin_count, MPI_DOUBLE_PRECISION, &
+       target_rank, target_disp, target_count, MPI_DOUBLE_PRECISION, &
+       memwin, ierror)
+end subroutine jml_get_double_1d_model
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine jml_WinLock(comp,dest_model,dest_pe,memwin)
+  implicit none
+  integer, intent(IN) :: comp,dest_model,dest_pe
+  integer, intent(IN) :: memwin
+  integer :: target_rank
+  target_rank = dest_pe + local(comp)%inter_comm(dest_model)%pe_offset
+  call MPI_WIN_LOCK(MPI_LOCK_SHARED,target_rank,0,memwin,ierror)
+end subroutine jml_WinLock
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine jml_WinLock_all(memwin)
+  implicit none
+  integer, intent(IN) :: memwin
+  call MPI_WIN_LOCK_ALL(0,memwin,ierror)
+end subroutine jml_WinLock_all
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine jml_WinUnLock(comp,dest_model,dest_pe,memwin)
+  implicit none
+  integer, intent(IN) :: comp,dest_model,dest_pe
+  integer, intent(IN) :: memwin
+  integer :: target_rank
+  target_rank = dest_pe + local(comp)%inter_comm(dest_model)%pe_offset
+  call MPI_WIN_FLUSH(target_rank,memwin,ierror)
+  call MPI_WIN_UNLOCK(target_rank,memwin,ierror)
+end subroutine jml_WinUnLock
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine jml_WinUnLock_all(memwin)
+  implicit none
+  integer, intent(IN) :: memwin
+  call MPI_WIN_FLUSH_all(memwin,ierror)
+  call MPI_WIN_UNLOCK_all(memwin,ierror)
+end subroutine jml_WinUnLock_all
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+#endif
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 

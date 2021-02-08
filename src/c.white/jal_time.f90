@@ -321,14 +321,14 @@ subroutine jal_time_end()
   write(log_str,*) "/////////////////////////////// jal_time_end start //////////////////////////////// ", &
              my_comp_id, step_counter
   call put_log(trim(log_str))
-  
+
   data(1) = 1
   call jal_set_window_data(data, 1)
   
   do i = 1, num_of_total_comp
 
-     data(1) = 0
-     
+    data(1) = 0
+      
     if (is_my_component(i)) cycle
 
     if (get_comp_exchange_type(my_comp_id, i) /= ASSYNC_SEND_RECV) cycle
@@ -361,7 +361,8 @@ subroutine jal_time_end()
    end if
   end do
 
-  call jal_free_window()
+ 
+  !!!!!call jal_free_window() ! comment out 20210108
 
   write(log_str,*) "/////////////////////////////// jal_time_end finish /////////////////////////////// "
 

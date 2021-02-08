@@ -1547,3 +1547,17 @@ Routines
 Detail
  RMAによるデータ交換を実装。
  コンパイルオプションEXCHANGE_MY_MPI_RMAを定義するとRMAモードでデータ交換を行う。
+
+-----------------------------------------------------------------
+
+Version:4.080100
+Date:2021/02/08
+
+Files:jcup_grid.f90
+
+Routines
+ set_local_grid_mapping_1d     : [mod]
+
+Detail
+ recv_grid_doとsend_grid_doのループでリニアサーチをバイナリサーチに変更。
+ 

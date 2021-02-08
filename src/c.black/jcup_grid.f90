@@ -1093,19 +1093,21 @@ subroutine set_local_grid_mapping_1d(recv_comp_id, send_comp_id, mapping_tag, &
 
   recv_grid_do : do j = 1, size(recv_grid)
 
-    do i = j, size(peg%global_index_of_my_recv_point)
-      if (recv_grid(j)==peg%global_index_of_my_recv_point(i)) then
-        peg%recv_index_converter(j) = i
-        cycle recv_grid_do
-      end if
-    end do
+     peg%recv_index_converter(j) =  binary_search(peg%global_index_of_my_recv_point, recv_grid(j))
 
-    do i = 1, j - 1
-      if (recv_grid(j)==peg%global_index_of_my_recv_point(i)) then
-        peg%recv_index_converter(j) = i
-        cycle recv_grid_do
-      end if
-    end do
+    !do i = j, size(peg%global_index_of_my_recv_point)
+    ! if (recv_grid(j)==peg%global_index_of_my_recv_point(i)) then
+    !   peg%recv_index_converter(j) = i
+    !   cycle recv_grid_do
+    ! end if
+    !end do
+
+    !do i = 1, j - 1
+    !  if (recv_grid(j)==peg%global_index_of_my_recv_point(i)) then
+    !    peg%recv_index_converter(j) = i
+    !    cycle recv_grid_do
+    !  end if
+    !end do
 
   end do recv_grid_do
 
@@ -1166,18 +1168,19 @@ subroutine set_local_grid_mapping_1d(recv_comp_id, send_comp_id, mapping_tag, &
   peg%send_index_converter(:) = 0
 
   send_grid_do : do j = 1, size(send_grid)
-    do i = j, size(peg%global_index_of_my_send_point)
-      if (send_grid(j)==peg%global_index_of_my_send_point(i)) then
-        peg%send_index_converter(j) = i
-        cycle send_grid_do
-      end if
-    end do
-    do i = 1, j-1
-      if (send_grid(j)==peg%global_index_of_my_send_point(i)) then
-        peg%send_index_converter(j) = i
-        cycle send_grid_do
-      end if
-    end do
+    peg%send_index_converter(j) =  binary_search(peg%global_index_of_my_send_point, send_grid(j))
+    !do i = j, size(peg%global_index_of_my_send_point)
+    !  if (send_grid(j)==peg%global_index_of_my_send_point(i)) then
+    !    peg%send_index_converter(j) = i
+    !    cycle send_grid_do
+    !  end if
+    !end do
+    !do i = 1, j-1
+    !  if (send_grid(j)==peg%global_index_of_my_send_point(i)) then
+    !    peg%send_index_converter(j) = i
+    !    cycle send_grid_do
+    !  end if
+    !end do
   end do send_grid_do
 
   call put_log("set_local_grid_mapping_1d 6", 2)

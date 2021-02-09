@@ -2210,7 +2210,6 @@ subroutine jcup_get_data_1d_double(data_type, data, data_vector, is_recv_ok)
   !!!my_comp_id = current_comp_id ! get_recv_comp_id_from_data_name(data_name)
   call get_recv_data(data, time, my_comp_id, get_recv_data_id_from_data_name(data_name), data_name, is_data_reset)
 
-
   if (present(data_vector)) then ! 2018/02/07
      call recv_data_vector(data_type, data_vector)
   end if
@@ -2558,7 +2557,7 @@ subroutine jcup_recv_get_data_1d_double(send_comp_id, rd, data)
   use jcup_config, only : send_data_conf_type, recv_data_conf_type, GetRecvMappingTag, &
                           get_average_data_name, get_send_data_id
   use jcup_grid_base, only : get_my_local_area
-  use jcup_grid, only : set_data, get_data, recv_data, interpolate_data_1d, exchange_data_comp
+  use jcup_grid, only : set_data, get_data, recv_data_1d, interpolate_data_1d, exchange_data_comp
   use jcup_comp, only : get_component_relation, is_my_component
   use jcup_data, only : varp_type, get_comp_id, get_data_name, is_data_defined, set_time
   use jcup_buffer, only : get_send_data
@@ -2611,7 +2610,7 @@ subroutine jcup_recv_get_data_1d_double(send_comp_id, rd, data)
 
     call put_log("immediate data get start, data name : "//trim(data_name)//", model : COMP_PARALLEL", 1)
 
-    call recv_data(recv_comp_id, send_comp_id, recv_mapping_tag(recv_comp_id, send_comp_id), &
+    call recv_data_1d(recv_comp_id, send_comp_id, recv_mapping_tag(recv_comp_id, send_comp_id), &
                    DOUBLE_DATA, 1, rd%data_id)
 
     exchange_tag(1) = rd%exchange_tag
@@ -2708,7 +2707,7 @@ subroutine jcup_recv_get_data_25d_double(send_comp_id, rd, data)
   use jcup_config, only : send_data_conf_type, recv_data_conf_type, GetRecvMappingTag, &
                           get_average_data_name, get_send_data_id
   use jcup_grid_base, only : get_my_local_area
-  use jcup_grid, only : set_data, get_data, recv_data, interpolate_data_1d, exchange_data_comp
+  use jcup_grid, only : set_data, get_data, recv_data_1d, interpolate_data_1d, exchange_data_comp
   use jcup_comp, only : get_component_relation, is_my_component
   use jcup_data, only : varp_type, get_comp_id, get_data_name, is_data_defined, set_time
   use jcup_buffer, only : get_send_data
@@ -2763,7 +2762,7 @@ subroutine jcup_recv_get_data_25d_double(send_comp_id, rd, data)
 
     call put_log("immediate data get start, data name : "//trim(data_name)//", model : COMP_PARALLEL", 1)
 
-    call recv_data(recv_comp_id, send_comp_id, recv_mapping_tag(recv_comp_id, send_comp_id), &
+    call recv_data_1d(recv_comp_id, send_comp_id, recv_mapping_tag(recv_comp_id, send_comp_id), &
                    DOUBLE_DATA, num_of_data, rd%data_id)
 
     exchange_tag(1) = rd%exchange_tag

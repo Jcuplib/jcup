@@ -937,6 +937,7 @@ subroutine jcup_set_mapping_table(my_model_name, &
   integer :: map_num, send_grid_num, recv_grid_num
   integer :: i
 
+
   call put_log("set mapping table start : "//trim(send_model_name)//":"//trim(recv_model_name) &
               //", grid = "//trim(send_grid_name)//":"//trim(recv_grid_name),1)
 
@@ -1028,6 +1029,7 @@ subroutine jcup_set_mapping_table(my_model_name, &
   end if
 
 
+
   if (jml_GetLeaderRank(send_model_id) /= jml_GetLeaderRank(recv_model_id)) then
     call send_recv_index2pe()
   end if
@@ -1111,6 +1113,7 @@ subroutine jcup_set_mapping_table(my_model_name, &
               //", grid number = "//trim(IntToStr(send_grid_num))//":"//trim(IntToStr(recv_grid_num)),1)
 
   is_Initialize_completed = .true.
+
 
 
   return

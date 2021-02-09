@@ -1560,4 +1560,20 @@ Routines
 
 Detail
  recv_grid_doとsend_grid_doのループでリニアサーチをバイナリサーチに変更。
+
+-----------------------------------------------------------------
+
+Version:4.080101
+Date:2021/02/09
+
+Files:jcup_grid.f90, jcup_exchange.f90
+
+Routines
+ recv_data_1d                  : [add]
+ jcup_recv_get_data_1d_double  : [mod]
+ jcup_recv_get_data_25d_double : [mod]
+
+Detail
+ immediate send recvのRMAモードで送信側はisend, 受信側はRMAで通信するバグがあったので、
+ 受信側もirecvで受信するよう修正。
  

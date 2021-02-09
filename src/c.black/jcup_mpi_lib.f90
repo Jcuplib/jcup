@@ -3149,22 +3149,35 @@ end subroutine jml_RecvAll
 #ifdef EXCHANGE_BY_MPI_RMA
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+!=======+                RMA EXCHANGE MODE SUBROUTINES              +=========+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine jml_Alloc_MemWindow(numcomponents)
   implicit none
   integer, intent(IN) :: numcomponents
   integer :: i, j
+
   allocate(mem_windows(numcomponents, numcomponents))
+
   do j=1, numcomponents 
     do i=1, numcomponents
       mem_windows(i,j)%root => NULL()
     enddo
   enddo
+
 end subroutine jml_Alloc_MemWindow
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine jml_Dealloc_MemWindow()
   deallocate(mem_windows)
 end subroutine jml_Dealloc_MemWindow
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
 
 function jml_get_last_mem_window_type(comp, target_model) result(wintype)
   implicit none

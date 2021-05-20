@@ -40,7 +40,7 @@ module jcup_exchange
 
 !--------------------------------   private  ---------------------------------!
 
-  real(kind=8), private :: fill_value = 0.d0 
+  real(kind=8), private :: fill_value = HUGE(kind(1.d0))
 
   integer :: max_grid_size
   integer :: max_data_num
@@ -1921,10 +1921,10 @@ subroutine jcup_put_data_1d_double(data_type, data, data_vector)
   type(time_type)   :: time, next_time
   character(STR_SHORT) :: average_data_name
   type(send_data_conf_type), pointer :: sd
-  real(kind=8) :: averaging_weight
+  real(kind=8), pointer :: averaging_weight(:)
   integer :: delta_t
   integer :: my_comp_id
-  integer :: i
+  integer :: i, di
   character(len=STR_SHORT) :: data_name
   logical :: is_average
 
@@ -1960,6 +1960,9 @@ subroutine jcup_put_data_1d_double(data_type, data, data_vector)
 
   if (.not.jcup_isPutOK(data_type, time)) return
 
+  allocate(averaging_weight(size(data)))
+  averaging_weight(:) = 1.d0
+
   if (is_mean_data(my_comp_id, data_name)) then
     do i = 1, sd%num_of_my_recv_data
       if (get_comp_exchange_type(my_comp_id, sd%my_recv_conf(i)%model_id) == IMMEDIATE_SEND_RECV) cycle ! skip immediate_send_recv
@@ -1967,33 +1970,43 @@ subroutine jcup_put_data_1d_double(data_type, data, data_vector)
       is_average = sd%my_recv_conf(i)%is_average
       if (sd%my_recv_conf(i)%is_average) then
         if (.not.is_first_step()) then ! average data
+
           average_data_name = trim(get_average_data_name(data_name,sd%my_recv_conf(i)%model_id,sd%my_recv_conf(i)%name))
+
           call get_delta_t(my_comp_id, 1, delta_t) ! 2014/10/28 [ADD]
-          !averaging_weight = dble(time%delta_t)/dble(sd%my_recv_conf(i)%interval)
-          averaging_weight = dble(delta_t)/dble(sd%my_recv_conf(i)%interval) ! 2014/10/28 [MOD]
+
+          averaging_weight(:) = dble(delta_t)/dble(sd%my_recv_conf(i)%interval) ! 2021/04/01 [MOD]
+
+          do di = 1, size(data)
+            if (data(di) == fill_value) averaging_weight(di) = 0.d0
+          end do
+
           call cal_next_exchange_time(my_comp_id, 1, sd%my_recv_conf(i)%interval, next_time)
           call put_send_data(data, next_time, my_comp_id, &
                              get_send_data_id(sd%my_recv_conf(i)%model_id, data_name, is_average), &
-                             average_data_name, .true., averaging_weight)
+                             average_data_name, .true., fill_value, averaging_weight)
+
         else ! first step of average data
           call put_send_data(data, time, my_comp_id, &
                              get_send_data_id(sd%my_recv_conf(i)%model_id, data_name, is_average), &
-                             data_name, .false., 1.d0)
+                             data_name, .false., fill_value, averaging_weight)
         end if
       else  ! non average data
         if ((is_first_step()).or.(is_put_step_data(data_name))) then
            call put_send_data(data, time, my_comp_id, &
                               get_send_data_id(sd%my_recv_conf(i)%model_id, data_name, is_average), &
-                              data_name, .false., 1.d0)
+                              data_name, .false., fill_value, averaging_weight)
         end if
       end if
     end do
   else
     call put_send_data(data, time, my_comp_id, &
-                       get_send_data_id(0, data_name, .false.), data_name, .false., 1.d0)
+                       get_send_data_id(0, data_name, .false.), data_name, .false., fill_value, averaging_weight)
     !!!!!call put_send_data(data, time, current_comp_id, &
     !!!!!                   get_send_data_id(0, data_name, .false.), data_name, .false., 1.d0)
   end if
+
+  deallocate(averaging_weight)
 
   if (present(data_vector)) then ! 2018/02/7
     call send_data_vector(data_type, data_vector)
@@ -2030,10 +2043,10 @@ subroutine jcup_put_data_25d_double(data_type, data, data_vector)
   type(time_type)   :: time, next_time
   character(STR_SHORT) :: average_data_name
   type(send_data_conf_type), pointer :: sd
-  real(kind=8) :: averaging_weight
+  real(kind=8), pointer :: averaging_weight(:,:)
   integer :: delta_t
   integer :: my_comp_id
-  integer :: i
+  integer :: i, di, dj
   character(len=STR_SHORT) :: data_name
   logical :: is_average
 
@@ -2066,6 +2079,9 @@ subroutine jcup_put_data_25d_double(data_type, data, data_vector)
     end if
   end do
 
+  allocate(averaging_weight(size(data,1), size(data,2)))
+  averaging_weight(:,:) = 1.d0
+
   if (is_mean_data(my_comp_id, data_name)) then
     do i = 1, sd%num_of_my_recv_data
 
@@ -2073,34 +2089,49 @@ subroutine jcup_put_data_25d_double(data_type, data, data_vector)
 
       if (sd%my_recv_conf(i)%is_average) then
         if (.not.is_first_step()) then
+
           average_data_name = trim(get_average_data_name(data_name,sd%my_recv_conf(i)%model_id,sd%my_recv_conf(i)%name))
+
           call get_delta_t(my_comp_id, 1, delta_t) ! 2014/10/28 [ADD]
+
           !averaging_weight = dble(time%delta_t)/dble(sd%my_recv_conf(i)%interval)
-          averaging_weight = dble(delta_t)/dble(sd%my_recv_conf(i)%interval) ! 2014/10/28 [MOD]
+
+          averaging_weight(:,:) = dble(delta_t)/dble(sd%my_recv_conf(i)%interval) ! 2021/04/01 [MOD]
+
+          do dj = 1, size(data, 2)
+             do di = 1, size(data, 1)
+                if (data(di, dj) == fill_value) averaging_weight(di, dj) = 0.d0
+             end do
+          end do       
+
           call cal_next_exchange_time(my_comp_id, 1, sd%my_recv_conf(i)%interval, next_time)
           call put_send_data(data, next_time, my_comp_id, & ! 2014/11/19 [MOD] current_comp_id -> my_comp_id
                              get_send_data_id(sd%my_recv_conf(i)%model_id, data_name, is_average), &
-                             average_data_name, .true., averaging_weight)
+                             average_data_name, .true., fill_value, averaging_weight)
+
         else ! first step of average data
           call put_send_data(data, time, my_comp_id, &
                              get_send_data_id(sd%my_recv_conf(i)%model_id, data_name, is_average), &
-                             data_name, .false., 1.d0)
+                             data_name, .false., fill_value, averaging_weight)
         end if
       else ! non average data
         if (is_put_step_data(data_name)) then
            call put_send_data(data, time, my_comp_id, &
                               get_send_data_id(sd%my_recv_conf(i)%model_id, data_name, is_average), &
-                              data_name, .false., 1.d0)
+                              data_name, .false., fill_value, averaging_weight)
         end if
       end if
     end do
   else
-    call put_send_data(data, time, my_comp_id, get_send_data_id(0, data_name, .false.), data_name, .false.,1.d0)
+    call put_send_data(data, time, my_comp_id, get_send_data_id(0, data_name, .false.), data_name, .false., fill_value, averaging_weight)
   end if
+
+  deallocate(averaging_weight)
 
   if (present(data_vector)) then ! 2018/02/08
     call send_data_vector(data_type, data_vector)
   end if
+
 
   call set_time(data_type, time)
 
@@ -2318,6 +2349,7 @@ subroutine jcup_put_send_data_1d_double(sd, rd, data)
   character(len=STR_SHORT) :: recv_data_name
   type(time_type) :: time
   integer :: exchange_tag(1)
+  real(kind=8), pointer :: averaging_weight(:)
 
   data_name = sd%name
 
@@ -2330,6 +2362,9 @@ subroutine jcup_put_send_data_1d_double(sd, rd, data)
   !if (recv_model_id == current_comp_id) then
   !  call error("jcup_SendData2D_double","dest_model_name : "//trim(dest_model_name)//" error")
   !end if
+
+  allocate(averaging_weight(size(data)))
+  averaging_weight(:) = 1.d0
 
   call set_current_mapping_tag(sd%model_id, recv_comp_id, GetMappingTag(recv_comp_id, data_name))
 
@@ -2355,7 +2390,7 @@ subroutine jcup_put_send_data_1d_double(sd, rd, data)
     time%yyyy = 9999 ; time%mo = 99 ; time%dd = 99 ; time%hh = 99 ; time%mm = 99 ; time%ss = 99
 
     call put_send_data(data, time, current_comp_id, &
-                       get_send_data_id(0, data_name, rd%is_average), data_name, .false., 1.d0)
+                       get_send_data_id(0, data_name, rd%is_average), data_name, .false., fill_value, averaging_weight)
 
     call put_log("immediate data put completed, data name : "//trim(data_name)//", model : COMP_SERIAL or COMP_SUBSET", 1)
 
@@ -2402,7 +2437,7 @@ subroutine jcup_put_send_data_1d_double(sd, rd, data)
       time%yyyy = 9999 ; time%mo = 99 ; time%dd = 99 ; time%hh = 99 ; time%mm = 99 ; time%ss = 99
 
       call put_send_data(data, time, current_comp_id, &
-                         get_send_data_id(0, data_name, rd%is_average), data_name, .false., 1.d0)
+                         get_send_data_id(0, data_name, rd%is_average), data_name, .false., fill_value, averaging_weight)
     else
       buffer_double1d(1:ni,1) = data(1:ni)
 
@@ -2416,6 +2451,8 @@ subroutine jcup_put_send_data_1d_double(sd, rd, data)
   case default
     call error("jcup_put_send_data_1d_double", "immediate exchange parameter error")
   end select
+
+  deallocate(averaging_weight)
 
 end subroutine jcup_put_send_data_1d_double
 
@@ -2445,6 +2482,7 @@ subroutine jcup_put_send_data_25d_double(sd, rd, data)
   type(time_type) :: time
   integer :: exchange_tag(1)
   integer :: num_of_data
+  real(kind=8), pointer :: averaging_weight(:,:)
 
   data_name = sd%name
 
@@ -2457,6 +2495,9 @@ subroutine jcup_put_send_data_25d_double(sd, rd, data)
   !if (recv_model_id == current_comp_id) then
   !  call error("jcup_SendData2D_double","dest_model_name : "//trim(dest_model_name)//" error")
   !end if
+
+  allocate(averaging_weight(size(data,1), size(data,2)))
+  averaging_weight(:,:) = 1.d0
 
   call set_current_mapping_tag(sd%model_id, recv_comp_id, GetMappingTag(recv_comp_id, data_name))
 
@@ -2485,7 +2526,7 @@ subroutine jcup_put_send_data_25d_double(sd, rd, data)
     time%yyyy = 9999 ; time%mo = 99 ; time%dd = 99 ; time%hh = 99 ; time%mm = 99 ; time%ss = 99
 
     call put_send_data(data, time, current_comp_id, &
-                       get_send_data_id(0, data_name, rd%is_average), data_name, .false., 1.d0)
+                       get_send_data_id(0, data_name, rd%is_average), data_name, .false., fill_value, averaging_weight)
 
     call put_log("immediate data put completed, data name : "//trim(data_name)//", model : COMP_SERIAL or COMP_SUBSET", 1)
 
@@ -2532,7 +2573,7 @@ subroutine jcup_put_send_data_25d_double(sd, rd, data)
       time%yyyy = 9999 ; time%mo = 99 ; time%dd = 99 ; time%hh = 99 ; time%mm = 99 ; time%ss = 99
 
       call put_send_data(data, time, current_comp_id, &
-                         get_send_data_id(0, data_name, rd%is_average), data_name, .false., 1.d0)
+                         get_send_data_id(0, data_name, rd%is_average), data_name, .false., fill_value, averaging_weight)
     else
       buffer_double1d(1:ni,:) = data(1:ni,:)
 
@@ -2546,6 +2587,8 @@ subroutine jcup_put_send_data_25d_double(sd, rd, data)
   case default
     call error("jcup_put_send_data_25d_double", "immediate exchange parameter error")
   end select
+
+  deallocate(averaging_weight)
 
 end subroutine jcup_put_send_data_25d_double
 

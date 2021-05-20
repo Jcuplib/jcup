@@ -39,10 +39,13 @@ module jcup_data_buffer
     integer :: component_id
     integer :: data_id
     real(kind=8), pointer :: double_d(:)
+    real(kind=8), pointer :: total_weight(:)
     character(len=STR_SHORT) :: name
-    logical :: is_using
-    integer :: data_type ! real, double 
-    integer :: data_dim  ! 2D or 3D
+    logical      :: is_using
+    logical      :: is_mean   ! average or snapshot
+    real(kind=8) :: fill_value
+    integer      :: data_type ! real, double 
+    integer      :: data_dim  ! 2D or 3D
     type(data_buffer_type), pointer :: before_ptr, next_ptr
   end type
   
@@ -81,7 +84,9 @@ subroutine init_data_buffer(db)
   db%next_ptr => db
   db%name = repeat(" ",STR_SHORT)
   db%is_using = .false.
+  db%is_mean  = .false.
   nullify(db%double_d)
+  nullify(db%total_weight)
 
 end subroutine init_data_buffer
 
@@ -100,6 +105,7 @@ subroutine destruct_data_buffer(db)
     nullify(db%before_ptr)
     nullify(db%next_ptr)
     if (associated(db%double_d)) deallocate(db%double_d)
+    if (associated(db%total_weight)) deallocate(db%total_weight)
     deallocate(db)
     db => tmp_ptr
   end do
@@ -135,6 +141,7 @@ subroutine delete_data_buffer(db)
   db%next_ptr%before_ptr => db%before_ptr
   
   if (associated(db%double_d)) deallocate(db%double_d)
+  if (associated(db%total_weight)) deallocate(db%total_weight)
   deallocate(db)
 
 end subroutine delete_data_buffer
@@ -193,34 +200,38 @@ end subroutine set_3d_to_1d
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine add_1d_to_1d(dtin, weight, dt1d)
+subroutine add_1d_to_1d(dtin, weight, dt1d, total_weight)
   use jcup_mpi_lib, only : jml_GetMyrankGlobal
   implicit none
   real(kind=8), intent(IN) :: dtin(:)
-  real(kind=8), intent(IN) :: weight
+  real(kind=8), intent(IN) :: weight(:)
   real(kind=8), intent(INOUT) :: dt1d(:)
+  real(kind=8), intent(INOUT) :: total_weight(:)
   integer :: i, j, ij
 
   do i = 1, size(dtin)
-    dt1d(i) = dt1d(i)+dtin(i)*weight
+    dt1d(i) = dt1d(i)+dtin(i)*weight(i)
+    total_weight(i) = total_weight(i) + weight(i)
   end do
 
 end subroutine add_1d_to_1d
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine add_2d_to_1d(dt2d, weight, dt1d)
+subroutine add_2d_to_1d(dt2d, weight, dt1d, total_weight)
   implicit none
   real(kind=8), intent(IN) :: dt2d(:,:)
-  real(kind=8), intent(IN) :: weight
+  real(kind=8), intent(IN) :: weight(:,:)
   real(kind=8), intent(INOUT) :: dt1d(:)
+  real(kind=8), intent(INOUT) :: total_weight(:)
   integer :: i, j, ij
 
   ij = 0
   do j = 1, size(dt2d,2)
     do i = 1, size(dt2d,1)
       ij = ij+1
-      dt1d(ij) = dt1d(ij)+dt2d(i,j)*weight
+      dt1d(ij) = dt1d(ij)+dt2d(i,j)*weight(i,j)
+      total_weight(ij) = total_weight(ij) + weight(i,j)
     end do
   end do
 
@@ -228,11 +239,12 @@ end subroutine add_2d_to_1d
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine add_3d_to_1d(dt3d, weight, dt1d)
+subroutine add_3d_to_1d(dt3d, weight, dt1d, total_weight)
   implicit none
   real(kind=8), intent(IN) :: dt3d(:,:,:)
-  real(kind=8), intent(IN) :: weight
+  real(kind=8), intent(IN) :: weight(:,:,:)
   real(kind=8), intent(INOUT) :: dt1d(:)
+  real(kind=8), intent(INOUT) :: total_weight(:)
   integer :: i, j, k, ijk
 
   ijk = 0
@@ -240,7 +252,8 @@ subroutine add_3d_to_1d(dt3d, weight, dt1d)
     do j = 1, size(dt3d,2)
       do i = 1, size(dt3d,1)
         ijk = ijk+1
-        dt1d(ijk) = dt1d(ijk)+dt3d(i,j,k)*weight
+        dt1d(ijk) = dt1d(ijk)+dt3d(i,j,k)*weight(i,j,k)
+        total_weight(ijk) = total_weight(ijk) + weight(i, j, k)
       end do
     end do
   end do
@@ -249,67 +262,115 @@ end subroutine add_3d_to_1d
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine get_1d_to_1d(dt1d, dtout)
+subroutine get_1d_to_1d(dt1d, total_weight, is_mean, fill_value, dtout)
   implicit none
-  real(kind=8), intent(IN) :: dt1d(:)
+  real(kind=8), intent(IN)    :: dt1d(:)
+  real(kind=8), intent(IN)    :: total_weight(:)
+  logical, intent(IN)         :: is_mean
+  real(kind=8), intent(IN)    :: fill_value
   real(kind=8), intent(INOUT) :: dtout(:)
   integer :: i
 
-  do i = 1, size(dtout)
-    dtout(i) = dt1d(i)
-  end do
+  if (is_mean) then
+    do i = 1, size(dtout)
+      if (total_weight(i) > 0.d0) then
+        dtout(i) = dt1d(i)/total_weight(i)
+      else
+        dtout(i) = fill_value
+      end if
+    end do
+  else
+    do i = 1, size(dtout)
+      dtout(i) = dt1d(i)
+    end do
+  end if
 
 end subroutine get_1d_to_1d
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine get_1d_to_2d(dt1d, dt2d)
+subroutine get_1d_to_2d(dt1d, total_weight, is_mean, fill_value, dt2d)
   implicit none
-  real(kind=8), intent(IN) :: dt1d(:)
+  real(kind=8), intent(IN)    :: dt1d(:)
+  real(kind=8), intent(IN)    :: total_weight(:)
+  logical, intent(IN)         :: is_mean
+  real(kind=8), intent(IN)    :: fill_value
   real(kind=8), intent(INOUT) :: dt2d(:,:)
   integer :: i, j, ij
 
   ij = 0
-  do j = 1, size(dt2d,2)
-    do i = 1, size(dt2d,1)
-      ij = ij+1
-      dt2d(i,j) = dt1d(ij)
+  if (is_mean) then
+    do j = 1, size(dt2d,2)
+      do i = 1, size(dt2d,1)
+        ij = ij+1
+        if (total_weight(ij) > 0.d0) then
+          dt2d(i,j) = dt1d(ij)/total_weight(ij)
+        else
+          dt2d(i,j) = fill_value
+        end if
+      end do
     end do
-  end do
+  else
+    do j = 1, size(dt2d,2)
+      do i = 1, size(dt2d,1)
+        ij = ij+1
+        dt2d(i,j) = dt1d(ij)
+      end do
+    end do
+  end if
 
 end subroutine get_1d_to_2d
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine get_1d_to_3d(dt1d, dt3d)
+subroutine get_1d_to_3d(dt1d, total_weight, is_mean, fill_value, dt3d)
   implicit none
-  real(kind=8), intent(IN) :: dt1d(:)
+  real(kind=8), intent(IN)    :: dt1d(:)
+  real(kind=8), intent(IN)    :: total_weight(:)
+  logical, intent(IN)         :: is_mean
+  real(kind=8), intent(IN)    :: fill_value
   real(kind=8), intent(INOUT) :: dt3d(:,:,:)
   integer :: i, j, k, ijk
 
   ijk = 0
-  do k = 1, size(dt3d,3)
-    do j = 1, size(dt3d,2)
-      do i = 1, size(dt3d,1)
-        ijk = ijk+1
-        dt3d(i,j,k) = dt1d(ijk)
+  if (is_mean) then
+    do k = 1, size(dt3d,3)
+      do j = 1, size(dt3d,2)
+        do i = 1, size(dt3d,1)
+          ijk = ijk+1
+          if (total_weight(ijk) > 0.d0) then
+            dt3d(i,j,k) = dt1d(ijk)/total_weight(ijk)
+          else
+            dt3d(i,j,k) = fill_value
+          end if
+        end do
       end do
     end do
-  end do
+  else
+    do k = 1, size(dt3d,3)
+      do j = 1, size(dt3d,2)
+        do i = 1, size(dt3d,1)
+          ijk = ijk+1
+          dt3d(i,j,k) = dt1d(ijk)
+        end do
+      end do
+    end do
+  end if
 
 end subroutine get_1d_to_3d
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine put_data_double_1d(dt, component_id, data_id, name, db_start, is_mean, weight)
+subroutine put_data_double_1d(dt, component_id, data_id, name, db_start, is_mean, fill_value, weight)
   use jcup_utils, only : put_log, IntToStr
   implicit none
-  real(kind=8), intent(IN) :: dt(:)
-  integer, intent(IN) :: component_id, data_id
-  character(len=*), intent(IN) :: name
+  real(kind=8), intent(IN)        :: dt(:)
+  integer, intent(IN)             :: component_id, data_id
+  character(len=*), intent(IN)    :: name
   type(data_buffer_type), pointer :: db_start
-  logical, intent(IN) :: is_mean
-  real(kind=8), intent(IN) :: weight
+  logical, intent(IN)             :: is_mean
+  real(kind=8), intent(IN)        :: fill_value
+  real(kind=8), intent(IN)        :: weight(:)
 
   type(data_buffer_type), pointer :: db_current
 
@@ -324,12 +385,14 @@ subroutine put_data_double_1d(dt, component_id, data_id, name, db_start, is_mean
         end if
       else
         allocate(db_current%double_d(size(dt,1)))
-        db_current%double_d(:) = 0.0
+        allocate(db_current%total_weight(size(dt,1)))
+        db_current%double_d(:) = 0.d0
+        db_current%total_weight(:) = 0.d0
         call put_log("allocate data buffer double 1d : name = "//trim(name)//&
                     ", Size:"//trim(IntToStr(size(dt,1))))
       end if
       if (is_mean) then
-        call add_1d_to_1d(dt, weight, db_current%double_d)
+        call add_1d_to_1d(dt, weight, db_current%double_d, db_current%total_weight)
       else
         call set_1d_to_1d(dt, db_current%double_d)
       end if
@@ -337,6 +400,8 @@ subroutine put_data_double_1d(dt, component_id, data_id, name, db_start, is_mean
       db_current%data_id = data_id
       db_current%name = name
       db_current%is_using = .true.
+      db_current%is_mean  = is_mean
+      db_current%fill_value = fill_value
       db_current%data_type = DOUBLE_DATA
       db_current%data_dim  = DATA_1D
       call put_log("reuse data buffer double 1d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id)) &
@@ -350,9 +415,11 @@ subroutine put_data_double_1d(dt, component_id, data_id, name, db_start, is_mean
   ! new data
   call insert_data_buffer(db_current)
   allocate(db_current%double_d(size(dt,1)))
+  allocate(db_current%total_weight(size(dt,1)))
   if (is_mean) then
     db_current%double_d(:) = 0.d0
-    call add_1d_to_1d(dt, weight, db_current%double_d)
+    db_current%total_weight(:) = 0.d0
+    call add_1d_to_1d(dt, weight, db_current%double_d, db_current%total_weight)
   else
     call set_1d_to_1d(dt, db_current%double_d)
   end if
@@ -360,6 +427,8 @@ subroutine put_data_double_1d(dt, component_id, data_id, name, db_start, is_mean
   db_current%data_id = data_id
   db_current%name = name
   db_current%is_using = .true.
+  db_current%is_mean  = is_mean
+  db_current%fill_value = fill_value
   db_current%data_type = DOUBLE_DATA
   db_current%data_dim  = DATA_1D
 
@@ -371,15 +440,16 @@ end subroutine put_data_double_1d
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine put_data_double_2d(dt, component_id, data_id, name, db_start, is_mean, weight)
+subroutine put_data_double_2d(dt, component_id, data_id, name, db_start, is_mean, fill_value, weight)
   use jcup_utils, only : put_log, IntToStr
   implicit none
-  real(kind=8), intent(IN) :: dt(:,:)
-  integer, intent(IN) :: component_id, data_id
-  character(len=*), intent(IN) :: name
+  real(kind=8), intent(IN)        :: dt(:,:)
+  integer, intent(IN)             :: component_id, data_id
+  character(len=*), intent(IN)    :: name
   type(data_buffer_type), pointer :: db_start
-  logical, intent(IN) :: is_mean
-  real(kind=8), intent(IN) :: weight
+  logical, intent(IN)             :: is_mean
+  real(kind=8), intent(IN)        :: fill_value
+  real(kind=8), intent(IN)        :: weight(:,:)
 
   type(data_buffer_type), pointer :: db_current
 
@@ -394,21 +464,25 @@ subroutine put_data_double_2d(dt, component_id, data_id, name, db_start, is_mean
         end if
       else
         allocate(db_current%double_d(size(dt,1)*size(dt,2)))
-        db_current%double_d(:) = 0.0
+        allocate(db_current%total_weight(size(dt,1)*size(dt,2)))
+        db_current%double_d(:) = 0.d0
+        db_current%total_weight(:) = 0.d0
         call put_log("allocate data buffer double 2d : name = "//trim(name)//&
                     ", Size:"//trim(IntToStr(size(dt,1)))//"x"//trim(IntToStr(size(dt,2))))  
         end if
       if (is_mean) then
-        call add_2d_to_1d(dt, weight, db_current%double_d)
+        call add_2d_to_1d(dt, weight, db_current%double_d, db_current%total_weight)
       else
         call set_2d_to_1d(dt, db_current%double_d)
       end if
       db_current%component_id = component_id
-      db_current%data_id = data_id
-      db_current%name = name
-      db_current%is_using = .true.
-      db_current%data_type = DOUBLE_DATA
-      db_current%data_dim  = DATA_2D
+      db_current%data_id    = data_id
+      db_current%name       = name
+      db_current%is_using   = .true.
+      db_current%is_mean    = is_mean
+      db_current%fill_value = fill_value
+      db_current%data_type  = DOUBLE_DATA
+      db_current%data_dim   = DATA_2D
       call put_log("reuse data buffer double 2d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id)) &
                    //", data id = "//trim(IntToStr(data_id)))  
       return
@@ -420,18 +494,22 @@ subroutine put_data_double_2d(dt, component_id, data_id, name, db_start, is_mean
   ! new data
   call insert_data_buffer(db_current)
   allocate(db_current%double_d(size(dt,1)*size(dt,2)))
+  allocate(db_current%total_weight(size(dt,1)*size(dt,2)))
   if (is_mean) then
     db_current%double_d(:) = 0.d0
-    call add_2d_to_1d(dt, weight, db_current%double_d)
+    db_current%total_weight(:) = 0.d0
+    call add_2d_to_1d(dt, weight, db_current%double_d, db_current%total_weight)
   else
     call set_2d_to_1d(dt, db_current%double_d)
   end if
   db_current%component_id = component_id
-  db_current%data_id = data_id
-  db_current%name = name
-  db_current%is_using = .true.
-  db_current%data_type = DOUBLE_DATA
-  db_current%data_dim  = DATA_2D
+  db_current%data_id    = data_id
+  db_current%name       = name
+  db_current%is_using   = .true.
+  db_current%is_mean    = is_mean
+  db_current%fill_value = fill_value
+  db_current%data_type  = DOUBLE_DATA
+  db_current%data_dim   = DATA_2D
 
   call put_log("allocate new data buffer double 2d : name = "//trim(name)//", comp id = "//trim(IntToStr(component_id)) &
                 //", data id = "//trim(IntToStr(data_id))// &
@@ -441,15 +519,16 @@ end subroutine put_data_double_2d
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine put_data_double_3d(dt, component_id, data_id, name, db_start, is_mean, weight)
+subroutine put_data_double_3d(dt, component_id, data_id, name, db_start, is_mean, fill_value, weight)
   use jcup_utils, only : put_log, IntToStr
   implicit none
-  real(kind=8), intent(IN) :: dt(:,:,:)
-  integer, intent(IN) :: component_id, data_id
-  character(len=*), intent(IN) :: name
+  real(kind=8), intent(IN)        :: dt(:,:,:)
+  integer, intent(IN)             :: component_id, data_id
+  character(len=*), intent(IN)    :: name
   type(data_buffer_type), pointer :: db_start
-  logical, intent(IN) :: is_mean
-  real(kind=8), intent(IN) :: weight
+  logical, intent(IN)             :: is_mean
+  real(kind=8), intent(IN)        :: fill_value
+  real(kind=8), intent(IN)        :: weight(:,:,:)
 
   type(data_buffer_type), pointer :: db_current
 
@@ -464,13 +543,15 @@ subroutine put_data_double_3d(dt, component_id, data_id, name, db_start, is_mean
         end if
       else
         allocate(db_current%double_d(size(dt,1)*size(dt,2)*size(dt,3)))
-        db_current%double_d(:) = 0.0
+        allocate(db_current%total_weight(size(dt,1)*size(dt,2)*size(dt,3)))
+        db_current%double_d(:) = 0.d0
+        db_current%total_weight(:) = 0.d0
         call put_log("allocate data buffer double 3d : name = "//trim(name)//&
                     ", Size:"//trim(IntToStr(size(dt,1)))//"x"//trim(IntToStr(size(dt,2)))//"x"//&
                        trim(IntToStr(size(dt,3))))  
       end if
       if (is_mean) then
-        call add_3d_to_1d(dt, weight, db_current%double_d)
+        call add_3d_to_1d(dt, weight, db_current%double_d, db_current%total_weight)
       else
         call set_3d_to_1d(dt, db_current%double_d)
       end if
@@ -478,6 +559,8 @@ subroutine put_data_double_3d(dt, component_id, data_id, name, db_start, is_mean
       db_current%data_id = data_id
       db_current%name = name
       db_current%is_using = .true.
+      db_current%is_mean  = is_mean
+      db_current%fill_value = fill_value
       db_current%data_type = DOUBLE_DATA
       db_current%data_dim  = DATA_3D
       call put_log("reuse data buffer double 3d : name = "//trim(name)//", data id = "//trim(IntToStr(data_id)))  
@@ -489,9 +572,11 @@ subroutine put_data_double_3d(dt, component_id, data_id, name, db_start, is_mean
 
   call insert_data_buffer(db_current)
   allocate(db_current%double_d(size(dt,1)*size(dt,2)*size(dt,3)))
+  allocate(db_current%total_weight(size(dt,1)*size(dt,2)*size(dt,3)))
   if (is_mean) then
     db_current%double_d(:) = 0.d0
-    call add_3d_to_1d(dt, weight, db_current%double_d)
+    db_current%total_weight(:) = 0.d0
+    call add_3d_to_1d(dt, weight, db_current%double_d, db_current%total_weight)
   else
     call set_3d_to_1d(dt, db_current%double_d)
   end if
@@ -499,6 +584,8 @@ subroutine put_data_double_3d(dt, component_id, data_id, name, db_start, is_mean
   db_current%data_id = data_id
   db_current%name = name
   db_current%is_using = .true.
+  db_current%is_mean  = is_mean
+  db_current%fill_value = fill_value
   db_current%data_type = DOUBLE_DATA
   db_current%data_dim  = DATA_3D
 
@@ -530,7 +617,8 @@ subroutine get_data_double_1d(dt, component_id, data_id, name, db_start, status)
          call error("get data double 1d","!!!! data dimension miss match, name = "//trim(name))
       end if
 
-      call get_1d_to_1d(db_current%double_d, dt)
+      call get_1d_to_1d(db_current%double_d, db_current%total_weight, db_current%is_mean, &
+                        db_current%fill_value, dt)
 
       status = 0 ; 
       call put_log("get data double 1d : name = "//trim(name)//", data id = "//trim(IntToStr(data_id)))
@@ -573,7 +661,8 @@ subroutine get_data_double_2d(dt, component_id, data_id, name, db_start, status)
       if (db_current%data_dim /= DATA_2D) then
          call error("get data double 2d","!!!! data dimension miss match, name = "//trim(name))
       end if
-      call get_1d_to_2d(db_current%double_d, dt)
+      call get_1d_to_2d(db_current%double_d, db_current%total_weight, db_current%is_mean, &
+                        db_current%fill_value, dt)
       status = 0 ; 
       call put_log("get data double 2d : name = "//trim(name)//", data id = "//trim(IntToStr(data_id)))
       return
@@ -615,7 +704,8 @@ subroutine get_data_double_3d(dt, component_id, data_id, name, db_start, status)
       if (db_current%data_dim /= DATA_3D) then
          call error("get data double 3d","!!!! data dimension miss match, name = "//trim(name))
       end if
-      call get_1d_to_3d(db_current%double_d, dt)
+      call get_1d_to_3d(db_current%double_d, db_current%total_weight, db_current%is_mean, &
+                        db_current%fill_value, dt)
 
       status = 0 ; 
       call put_log("get data double 3d : name = "//trim(name)//", data id = "//trim(IntToStr(data_id)))
@@ -677,6 +767,7 @@ subroutine reset_data_buffer(db_start, data_id, status)
   do 
     if (db_current%data_id == data_id) then
       db_current%double_d(:) = 0.d0
+      db_current%total_weight(:) = 0.d0
       db_current%data_id = 0
       db_current%component_id = 0
       db_current%is_using = .false.
@@ -711,6 +802,7 @@ subroutine reset_all_data_buffer(db_start)
       call put_log("reset data buffer : name = "//trim(db_current%name))
     end if
     db_current%double_d(:) = 0.d0
+    db_current%total_weight(:) = 0.d0
     db_current%data_id = 0
     db_current%component_id = 0
     db_current%is_using = .false.
@@ -742,6 +834,7 @@ subroutine reset_comp_data_buffer(db_start, component_id)
         call put_log("reset data buffer : name = "//trim(db_current%name))
       end if
       db_current%double_d(:) = 0.d0
+      db_current%total_weight(:) = 0.d0
       db_current%data_id = 0
       db_current%component_id = 0
       db_current%is_using = .false.
@@ -1650,63 +1743,72 @@ end function get_data_type
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine put_data_double_1d(tb, dt, time, component_id, data_id, name, is_mean, weight)
+subroutine put_data_double_1d(tb, dt, time, component_id, data_id, name, is_mean, &
+                              fill_value, weight)
   use jcup_data_buffer, only : put_data
   use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr, inc_num_of_data
   implicit none
   type(time_buffer_type), pointer :: tb
-  real(kind=8), intent(IN) :: dt(:)
-  type(time_type), intent(IN) :: time  
-  integer, intent(IN) :: component_id, data_id
-  character(len=*), intent(IN) :: name
-  logical, intent(IN) :: is_mean
-  real(kind=8), intent(IN) :: weight ! weight for data average (delta_t/interval)
+  real(kind=8), intent(IN)        :: dt(:)
+  type(time_type), intent(IN)     :: time  
+  integer, intent(IN)             :: component_id, data_id
+  character(len=*), intent(IN)    :: name
+  logical, intent(IN)             :: is_mean
+  real(kind=8), intent(IN)        :: fill_value
+  real(kind=8), intent(IN)        :: weight(:) ! weight for data average (delta_t/interval)
   character(len=6) :: weight_str
 
   call search_time_buffer(tb, time)
-  call put_data(dt, component_id, data_id, name, get_start_data_ptr(tb), is_mean, weight)
+  call put_data(dt, component_id, data_id, name, get_start_data_ptr(tb), is_mean, &
+                fill_value, weight)
   call inc_num_of_data(tb)
 
 end subroutine put_data_double_1d
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine put_data_double_2d(tb, dt, time, component_id, data_id, name, is_mean, weight)
+subroutine put_data_double_2d(tb, dt, time, component_id, data_id, name, is_mean, &
+                              fill_value, weight)
   use jcup_utils, only : put_log, IntToStr
   use jcup_data_buffer, only : put_data
   use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr, inc_num_of_data
   implicit none
   type(time_buffer_type), pointer :: tb
-  real(kind=8), intent(IN) :: dt(:,:)
-  type(time_type), intent(IN) :: time  
-  integer, intent(IN) :: component_id, data_id
-  character(len=*), intent(IN) :: name
-  logical, intent(IN) :: is_mean
-  real(kind=8), intent(IN) :: weight ! weight for data average (delta_t/interval)
+  real(kind=8), intent(IN)        :: dt(:,:)
+  type(time_type), intent(IN)     :: time  
+  integer, intent(IN)             :: component_id, data_id
+  character(len=*), intent(IN)    :: name
+  logical, intent(IN)             :: is_mean
+  real(kind=8), intent(IN)        :: fill_value
+  real(kind=8), intent(IN)        :: weight(:,:) ! weight for data average (delta_t/interval)
 
   call search_time_buffer(tb, time)
-  call put_data(dt, component_id, data_id, name, get_start_data_ptr(tb), is_mean, weight)
+  call put_data(dt, component_id, data_id, name, get_start_data_ptr(tb), is_mean, &
+                fill_value, weight)
   call inc_num_of_data(tb)
 
 end subroutine put_data_double_2d
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-subroutine put_data_double_3d(tb, dt, time, component_id, data_id, name, is_mean, weight)
+subroutine put_data_double_3d(tb, dt, time, component_id, data_id, name, is_mean, &
+                              fill_value, weight)
   use jcup_utils, only : put_log, IntToStr
   use jcup_data_buffer, only : put_data
   use jcup_time_buffer, only : search_time_buffer, get_start_data_ptr, inc_num_of_data
   implicit none
   type(time_buffer_type), pointer :: tb
-  real(kind=8), intent(IN) :: dt(:,:,:)
-  type(time_type), intent(IN) :: time  
-  integer, intent(IN) :: component_id, data_id
-  character(len=*), intent(IN) :: name
-  logical, intent(IN) :: is_mean
-  real(kind=8), intent(IN) :: weight ! weight for data average (delta_t/interval)
+  real(kind=8), intent(IN)        :: dt(:,:,:)
+  type(time_type), intent(IN)     :: time  
+  integer, intent(IN)             :: component_id, data_id
+  character(len=*), intent(IN)    :: name
+  logical, intent(IN)             :: is_mean
+  real(kind=8), intent(IN)        :: fill_value
+  real(kind=8), intent(IN)        :: weight(:,:,:) ! weight for data average (delta_t/interval)
 
   call search_time_buffer(tb, time)
-  call put_data(dt, component_id, data_id, name, get_start_data_ptr(tb), is_mean, weight)
+  call put_data(dt, component_id, data_id, name, get_start_data_ptr(tb), is_mean, &
+                fill_value, weight)
   call inc_num_of_data(tb)
 
 end subroutine put_data_double_3d

@@ -1576,4 +1576,128 @@ Routines
 Detail
  immediate send recvのRMAモードで送信側はisend, 受信側はRMAで通信するバグがあったので、
  受信側もirecvで受信するよう修正。
- 
+
+-----------------------------------------------------------------
+
+Version:4.080200
+Date:2021/03/06
+
+Files:jcup_interface,f90, jcup_grid.f90
+
+Routines
+ jcup_set_mapping_table        : [mod]
+ send_grid_mapping             : [mod]
+ recv_grid_mapping             : [mod]
+ recv_mapping_info             : [mod]
+ init_send_array               : [mod]
+ finish_grid_mapping           : [mod]
+
+Detail
+ マッピングテーブル設定に関わるログ出力を詳細化
+
+-----------------------------------------------------------------
+
+Version:4.080201
+Date:2021/03/12
+
+Files:jcup_grid.f90
+
+Routines
+ set_grid_mapping_1d           : [mod]
+
+Detail
+ 配列local_operationをdeallocateしていなかったので修正。
+
+-----------------------------------------------------------------
+
+Version:4.080202
+Date:2021/03/12
+
+Files:jcup_grid_base.f90 jcup_grid.f90
+
+Routines
+ destruct_index2pe             : [add]
+ set_grid_mapping_1d           : [mod]
+
+Detail
+ 配列index2peをdeallocateしていなかったので修正。
+
+-----------------------------------------------------------------
+
+Version:4.080300
+Date:2021/03/24
+
+Files:jcup_grid.f90
+
+Routines
+ finish_grid_mapping           : [mod]
+
+Detail
+ リニアサーチをバイナリサーチに変更。
+
+-----------------------------------------------------------------
+
+Version:4.080400
+Date:2021/04/01
+
+Files:jcup_buffer_base.f90, jcup_buffer.f90, jcup_exchange.f90, 
+      jal_buffer.f90, jal_api.f90
+
+Routines
+ 多数                          : [mod]
+
+Detail
+ 欠損値の格子が時間変化する場合対応するためweightを配列にしtotal_weightを追加した。
+ またtotal_weightが0の場合はfill_valueを代入するようにした。
+
+-----------------------------------------------------------------
+
+Version:4.080500
+Date:2021/05/09
+
+Files:jcup_grid.f90, jcup_mpi_lib.f90
+
+Routines
+ finish_grid_mapping           : [mod]
+ jml_init                      : [mod]
+ jml_ISendModel                : [mod]
+ jml_IRecvModel                : [mod]
+
+Detail
+ finish_grid_mappingでisend_request, irecv_requestの配列サイズをnum_of_pe*100からnum_of_pe*100+100に変更。
+ jml_initでisend_request, irecv_requestの配列を明示的に初期化(大きさ100)。
+ jml_ISendModel, jml_IrecvModelのエラーメッセージを修正。
+
+-----------------------------------------------------------------
+
+Version:4.080501
+Date:2021/05/10
+
+Files:jal_exchange.f90
+
+Routines
+ jal_send_data                 : [mod]
+ jal_recv_data                 : [mod]
+ jal_interpolate_time          : [mod]
+
+Detail
+ バッファにデータを保存、バッファからデータを取り出す際、鉛直層数がバッファ配列の大きさになっていたのを
+ データの鉛直層数に修正。
+
+-----------------------------------------------------------------
+
+Version:4.080600
+Date:2021/05/13
+
+Files:jal_api.f90, jcup_interface.f90
+
+Routines
+ jal_set_final_exchange_flag   : [add]
+ jal_finish                    : [mod]
+ jcup_coupling_end             : [mod]
+
+Detail
+ jalの終了処理でデータ送信するかどうかのフラグを設定するルーチンを作成。
+ デフォルトで送信しないようにjcup_coupling_endにルーチンコールを追加。
+ この修正はILS結合に対応するためのad hocな処置である。
+

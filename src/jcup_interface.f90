@@ -376,7 +376,7 @@ subroutine jcup_coupling_end(time_array, isCallFinalize)
 #ifdef EXCHANGE_BY_MPI_RMA
   use jcup_grid, only : finalize_mpi_rma
 #endif
-  use jal_api, only : jal_finish
+  use jal_api, only : jal_set_final_exchange_flag, jal_finish
   implicit none
   integer, optional, intent(IN) :: time_array(:) ! 2014/07/08
   logical, optional, intent(IN) :: isCallFinalize
@@ -391,6 +391,7 @@ subroutine jcup_coupling_end(time_array, isCallFinalize)
   call send_final_step_data()
 
   if (is_assync_exchange) then
+    call jal_set_final_exchange_flag(.false.) ! ad hoc call, for ILS coupling
     call jal_finish()
   end if
  
@@ -669,7 +670,7 @@ subroutine jcup_def_varp(data_type_ptr, comp_name, data_name, grid_name, num_of_
     if (num_of_data > NUM_OF_EXCHANGE_DATA) then
       logstr = "parameter num_of_data must be <= NUM_OF_EXCHANGE_DATA. num_of_data = " &
                //trim(IntToStr(num_of_data))
-      call error("jcup_def_varp", trim(logstr))
+       call error("jcup_def_varp", trim(logstr))
     end if
 
     if (num_of_data > 1) then
@@ -911,7 +912,7 @@ end subroutine jcup_init_time_int
 subroutine jcup_set_mapping_table(my_model_name, &
                                   send_model_name, send_grid_name, recv_model_name,  recv_grid_name, mapping_tag, &
                                   send_grid, recv_grid)
-  use jcup_constant, only : NUM_OF_EXCHANGE_GRID, MAX_GRID, NO_GRID
+  use jcup_constant, only : NUM_OF_EXCHANGE_GRID, MAX_GRID, NO_GRID, STR_LONG
   use jcup_mpi_lib, only : jml_isLocalLeader, jml_BcastLocal, jml_SendLeader, jml_RecvLeader, jml_GetMyrank, &
                            jml_GetLeaderRank
   use jcup_utils, only : put_log, IntToStr, error
@@ -936,7 +937,7 @@ subroutine jcup_set_mapping_table(my_model_name, &
   logical :: is_my_table
   integer :: map_num, send_grid_num, recv_grid_num
   integer :: i
-
+  character(len=STR_LONG) :: log_str
 
   call put_log("set mapping table start : "//trim(send_model_name)//":"//trim(recv_model_name) &
               //", grid = "//trim(send_grid_name)//":"//trim(recv_grid_name),1)
@@ -1008,19 +1009,31 @@ subroutine jcup_set_mapping_table(my_model_name, &
 
   if (is_my_table) then
 
-    if (jml_isLocalLeader(my_model_id)) then ! 2012/04/12 T.Arakawa [ADD]
+   if (jml_isLocalLeader(my_model_id)) then ! 2012/04/12 T.Arakawa [ADD]
       if (minval(send_grid) < get_grid_min_index(send_model_id, send_grid_num)) then
-        call error("jcup_set_mapping_table", "send_grid_index < defined grid index, check index")
+         write(log_str,'(A, I, A, I, A, I, A)') "min of send_grid_index (val = ", minval(send_grid), &
+              ", location = ", minloc(send_grid), ") < min of defined grid_index (val = ", &
+              get_grid_min_index(send_model_id, send_grid_num), "), check index"
+        call error("jcup_set_mapping_table", trim(log_str))
       end if
       if (maxval(send_grid) > get_grid_max_index(send_model_id, send_grid_num)) then
-        call error("jcup_set_mapping_table", "send_grid_index > defined grid index, check index")
+        write(log_str,'(A, I, A, I, A, I, A)') "max of send_grid_index (val = ", maxval(send_grid), &
+              ", location = ", maxloc(send_grid), ") > max of defined grid_index (val = ", &
+              get_grid_max_index(send_model_id, send_grid_num), "), check index"
+        call error("jcup_set_mapping_table", trim(log_str))
       end if
 
       if (minval(recv_grid) < get_grid_min_index(recv_model_id, recv_grid_num)) then
-        call error("jcup_set_mapping_table", "recv_grid_index < defined grid index, check index")
+         write(log_str,'(A, I, A, I, A, I, A)') "min of recv_grid_index (val = ", minval(recv_grid), &
+              ", location = ", minloc(recv_grid), ") < min of defined grid_index (val = ", &
+              get_grid_min_index(recv_model_id, recv_grid_num), "), check index"
+        call error("jcup_set_mapping_table", trim(log_str))
       end if
       if (maxval(recv_grid) > get_grid_max_index(recv_model_id, recv_grid_num)) then
-        call error("jcup_set_mapping_table", "recv_grid_index > defined grid index, check index")
+        write(log_str,'(A, I, A, I, A, I, A)') "max of recv_grid_index (val = ", maxval(recv_grid), &
+              ", location = ", maxloc(recv_grid), ") > max of defined grid_index (val = ", &
+              get_grid_max_index(recv_model_id, recv_grid_num), "), check index"
+        call error("jcup_set_mapping_table", trim(log_str))
       end if
     end if
 
@@ -1040,9 +1053,17 @@ subroutine jcup_set_mapping_table(my_model_name, &
       call send_grid_info()
     end if
 
+    call put_log("set_send_mapping_table start")
     call set_send_mapping_table(send_model_id, recv_model_id, map_num)
+    call put_log("set_send_mapping_table ok")
+
+    call put_log("recv_grid_mapping start")
     call recv_grid_mapping(send_model_id, recv_model_id, map_num)
+    call put_log("recv_grid_mapping ok")
+
+    call put_log("set_send_grid_tag start")
     call set_send_grid_tag(send_model_id, recv_model_id, map_num, send_grid_num)
+    call put_log("set_send_grid_tag ok")
   end if    
 
 
@@ -1062,9 +1083,17 @@ subroutine jcup_set_mapping_table(my_model_name, &
 
       end if
 
+    call put_log("set_recv_mapping_table start")
     call set_recv_mapping_table(recv_model_id, send_model_id, map_num)
+    call put_log("set_recv_mapping_table ok")
+
+    call put_log("send_grid_mapping start")
     call send_grid_mapping(send_model_id, recv_model_id, map_num)
+    call put_log("send_grid_mapping ok")
+
+    call put_log("set_recv_grid_tag start")
     call set_recv_grid_tag(recv_model_id, send_model_id, map_num, recv_grid_num)
+    call put_log("set_recv_grid_tag ok")
   end if
 
   if (is_my_component(send_model_id).and.(is_my_component(recv_model_id))) then
@@ -1103,9 +1132,13 @@ subroutine jcup_set_mapping_table(my_model_name, &
 
   end if
 
+  call put_log("finish_grid_mapping start")
   call finish_grid_mapping(send_model_id, recv_model_id, map_num, send_grid_num, recv_grid_num)
+  call put_log("finish_grid_mapping ok")
 
+  call put_log("check_table_data_mismatch_start start")
   call check_table_data_mismatch(send_model_id, recv_model_id, send_grid_num, recv_grid_num, map_num)
+  call put_log("check_table_data_mismatch_start ok")
 
 
   call put_log("set mapping table end : "//trim(send_model_name)//":"//trim(recv_model_name) &
@@ -1497,6 +1530,8 @@ subroutine jcup_set_date_time_int(component_name, time_array, delta_t, is_exchan
   integer, intent(IN) :: time_array(:) ! 2014/07/03 [MOD]
   integer, intent(IN) :: delta_t
   logical, optional :: is_exchange
+  integer, save :: before_delta_t
+  integer :: delta_t_jal
   integer :: yyyy, mo, dd, hh, mm
   integer(kind=8) :: ss
   integer :: milli_sec, micro_sec
@@ -1518,7 +1553,11 @@ subroutine jcup_set_date_time_int(component_name, time_array, delta_t, is_exchan
   call put_log("------------------------------------------------------------------------------------")
 
   if (is_assync_exchange) then        ! if my binary has sync exchange
-    call jal_set_time(delta_t)
+    delta_t_jal = delta_t
+    if (delta_t_jal <= 0) then
+      delta_t_jal = before_delta_t
+    end if
+    call jal_set_time(delta_t_jal)
     if (.not.is_sync_exchange) return ! if my binary has no sync exchange
   end if
   
@@ -1640,6 +1679,8 @@ subroutine jcup_set_date_time_int(component_name, time_array, delta_t, is_exchan
   !end do
 
   call set_current_time(comp_id, 1, yyyy,mo,dd,hh,mm,ss, milli_sec, micro_sec, delta_t=delta_t) ! set time and delta t of current component
+
+  before_delta_t = delta_t
 
 end subroutine jcup_set_date_time_int
 

@@ -80,45 +80,47 @@ end subroutine jal_finalize_buffer
 
 !====================================================================================================
 
-subroutine jal_put_send_data_1d(dt, time, component_id, data_id, name, is_mean, weight)
+subroutine jal_put_send_data_1d(dt, time, component_id, data_id, name, is_mean, fill_value, weight)
   use jcup_utils, only : put_log, IntToStr
   use jcup_buffer_base, only : put_data_base
   implicit none
-  real(kind=8), intent(IN) :: dt(:)
-  type(time_type), intent(IN) :: time  
-  integer, intent(IN) :: component_id, data_id
+  real(kind=8), intent(IN)     :: dt(:)
+  type(time_type), intent(IN)  :: time  
+  integer, intent(IN)          :: component_id, data_id
   character(len=*), intent(IN) :: name
-  logical, intent(IN) :: is_mean
-  real(kind=8), intent(IN) :: weight ! weight for data average (delta_t/interval)
+  logical, intent(IN)          :: is_mean
+  real(kind=8), intent(IN)     :: fill_value
+  real(kind=8), intent(IN)     :: weight(:) ! weight for data average (delta_t/interval)
   character(len=6) :: weight_str
 
   !write(weight_str, '(F)') weight
   call put_log("Put data, data name = "//trim(name)//", data id = "//trim(IntToStr(data_id)), 1) !//", weight= "//trim(weight_str),1)
   call put_log("put_send_data_double_1d : put data : name = "//trim(name)//", comp id = " &
                //trim(IntToStr(component_id))//", data id = "//trim(IntToStr(data_id)))
-  call put_data_base(send_buffer, dt, time, component_id, data_id, name, is_mean, weight)
+  call put_data_base(send_buffer, dt, time, component_id, data_id, name, is_mean, fill_value, weight)
 
 end subroutine jal_put_send_data_1d
 
 !====================================================================================================
 
-subroutine jal_put_send_data_2d(dt, time, component_id, data_id, name, is_mean, weight)
+subroutine jal_put_send_data_2d(dt, time, component_id, data_id, name, is_mean, fill_value, weight)
   use jcup_utils, only : put_log, IntToStr
   use jcup_buffer_base, only : put_data_base
   implicit none
-  real(kind=8), intent(IN) :: dt(:,:)
-  type(time_type), intent(IN) :: time  
-  integer, intent(IN) :: component_id, data_id
+  real(kind=8), intent(IN)     :: dt(:,:)
+  type(time_type), intent(IN)  :: time  
+  integer, intent(IN)          :: component_id, data_id
   character(len=*), intent(IN) :: name
-  logical, intent(IN) :: is_mean
-  real(kind=8), intent(IN) :: weight ! weight for data average (delta_t/interval)
+  logical, intent(IN)          :: is_mean
+  real(kind=8), intent(IN)     :: fill_value
+  real(kind=8), intent(IN)     :: weight(:,:) ! weight for data average (delta_t/interval)
   character(len=6) :: weight_str
 
   !write(weight_str, '(F)') weight
   call put_log("Put data, data name = "//trim(name)//", data id = "//trim(IntToStr(data_id)), 1) !//", weight= "//trim(weight_str),1)
   call put_log("put_send_data_double_2d : put data : name = "//trim(name)//", comp id = " &
                //trim(IntToStr(component_id))//", data id = "//trim(IntToStr(data_id)))
-  call put_data_base(send_buffer, dt, time, component_id, data_id, name, is_mean, weight)
+  call put_data_base(send_buffer, dt, time, component_id, data_id, name, is_mean, fill_value, weight)
 
 end subroutine jal_put_send_data_2d
 
@@ -199,13 +201,19 @@ subroutine jal_put_recv_data_1d(dt, time, my_comp_id, target_comp_id, data_id, n
   integer, intent(IN) :: my_comp_id, target_comp_id, data_id
   character(len=*), intent(IN) :: name
   character(len=6) :: weight_str
+  real(kind=8), pointer :: weight(:)
+
+  allocate(weight(size(dt)))
+  weight(:) = 1.d0
 
   !write(weight_str, '(F)') weight
   !call put_log("Put data, data name = "//trim(name)//", data id = "//trim(IntToStr(data_id)), 1) !//", weight= "//trim(weight_str),1)
   call put_log("put_recv_data_double_1d : put data : name = "//trim(name)//", comp id = " &
                //trim(IntToStr(my_comp_id))//", data id = "//trim(IntToStr(data_id)))
   call put_data_base(recv_buffer(target_comp_id)%recv_buffer_ptr, dt, time, &
-                     my_comp_id, data_id, name, .false., 0.d0)
+                     my_comp_id, data_id, name, .false., 0.d0, weight)
+
+  deallocate(weight)
 
 end subroutine jal_put_recv_data_1d
 
@@ -220,13 +228,18 @@ subroutine jal_put_recv_data_2d(dt, time, my_comp_id, target_comp_id, data_id, n
   integer, intent(IN) :: my_comp_id, target_comp_id, data_id
   character(len=*), intent(IN) :: name
   character(len=6) :: weight_str
+  real(kind=8), pointer :: weight(:,:)
 
+  allocate(weight(size(dt,1), size(dt,2)))
+  weight(:,:) = 1.d0
   !write(weight_str, '(F)') weight
   !call put_log("Put data, data name = "//trim(name)//", data id = "//trim(IntToStr(data_id)), 1) !//", weight= "//trim(weight_str),1)
   call put_log("put_recv_data_double_2d : put data : name = "//trim(name)//", comp id = " &
                //trim(IntToStr(my_comp_id))//", data id = "//trim(IntToStr(data_id)))
   call put_data_base(recv_buffer(target_comp_id)%recv_buffer_ptr, dt, time, &
-                     my_comp_id, data_id, name, .false., 0.d0)
+                     my_comp_id, data_id, name, .false., 0.d0, weight)
+
+  deallocate(weight)
 
 end subroutine jal_put_recv_data_2d
 
@@ -241,13 +254,19 @@ subroutine jal_put_recv_data_3d(dt, time, my_comp_id, target_comp_id, data_id, n
   integer, intent(IN) :: my_comp_id, target_comp_id, data_id
   character(len=*), intent(IN) :: name
   character(len=6) :: weight_str
-
+  real(kind=8), pointer :: weight(:,:,:)
+  
+  allocate(weight(size(dt,1), size(dt,2), size(dt,3)))
+  weight(:,:,:) = 1.d0
+ 
   !write(weight_str, '(F)') weight
   !call put_log("Put data, data name = "//trim(name)//", data id = "//trim(IntToStr(data_id)), 1) !//", weight= "//trim(weight_str),1)
   call put_log("put_send_data_double_3d : put data : name = "//trim(name)//", comp id = " &
                //trim(IntToStr(my_comp_id))//", data id = "//trim(IntToStr(data_id)))
   call put_data_base(recv_buffer(target_comp_id)%recv_buffer_ptr, dt, time, &
-                     my_comp_id, data_id, name, .false., 0.d0)
+                     my_comp_id, data_id, name, .false., 0.d0, weight)
+
+  deallocate(weight)
 
 end subroutine jal_put_recv_data_3d
 

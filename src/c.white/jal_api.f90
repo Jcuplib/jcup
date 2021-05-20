@@ -8,12 +8,13 @@ module jal_api
 
 !--------------------------------   public  ----------------------------------!
 
-  public :: jal_init
-  public :: jal_set_time
-  public :: jal_finish
-  public :: jal_put_data
-  public :: jal_get_data
-  
+  public :: jal_init                    ! subroutine (comp_name)
+  public :: jal_set_time                ! subroutine (delta_t)
+  public :: jal_finish                  ! subroutine ()
+  public :: jal_put_data                ! subroutine (varp, data)
+  public :: jal_get_data                ! subroutine (varg, data)
+  public :: jal_set_final_exchange_flag ! subroutine (exchange_flag)
+
 !--------------------------------   private  ---------------------------------!
 
   interface jal_put_data
@@ -27,8 +28,9 @@ module jal_api
   character(len=STR_SHORT) :: my_name
   integer :: my_comp_id
 
-  logical :: is_init_exchange = .false.
-  
+  logical :: is_init_exchange  = .false.
+  logical :: exchange_final_data = .true.
+
 contains
 
 !====================================================================================================
@@ -51,11 +53,23 @@ end subroutine jal_init
 
 !====================================================================================================
 
+subroutine jal_set_final_exchange_flag(flag)
+  implicit none
+  logical, intent(IN) :: flag
+
+  exchange_final_data = flag
+
+end subroutine jal_set_final_exchange_flag
+ 
+!====================================================================================================
+
 subroutine jal_finish()
   use jal_time, only : jal_time_end
   implicit none
 
-  call jal_time_end()
+  if (exchange_final_data) then
+    call jal_time_end()
+  end if
 
 end subroutine jal_finish
 
@@ -75,6 +89,7 @@ subroutine jal_put_data_1d(varp, dt)
   real(kind=8), intent(IN) :: dt(:)
   character(len=STR_SHORT) :: data_name
   type(time_type), pointer :: time_ptr
+  real(kind=8), pointer    :: weight(:)
 
   if (.not.is_init_exchange) then
      call jal_init_exchange_buffer(size(dt), NUM_OF_EXCHANGE_DATA)
@@ -87,8 +102,13 @@ subroutine jal_put_data_1d(varp, dt)
 
   time_ptr => jal_get_before_time(my_comp_id)
 
+  allocate(weight(size(dt)))
+  weight(:) = 1.d0
+
   call jal_put_send_data(dt, time_ptr, my_comp_id, &
-                         varp%sd%data_id, data_name, .false., 1.d0)
+                         varp%sd%data_id, data_name, .false., 0.d0, weight)
+
+  deallocate(weight)
 
 end subroutine jal_put_data_1d
 
@@ -108,6 +128,7 @@ subroutine jal_put_data_2d(varp, dt)
   real(kind=8), intent(IN) :: dt(:,:)
   character(len=STR_SHORT) :: data_name
   type(time_type), pointer :: time_ptr
+  real(kind=8), pointer    :: weight(:,:)
 
   if (.not.is_init_exchange) then
      call jal_init_exchange_buffer(size(dt,1), NUM_OF_EXCHANGE_DATA)
@@ -120,8 +141,13 @@ subroutine jal_put_data_2d(varp, dt)
 
   time_ptr => jal_get_before_time(my_comp_id)
 
+  allocate(weight(size(dt,1), size(dt,2)))
+  weight(:,:) = 1.d0
+
   call jal_put_send_data(dt, time_ptr, my_comp_id, &
-                         varp%sd%data_id, data_name, .false., 1.d0)
+                         varp%sd%data_id, data_name, .false., 0.d0, weight)
+
+  deallocate(weight)
 
 end subroutine jal_put_data_2d
 

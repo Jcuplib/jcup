@@ -317,7 +317,6 @@ subroutine recv_array_from_send_model_real(my_comp_name, send_comp_name, array, 
 
   if (present(bcast_flag)) is_bcast = bcast_flag
 
-
   my_model = get_comp_id_from_name(my_comp_name)
   send_model = get_comp_id_from_name(send_comp_name)
 
@@ -362,7 +361,6 @@ subroutine recv_array_from_send_model_dbl(my_comp_name, send_comp_name, array, b
   logical :: is_bcast = .true.
 
   if (present(bcast_flag)) is_bcast = bcast_flag
-
 
   my_model = get_comp_id_from_name(my_comp_name)
   send_model = get_comp_id_from_name(send_comp_name)

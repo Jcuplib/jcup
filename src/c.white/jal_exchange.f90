@@ -515,9 +515,15 @@ contains
     real(kind=8), pointer :: data_ptr
     character(len=255) :: log_str
 
+      write(log_str,'(A,I5,I5)') "jal_send_array IN , send time = ", int(array(1)), int(array(2))
+      call put_log(trim(log_str))
+
     if (jml_isLocalLeader(my_comp_id)) then
       data_ptr => array(1)
     
+      write(log_str,'(A,I5,I5)') "jal_send_array START , send time = ", int(array(1)), int(array(2))
+      call put_log(trim(log_str))
+
       call jml_ISendModel(my_comp_id, data_ptr, 1, size(array), target_comp_id, 0, 0)
 
       write(log_str,'(A,I5,I5)') "jal_send_array, send time = ", int(array(1)), int(array(2))
@@ -535,11 +541,24 @@ contains
     real(kind=8), pointer :: data_ptr
     character(len=255) :: log_str
     
+    write(log_str,'(A,I5,I5)') "jal_recv_array IN"
+    call put_log(trim(log_str))
+
     if (jml_isLocalLeader(my_comp_id)) then
       data_ptr => array(1)
+      write(log_str,'(A,I5,I5)') "jal_recv_array START, ", target_comp_id
+      call put_log(trim(log_str))
+
       call jml_IRecvModel(my_comp_id, data_ptr, 1, size(array), target_comp_id, 0, 0)
       call jml_recv_waitall()
+
+      write(log_str,'(A,I5,I5)') "jal_recv_array END, recv time = ", int(array(1)), int(array(2))
+      call put_log(trim(log_str))
+
    end if
+
+      write(log_str,'(A,I5,I5)') "jal_recv_array Bcast START"
+      call put_log(trim(log_str))
 
     call jml_BcastLocal(my_comp_id, array, 1, size(array), 0)
     
@@ -560,6 +579,7 @@ contains
     character(len=*), intent(IN) :: target_comp
     type(time_type), pointer :: before_time, current_time
     integer :: target_comp_id
+    integer :: num_of_layer
     integer :: i, j
 
     target_comp_id = get_comp_id_from_name(target_comp)
@@ -568,14 +588,19 @@ contains
     
     do i = 1, exchange_info(target_comp_id)%num_of_send_cluster
        if (exchange_info(target_comp_id)%send_info(i)%data_type == DATA_25D) then
-          call jal_get_send_data(buffer1(:,:), before_time, my_comp_id, exchange_info(target_comp_id)%send_info(i)%data_id(1), &
+          num_of_layer = exchange_info(target_comp_id)%send_info(i)%num_of_data
+
+          call jal_get_send_data(buffer1(:,1:num_of_layer), before_time, my_comp_id, &
+                 exchange_info(target_comp_id)%send_info(i)%data_id(1), &
                  exchange_info(target_comp_id)%send_info(i)%data_name(1))
+
        else
          do j = 1, exchange_info(target_comp_id)%send_info(i)%num_of_data
             call jal_get_send_data(buffer1(:,j), before_time, my_comp_id, exchange_info(target_comp_id)%send_info(i)%data_id(j), &
                  exchange_info(target_comp_id)%send_info(i)%data_name(j))
          end do
        end if
+       
        call set_data(buffer1)
 
        call send_data_1d_nowait(my_comp_id, target_comp_id, 1, DOUBLE_DATA, &
@@ -619,6 +644,7 @@ contains
     type(cluster_info_type), pointer :: recv_conf_ptr
     integer :: target_comp_id
     integer :: exchange_tag(8)
+    integer :: num_of_layer
     integer :: i, j
     character(len=255) :: log_str
     
@@ -646,7 +672,8 @@ contains
                                    recv_conf_ptr%data_id(j), recv_conf_ptr%data_name(j))
          end do
        else
-          call jal_put_recv_data(buffer1(:,:), current_time, my_comp_id, target_comp_id, &
+          num_of_layer = recv_conf_ptr%num_of_data
+          call jal_put_recv_data(buffer1(:,1:num_of_layer), current_time, my_comp_id, target_comp_id, &
                                  recv_conf_ptr%data_id(1), recv_conf_ptr%data_name(1))
        end if 
        write(log_str,*) "jal_recv_data ", buffer1(1,1)
@@ -669,10 +696,13 @@ contains
     integer, intent(IN) :: target_comp_id
     type(time_type), intent(IN)  :: before_time, current_time
     type(cluster_info_type), pointer :: recv_conf_ptr
+    integer :: num_of_layer
     integer :: i,j
     
     do i = 1, exchange_info(target_comp_id)%num_of_time_cluster
        recv_conf_ptr => exchange_info(target_comp_id)%time_info(i)
+       num_of_layer = recv_conf_ptr%num_of_data
+       
        if (recv_conf_ptr%data_type == DATA_1D) then
          do j = 1, recv_conf_ptr%num_of_data
             call jal_get_recv_data(buffer1(:,j), before_time, my_comp_id, target_comp_id, &
@@ -681,15 +711,15 @@ contains
                                    recv_conf_ptr%data_id(j), recv_conf_ptr%data_name(j))
          end do
        else       
-          call jal_get_recv_data(buffer1(:,:), before_time, my_comp_id, target_comp_id, &
+          call jal_get_recv_data(buffer1(:,1:num_of_layer), before_time, my_comp_id, target_comp_id, &
                                  recv_conf_ptr%data_id(1), recv_conf_ptr%data_name(1))
-          call jal_get_recv_data(buffer2(:,:), current_time, my_comp_id, target_comp_id, &
+          call jal_get_recv_data(buffer2(:,1:num_of_layer), current_time, my_comp_id, target_comp_id, &
                                  recv_conf_ptr%data_id(1), recv_conf_ptr%data_name(1))
        end if
 
        call time_interpolation(get_component_name(my_comp_id), my_time%ss, before_time%ss, current_time%ss, &
-            size(buffer1,1), recv_conf_ptr%num_of_data, size(buffer3,2), &
-            buffer1, buffer2, buffer3, recv_conf_ptr%exchange_tag(1))
+            size(buffer1,1), num_of_layer, num_of_layer, &
+            buffer1(:,1:num_of_layer), buffer2(:,1:num_of_layer), buffer3(:,1:num_of_layer), recv_conf_ptr%exchange_tag(1))
        
        if (recv_conf_ptr%data_type == DATA_1D) then
          do j = 1, recv_conf_ptr%num_of_data
@@ -697,7 +727,7 @@ contains
                                    recv_conf_ptr%data_id(j), recv_conf_ptr%data_name(j))
          end do
        else
-          call jal_put_recv_data(buffer3(:,:), my_time,  my_comp_id, target_comp_id, &
+          call jal_put_recv_data(buffer3(:,1:num_of_layer), my_time,  my_comp_id, target_comp_id, &
                                  recv_conf_ptr%data_id(1), recv_conf_ptr%data_name(1))
        end if  
      end do

@@ -13,31 +13,31 @@ module jcup_utils
 
   ! public procedures
   public :: init_utils
-  public :: set_log_level ! subroutine (log_level, log_stderr)
-  public :: get_log_level ! integer function ()
-  public :: is_output_stderr ! logical function ()
-  public :: set_log_unit_id
-  public :: init_log
-  public :: finalize_log
-  public :: put_log ! subroutine (log_str, log_level)
-  public :: open_log_file
-  public :: close_log_file
-  public :: error
-  public :: check_argument
-  public :: IntToStr
-  public :: LongIntToStr
-  public :: StrToInt
-  public :: IDate2CDate
-  public :: cdate_2_idate
-  public :: sort_int_1d
-  public :: binary_search
-  public :: split_string
-  public :: TrimString
-  public :: startsWith
-  public :: lw2up
-  public :: up2lw
-  public :: is_comment_line
-  public :: cut_comment
+  public :: set_log_level        ! subroutine (log_level, log_stderr)
+  public :: get_log_level        ! integer function ()
+  public :: is_output_stderr     ! logical function ()
+  public :: set_log_unit_id      !
+  public :: init_log             !
+  public :: finalize_log         !  
+  public :: put_log              ! subroutine (log_str, log_level)
+  public :: open_log_file        !
+  public :: close_log_file       !
+  public :: error                !
+  public :: check_argument       !
+  public :: IntToStr             !
+  public :: LongIntToStr         !
+  public :: StrToInt             !
+  public :: IDate2CDate          !
+  public :: cdate_2_idate        !
+  public :: sort_int_1d          ! subroutine (num_of_data, sort_array, sorted_index)
+  public :: binary_search        ! integer function (data_array, key)
+  public :: split_string         !
+  public :: TrimString           !
+  public :: startsWith           !
+  public :: lw2up                !
+  public :: up2lw                !
+  public :: is_comment_line      !
+  public :: cut_comment          !
 
   integer, parameter, public :: NO_OUTPUT_LOG = 0
   integer, parameter, public :: STANDARD_LOG = 1

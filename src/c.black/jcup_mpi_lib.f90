@@ -302,11 +302,11 @@ module jcup_mpi_lib
   real(kind=8), pointer :: local_buffer(:)
 
 
-  integer, private          :: isend_counter
+  integer, private          :: isend_counter = 0
   integer, private, pointer :: isend_request(:)
   integer, private, pointer :: isend_status(:,:)
 
-  integer, private          :: irecv_counter
+  integer, private          :: irecv_counter = 0
   integer, private, pointer :: irecv_request(:)
   integer, private, pointer :: irecv_status(:,:)
 
@@ -376,6 +376,13 @@ subroutine jml_init()
      allocate(local_buffer(buffer_size/buffer_byte + 1))
      call mpi_buffer_attach(local_buffer, buffer_byte*size(local_buffer), ierror)
    end if
+
+   isend_counter = 0
+   allocate(isend_request(100))
+   allocate(isend_status(MPI_STATUS_SIZE, 100))
+   irecv_counter = 0
+   allocate(irecv_request(100))
+   allocate(irecv_status(MPI_STATUS_SIZE, 100))
 
 end subroutine jml_init
 
@@ -1265,7 +1272,7 @@ subroutine jml_bcast_real_1d_local(comp, data,is,ie,source)
     source_rank = local(comp)%root_rank
   end if
 
-  call MPI_Bcast(data(is:),ie-is+1,MPI_DOUBLE_PRECISION,source_rank,local(comp)%mpi_comm,ierror)
+  call MPI_Bcast(data(is:),ie-is+1,MPI_REAL,source_rank,local(comp)%mpi_comm,ierror)
 
 end subroutine jml_bcast_real_1d_local
 
@@ -1277,7 +1284,6 @@ subroutine jml_bcast_double_1d_local(comp, data,is,ie,source)
   real(kind=8), intent(INOUT) :: data(:)
   integer, intent(IN) :: is, ie
   integer, intent(IN), optional :: source
-
   integer :: source_rank
 
   if (present(source)) then
@@ -2799,6 +2805,8 @@ subroutine jml_set_num_of_isend(num_of_isend)
   implicit none
   integer, intent(IN) :: num_of_isend
 
+  isend_counter = 0
+
   if (associated(isend_request)) then
     if (size(isend_request) >= num_of_isend) return
   end if
@@ -2817,7 +2825,6 @@ subroutine jml_set_num_of_isend(num_of_isend)
 
   allocate(isend_request(num_of_isend))
   allocate(isend_status(MPI_STATUS_SIZE, num_of_isend))
-  isend_counter = 0
 
 end subroutine jml_set_num_of_isend
 
@@ -2826,6 +2833,8 @@ end subroutine jml_set_num_of_isend
 subroutine jml_set_num_of_irecv(num_of_irecv)
   implicit none
   integer, intent(IN) :: num_of_irecv
+
+  irecv_counter = 0
 
   if (associated(irecv_request)) then
     if (size(irecv_request) >= num_of_irecv) return
@@ -2844,7 +2853,6 @@ subroutine jml_set_num_of_irecv(num_of_irecv)
 
   allocate(irecv_request(num_of_irecv))
   allocate(irecv_status(MPI_STATUS_SIZE, num_of_irecv))
-  irecv_counter = 0
 
 end subroutine jml_set_num_of_irecv
 
@@ -2870,6 +2878,7 @@ subroutine jml_isend_double_1d_local(comp, data,is,ie,dest_model,dest_pe, exchan
 
   if (size(isend_request) < isend_counter) then
     write(0, *) "jml_isend_double_1d_local, isend_counter > size(isend_request)"
+    call MPI_abort(MPI_COMM_WORLD, tag, ierror)
     stop 9999
   end if
 
@@ -2903,6 +2912,7 @@ subroutine jml_irecv_double_1d_local(comp, data,is,ie,source_model,source_pe, ex
 
   if (size(irecv_request) < irecv_counter) then
     write(0, *) "jml_irecv_double_1d_local, irecv_counter > size(irecv_request)"
+    call MPI_abort(MPI_COMM_WORLD, tag, ierror)
     stop 9999
   end if
 
@@ -2945,7 +2955,9 @@ subroutine jml_isend_double_1d_model(comp, data,is,ie,dest_model,dest_pe, exchan
     isend_counter = isend_counter + 1
 
     if (size(isend_request) < isend_counter) then
-      write(0, *) "jml_isend_double_1d_model, isend_counter > size(isend_request)"
+      write(0, '(A,I7,A,I7)') "ERROR!!! jml_isend_double_1d_model, isend_counter = ", isend_counter, &
+                              " > size(isend_request) = ", size(isend_request)
+      call MPI_abort(MPI_COMM_WORLD, tag, ierror)
       stop 9999
     end if
 
@@ -2988,7 +3000,9 @@ subroutine jml_isend_int_1d_model(comp, data,is,ie,dest_model,dest_pe, exchange_
     isend_counter = isend_counter + 1
 
     if (size(isend_request) < isend_counter) then
-      write(0, *) "jml_isend_int_1d_model, isend_counter > size(isend_request)"
+      write(0, '(A,I7,A,I7)') "ERROR!!! jml_isend_int_1d_model, isend_counter = ", isend_counter, &
+                              " > size(isend_request) = ", size(isend_request)
+      call MPI_abort(MPI_COMM_WORLD, tag, ierror)
       stop 9999
     end if
 
@@ -3025,7 +3039,9 @@ subroutine jml_irecv_double_1d_model(comp, data,is,ie,source_model,source_pe, ex
   source_rank = source_pe + local(comp)%inter_comm(source_model)%pe_offset
 
     if (size(irecv_request) < irecv_counter) then
-      write(0, *) "jml_irecv_double_1d_model, irecv_counter > size(irecv_request)"
+      write(0, '(A,I7,A,I7)') "ERROR!!! jml_irecv_double_1d_model, irecv_counter = ", irecv_counter, &
+                              " > size(irecv_request) = ", size(irecv_request)
+      call MPI_abort(MPI_COMM_WORLD, tag, ierror)
       stop 9999
     end if
 
@@ -3062,7 +3078,9 @@ subroutine jml_irecv_int_1d_model(comp, data,is,ie,source_model,source_pe, excha
   source_rank = source_pe + local(comp)%inter_comm(source_model)%pe_offset
 
     if (size(irecv_request) < irecv_counter) then
-      write(0, *) "jml_irecv_int_1d_model, irecv_counter > size(irecv_request)"
+      write(0, '(A,I7,A,I7)') "ERROR!!! jml_irecv_int_1d_model, irecv_counter = ", irecv_counter, &
+                  " > size(irecv_request) = ", size(irecv_request)
+      call MPI_abort(MPI_COMM_WORLD, tag, ierror)
       stop 9999
     end if
   call MPI_IRECV(data,ie-is+1,MPI_INTEGER,source_rank,tag, &

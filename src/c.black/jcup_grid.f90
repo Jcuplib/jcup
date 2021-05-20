@@ -639,6 +639,12 @@ subroutine set_grid_mapping_1d(send_comp_id, recv_comp_id, mapping_tag, &
        call remap_send_array(local_operation, send_pe, offset, num_of_local_operation, send_buffer)
        call jml_ScatterVLocal(recv_comp_id, send_buffer, num_of_local_operation, offset, &
                               peg%local_operation_index, num_of_my_operation)
+       deallocate(local_operation)
+
+       call remap_send_array(global_pe_num, send_pe, offset, num_of_local_operation, send_buffer)
+       call jml_ScatterVLocal(recv_comp_id, send_buffer, num_of_local_operation, offset, &
+                              local_pe_num, num_of_my_operation)
+       deallocate(global_pe_num)
 
        call remap_send_array(send_grid_index, send_pe, offset, num_of_local_operation, send_buffer)
        call jml_ScatterVLocal(recv_comp_id, send_buffer, num_of_local_operation, offset, &
@@ -648,14 +654,10 @@ subroutine set_grid_mapping_1d(send_comp_id, recv_comp_id, mapping_tag, &
        call jml_ScatterVLocal(recv_comp_id, send_buffer, num_of_local_operation, offset, &
                               peg%local_recv_grid_index, num_of_my_operation)
 
-       call remap_send_array(global_pe_num, send_pe, offset, num_of_local_operation, send_buffer)
-       call jml_ScatterVLocal(recv_comp_id, send_buffer, num_of_local_operation, offset, &
-                              local_pe_num, num_of_my_operation)
        deallocate(send_buffer)
        deallocate(send_pe)
        deallocate(offset)
        deallocate(num_of_local_operation)
-       deallocate(global_pe_num)
   else
 
       allocate(send_buffer(1))
@@ -664,11 +666,11 @@ subroutine set_grid_mapping_1d(send_comp_id, recv_comp_id, mapping_tag, &
       call jml_ScatterVLocal(recv_comp_id, send_buffer, num_of_local_operation, offset, &
                              peg%local_operation_index, num_of_my_operation)
       call jml_ScatterVLocal(recv_comp_id, send_buffer, num_of_local_operation, offset, &
+                             local_pe_num, num_of_my_operation)
+      call jml_ScatterVLocal(recv_comp_id, send_buffer, num_of_local_operation, offset, &
                              peg%local_send_grid_index, num_of_my_operation)
       call jml_ScatterVLocal(recv_comp_id, send_buffer, num_of_local_operation, offset, &
                              peg%local_recv_grid_index, num_of_my_operation)
-      call jml_ScatterVLocal(recv_comp_id, send_buffer, num_of_local_operation, offset, &
-                             local_pe_num, num_of_my_operation)
       deallocate(send_buffer)
       deallocate(num_of_local_operation)
       deallocate(offset)
@@ -679,12 +681,13 @@ subroutine set_grid_mapping_1d(send_comp_id, recv_comp_id, mapping_tag, &
   call set_local_grid_mapping_1d(recv_comp_id, send_comp_id, mapping_num, send_grid_num,  &
                                  recv_grid_num, peg%local_send_grid_index, peg%local_recv_grid_index, local_pe_num)
 
+  deallocate(local_pe_num)
+
   call put_log("set_mapping_table 6 ", 2)
 
   allocate(peg%send_double_buffer_1d(recv_array(recv_comp_id, send_comp_id)%pe_array(mapping_num)%num_of_point, &
                                      NUM_OF_EXCHANGE_DATA))
 
-  deallocate(local_pe_num)
 
 end subroutine set_grid_mapping_1d
 
@@ -963,7 +966,7 @@ subroutine set_grid_mapping_1d_local(send_comp_id, recv_comp_id, mapping_tag, &
   use jcup_mpi_lib, only : jml_isLocalLeader, jml_BcastLocal, jml_GetMyrank, jml_GetMyrankGlobal, &
                            jml_ScatterLocal, jml_ScatterVLocal, jml_SendLocal, jml_RecvLocal
   use jcup_utils, only : error, put_log
-  use jcup_grid_base, only : get_num_of_pe, get_pe_num
+  use jcup_grid_base, only : get_num_of_pe
   implicit none
   integer, intent(IN) :: send_comp_id
   integer, intent(IN) :: recv_comp_id
@@ -1248,7 +1251,7 @@ subroutine set_local_grid_mapping_1d(recv_comp_id, send_comp_id, mapping_tag, &
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine make_pe_array(send_comp_id, send_grid_tag, local_send_index, send_pe_num, pe_array)
-  use jcup_grid_base, only : get_num_of_pe, get_pe_num
+  use jcup_grid_base, only : get_num_of_pe
   implicit none
   integer, intent(IN) :: send_comp_id
   integer, intent(IN) :: send_grid_tag
@@ -1354,6 +1357,7 @@ end subroutine exchange_grid_mapping
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine send_grid_mapping(send_comp_id, recv_comp_id, mapping_tag)
+  use jcup_utils, only : put_log
   use jcup_mpi_lib, only : jml_SendModel
   implicit none
   integer, intent(IN) :: send_comp_id, recv_comp_id
@@ -1361,8 +1365,11 @@ subroutine send_grid_mapping(send_comp_id, recv_comp_id, mapping_tag)
   integer :: is, ie, pe
   integer :: i
 
+  call put_log("send_mapping_info start")
   call send_mapping_info(send_comp_id, recv_comp_id, mapping_tag)
+  call put_log("send_mapping_info ok")
 
+  call put_log("data point send start")
   do i = 1, recv_array(recv_comp_id, send_comp_id)%pe_array(mapping_tag)%num_of_pe
     is = recv_array(recv_comp_id, send_comp_id)%pe_array(mapping_tag)%pa(i)%s_point
     ie = recv_array(recv_comp_id, send_comp_id)%pe_array(mapping_tag)%pa(i)%e_point
@@ -1370,6 +1377,7 @@ subroutine send_grid_mapping(send_comp_id, recv_comp_id, mapping_tag)
     call jml_SendModel(recv_comp_id,recv_array(recv_comp_id, send_comp_id)%pe_array(mapping_tag)%data_point, is, ie, &
                        send_comp_id, pe-1)
   end do
+  call put_log("data point send ok")
 
 end subroutine send_grid_mapping
 
@@ -1424,6 +1432,7 @@ end subroutine send_mapping_info
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine recv_grid_mapping(send_comp_id, recv_comp_id, mapping_tag)
+  use jcup_utils, only : put_log
   use jcup_mpi_lib, only : jml_RecvModel
   implicit none
   integer, intent(IN) :: send_comp_id, recv_comp_id
@@ -1431,8 +1440,11 @@ subroutine recv_grid_mapping(send_comp_id, recv_comp_id, mapping_tag)
   integer :: is, ie, pe
   integer :: i
 
+  call put_log("recv_mapping_info start")
   call recv_mapping_info(send_comp_id, recv_comp_id, mapping_tag)
+  call put_log("recv_mapping_info ok")
 
+  call put_log("data point recv start")
   do i = 1, send_array(send_comp_id, recv_comp_id)%pe_array(mapping_tag)%num_of_pe
     is = send_array(send_comp_id, recv_comp_id)%pe_array(mapping_tag)%pa(i)%s_point
     ie = send_array(send_comp_id, recv_comp_id)%pe_array(mapping_tag)%pa(i)%e_point
@@ -1440,13 +1452,16 @@ subroutine recv_grid_mapping(send_comp_id, recv_comp_id, mapping_tag)
     call jml_RecvModel(send_comp_id, send_array(send_comp_id, recv_comp_id)%pe_array(mapping_tag)%data_point, is, ie, &
                        recv_comp_id, pe-1)
   end do
+  call put_log("data point recv ok")
 
 end subroutine recv_grid_mapping
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine recv_mapping_info(send_comp_id, recv_comp_id, mapping_tag)
-  use jcup_mpi_lib, only : jml_isLocalLeader, jml_SendLocal, jml_RecvLocal, jml_RecvLeader, jml_GetMyrank
+  use jcup_constant, only  : STR_LONG
+  use jcup_utils, only     : put_log
+  use jcup_mpi_lib, only   : jml_isLocalLeader, jml_SendLocal, jml_RecvLocal, jml_RecvLeader, jml_GetMyrank
   use jcup_grid_base, only : get_num_of_pe
   implicit none
   integer, intent(IN) :: send_comp_id, recv_comp_id
@@ -1456,6 +1471,7 @@ subroutine recv_mapping_info(send_comp_id, recv_comp_id, mapping_tag)
   integer, allocatable :: int_buffer(:)
   integer :: recv_pe, my_pe
   integer :: i, j
+  character(len=STR_LONG) :: log_str
 
   recv_pe = get_num_of_pe(recv_comp_id)
   my_pe   = get_num_of_pe(send_comp_id)
@@ -1480,7 +1496,9 @@ subroutine recv_mapping_info(send_comp_id, recv_comp_id, mapping_tag)
     call jml_RecvLocal(send_comp_id, int_buffer, 1, recv_pe, 0)
   end if
 
+  call put_log("init_send_array start")
   call init_send_array(int_buffer, send_array(send_comp_id, recv_comp_id)%pe_array(mapping_tag))
+  call put_log("init_send_array ok")
 
   deallocate(int_buffer)
   deallocate(info_matrix)
@@ -1490,12 +1508,15 @@ end subroutine recv_mapping_info
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine init_send_array(array_info, send_array)
+  use jcup_constant, only : STR_LONG
+  use jcup_utils, only : put_log, error
   implicit none
   integer, intent(IN) :: array_info(:)
   type(pe_array_type), intent(INOUT) :: send_array
   integer :: counter
   integer :: s_point, e_point
   integer :: i
+  character(len=STR_LONG) :: log_str
 
   counter = 0
   do i = 1, size(array_info)
@@ -1519,15 +1540,109 @@ subroutine init_send_array(array_info, send_array)
     end if
   end do  
 
+  write(log_str, '("init_send_array, data_buffer allocation start. array size = ",I,I)') e_point, NUM_OF_EXCHANGE_DATA
+  call put_log(trim(log_str))
   send_array%num_of_point = e_point  
   allocate(send_array%data_point(e_point))
+  if (.not.associated(send_array%data_point)) then
+    call error("init_send_array", "array send_array%data_point allocation error")
+  end if
+
   allocate(send_array%data_buffer(e_point*NUM_OF_EXCHANGE_DATA))
+  if (.not.associated(send_array%data_buffer)) then
+    call error("init_send_array", "array send_array%data_buffer allocation error")
+  end if
+
+  call put_log("init_send_array, data_buffer allocation ok")
 
 end subroutine init_send_array
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine finish_grid_mapping(send_comp_id, recv_comp_id, mapping_tag, send_grid_tag, recv_grid_tag)
+  use jcup_utils, only : put_log, sort_int_1d, binary_search
+  use jcup_mpi_lib, only :  jml_set_num_of_isend, jml_set_num_of_irecv
+  use jcup_comp, only : is_my_component
+  use jcup_grid_base, only : local_area_type, get_my_local_area_ptr, global_index_to_local_index
+  implicit none
+  integer, intent(IN) :: send_comp_id, recv_comp_id
+  integer, intent(IN) :: mapping_tag
+  integer, intent(IN) :: send_grid_tag
+  integer, intent(IN) :: recv_grid_tag
+  type(local_area_type), pointer :: local_area_ptr
+  integer, allocatable :: sort_grid(:), sort_index(:)
+  integer :: counter
+  integer :: p, d, index 
+  integer :: i
+
+  spa => send_array(send_comp_id, recv_comp_id)%pe_array(mapping_tag)
+  rpa => recv_array(recv_comp_id, send_comp_id)%pe_array(mapping_tag)
+
+#ifndef ADVANCED_EXCHANGE
+  if (is_my_component(send_comp_id)) then
+    call jml_set_num_of_isend(spa%num_of_pe*10000+100)
+  end if
+  if (is_my_component(recv_comp_id)) then
+    call jml_set_num_of_irecv(rpa%num_of_pe*10000+100)
+  end if
+#else
+  if (is_my_component(send_comp_id)) then
+    call jml_set_num_of_isend(10000)
+  end if
+  if (is_my_component(recv_comp_id)) then
+    call jml_set_num_of_irecv(10000)
+  end if
+#endif
+
+  if (is_my_component(send_comp_id)) then
+    call put_log("global_index_to_local_index start")
+
+    counter = 0
+    do p = 1, spa%num_of_pe
+      do d = spa%pa(p)%s_point, spa%pa(p)%e_point
+        counter = counter + 1
+      end do
+    end do
+
+    peg => a_grid(send_comp_id, recv_comp_id)%ex_grid(mapping_tag)
+    allocate(peg%local_send_index(counter))
+
+    local_area_ptr => get_my_local_area_ptr(send_comp_id, send_grid_tag)
+
+    allocate(sort_grid(size(local_area_ptr%grid_index)))
+    allocate(sort_index(size(local_area_ptr%grid_index)))
+    do i = 1, size(sort_grid)
+      sort_grid(i) = local_area_ptr%grid_index(i)
+      sort_index(i) = i
+    end do
+
+    call sort_int_1d(size(sort_grid), sort_grid, sort_index)
+  
+    counter = 0    
+
+    do p = 1, spa%num_of_pe
+      do d = spa%pa(p)%s_point, spa%pa(p)%e_point
+        counter = counter+1
+
+        peg%local_send_index(counter) = sort_index(binary_search(sort_grid, spa%data_point(d)))
+
+      end do
+    end do 
+
+    deallocate(sort_grid)
+    deallocate(sort_index)
+
+    call put_log("global_index_to_local_index ok")
+
+  end if
+
+
+end subroutine finish_grid_mapping
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine finish_grid_mapping_org(send_comp_id, recv_comp_id, mapping_tag, send_grid_tag, recv_grid_tag)
+  use jcup_utils, only : put_log
   use jcup_mpi_lib, only :  jml_set_num_of_isend, jml_set_num_of_irecv
   use jcup_comp, only : is_my_component
   use jcup_grid_base, only : global_index_to_local_index
@@ -1544,21 +1659,23 @@ subroutine finish_grid_mapping(send_comp_id, recv_comp_id, mapping_tag, send_gri
 
 #ifndef ADVANCED_EXCHANGE
   if (is_my_component(send_comp_id)) then
-    call jml_set_num_of_isend(spa%num_of_pe*100)
+    call jml_set_num_of_isend(spa%num_of_pe*10000+100)
   end if
   if (is_my_component(recv_comp_id)) then
-    call jml_set_num_of_irecv(rpa%num_of_pe*100)
+    call jml_set_num_of_irecv(rpa%num_of_pe*10000+100)
   end if
 #else
   if (is_my_component(send_comp_id)) then
-    call jml_set_num_of_isend(1000)
+    call jml_set_num_of_isend(10000)
   end if
   if (is_my_component(recv_comp_id)) then
-    call jml_set_num_of_irecv(1000)
+    call jml_set_num_of_irecv(10000)
   end if
 #endif
 
   if (is_my_component(send_comp_id)) then
+    call put_log("global_index_to_local_index start")
+
     counter = 0
     do p = 1, spa%num_of_pe
       do d = spa%pa(p)%s_point, spa%pa(p)%e_point
@@ -1578,10 +1695,13 @@ subroutine finish_grid_mapping(send_comp_id, recv_comp_id, mapping_tag, send_gri
         peg%local_send_index(counter) = index ! spa%data_point(d)
       end do
     end do 
+
+    call put_log("global_index_to_local_index ok")
+
   end if
 
 
-end subroutine finish_grid_mapping
+end subroutine finish_grid_mapping_org
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
@@ -2126,7 +2246,6 @@ subroutine recv_data(recv_comp_id, send_comp_id, mapping_tag, data_type, num_of_
     end do
 
   call jml_recv_waitall()
-
   call put_log("recv_data, data receive completed")
   
   do p = 1, rpa%num_of_pe

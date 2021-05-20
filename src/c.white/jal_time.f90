@@ -146,6 +146,14 @@ subroutine jal_set_time(delta_t)
   call put_log("--------------------------------- jal_set_time  ------------------------------------")
   call put_log("------------------------------------------------------------------------------------")
 
+  !if (delta_t <= 0.d0) then
+  !  write(log_str, *) "current time = ", time_array(1), ", delta t = ", time_array(2)
+  !  call put_log(trim(log_str))
+  !  write(log_str, *) "jal_set_time return, because delta t <= 0"
+  !  call put_log(trim(log_str))
+  !  return
+  !end if
+
   call jal_remove_past_send_data(jal_get_before_time(my_comp_id), my_comp_id)
 
   comp_time(my_comp_id)%before_delt = comp_time(my_comp_id)%current_delt
@@ -209,7 +217,8 @@ subroutine jal_set_time(delta_t)
   end do
 
   do i = 1, num_of_total_comp
-
+    
+    !!!!if (delta_t <= 0.d0) exit  ! recv skip 
 
     if (is_my_component(i)) cycle
 
@@ -258,7 +267,6 @@ subroutine jal_set_time(delta_t)
        call jal_recv_data(comp_time(i)%comp_name, jal_get_before_time(i), &
                           jal_get_current_time(i))
        
-
        call jal_remove_past_recv_data(jal_get_before_time(i),my_comp_id, i) ! remove past recv data
        
     end do
@@ -267,8 +275,11 @@ subroutine jal_set_time(delta_t)
 
   call jml_send_waitall()
 
-  
   do i = 1, num_of_total_comp
+
+     !!!!!if (delta_t <= 0.d0) exit ! time interpolation skip
+
+
      if (is_my_component(i)) cycle
 
      if (get_comp_exchange_type(my_comp_id, i) /= ASSYNC_SEND_RECV) cycle
@@ -340,11 +351,15 @@ subroutine jal_time_end()
     if (data(1) == 1) cycle
     
     !write(0, *) "final step time ", comp_time(my_comp_id)%before_sec, comp_time(my_comp_id)%current_sec, &
-    !     comp_time(i)%before_sec, comp_time(i)%current_sec
+    !     comp_time(i)%before_sec, comp_time(i)%current_sec, recv_sec(i), send_sec(i), i
     
-    if (is_send_time(comp_time(my_comp_id)%before_sec, comp_time(my_comp_id)%current_sec, &
+    if (is_send_time(comp_time(my_comp_id)%before_sec, &
                      comp_time(my_comp_id)%current_sec, &
-                     comp_time(i)%before_sec, comp_time(i)%current_sec, comp_time(i)%current_sec, recv_sec(i), send_sec(i))) then
+                     comp_time(my_comp_id)%current_sec, &  ! + comp_time(my_comp_id)%current_delt, &
+                     comp_time(i)%before_sec, &
+                     comp_time(i)%current_sec, &
+                     comp_time(i)%current_sec, & ! + comp_time(i)%current_delt, &
+                     recv_sec(i), send_sec(i))) then
 
       write(log_str, *) "send final step data, ", trim(comp_time(my_comp_id)%comp_name)//","//trim(comp_time(i)%comp_name)//",",&
                                      comp_time(my_comp_id)%current_sec, comp_time(i)%current_sec

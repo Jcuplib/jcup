@@ -13,25 +13,26 @@ module jcup_grid_base
 
   public :: init_grid_base
   public :: destruct_grid_base
-  public :: set_my_area_info ! subroutine (grid_index, component_name, grid_name)
-  public :: set_pe_num       ! subroutine (comp_id, grid_name)
+  public :: destruct_index2pe     ! subroutine (comp_id, grid_num)
+  public :: set_my_area_info      ! subroutine (grid_index, component_name, grid_name)
+  public :: set_pe_num            ! subroutine (comp_id, grid_name)
   public :: exchange_grid_info
   public :: global_index_to_local_index ! subroutine (comp_id, grid_num, global_index, local_index)
-  public :: get_num_of_component ! integer function
-  public :: get_num_of_grid ! integer function (component_id)
-  public :: get_num_of_point ! integer function (component_id, grid_num)
+  public :: get_num_of_component  ! integer function
+  public :: get_num_of_grid       ! integer function (component_id)
+  public :: get_num_of_point      ! integer function (component_id, grid_num)
   public :: get_comp_name_from_grid_name ! character function (grid_name)
-  public :: get_grid_num ! integer function (component_name, grid_name)
-  public :: get_num_of_pe ! integer function (component_id)
-  public :: get_pe_num ! integer function (component_id, grid_num, grid_index)
-  public :: get_grid_min_index ! integer function (component_id, grid_num)
-  public :: get_grid_max_index ! integer function (component_id, grid_num)
-  public :: get_my_local_area ! subroutine (component_id, grid_num, is, ie, js, je, ks, ke)
+  public :: get_grid_num          ! integer function (component_name, grid_name)
+  public :: get_num_of_pe         ! integer function (component_id)
+  public :: get_pe_num            ! integer function (component_id, grid_num, grid_index)
+  public :: get_grid_min_index    ! integer function (component_id, grid_num)
+  public :: get_grid_max_index    ! integer function (component_id, grid_num)
+  public :: get_my_local_area     ! subroutine (component_id, grid_num, is, ie, js, je, ks, ke)
   public :: get_my_local_area_ptr ! type(local_area_type), pointer function (component_id, grid_num)
-  public :: send_index2pe ! subroutine (my_comp_id, my_grid_num, dest_comp_id, dest_grid_num)
-  public :: recv_index2pe ! subroutine (source_comp_id, source_grid_num)
-  public :: get_grid_info ! subroutine (comp_name, grid_name, num_of_index, min_index, max_index)
-  public :: get_grid_index ! subroutine (component_id, grid_id, grid_index) ! 2015/05/11
+  public :: send_index2pe         ! subroutine (my_comp_id, my_grid_num, dest_comp_id, dest_grid_num)
+  public :: recv_index2pe         ! subroutine (source_comp_id, source_grid_num)
+  public :: get_grid_info         ! subroutine (comp_name, grid_name, num_of_index, min_index, max_index)
+  public :: get_grid_index        ! subroutine (component_id, grid_id, grid_index) ! 2015/05/11
 
   public :: local_area_type
 
@@ -496,6 +497,19 @@ integer function get_pe_num(comp_id, grid_num, grid_index)
   get_pe_num = comp_area(comp_id)%global_area(grid_num)%index2pe(grid_index)
 
 end function get_pe_num
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine destruct_index2pe(comp_id, grid_num)
+  use jcup_constant, only : NO_GRID
+  implicit none
+  integer, intent(IN) :: comp_id, grid_num
+
+  if (associated(comp_area(comp_id)%global_area(grid_num)%index2pe)) then
+    deallocate(comp_area(comp_id)%global_area(grid_num)%index2pe)
+  end if
+
+end subroutine destruct_index2pe
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 

@@ -10,12 +10,16 @@ WHITE = c.white
 
 MODS = $(JCUPOBJS:.o=.mod)
 
-all:
+all: makedir
 	cd ${BLACK} ; $(MAKE) ; cd ..
 	cd ${WHITE} ; $(MAKE) ; cd ..
 	$(MAKE) $(JCUPLIBDIR)/$(LIBJCUP)
 	$(MAKE) modules
 	@echo "Complete making $(LIBJCUP)."
+
+makedir:
+	mkdir -p $(JCUPLIBDIR)
+	mkdir -p $(JCUPINCDIR)
 
 $(JCUPLIBDIR)/$(LIBJCUP): $(JCUPAPI)
 	$(AR) $(ARFLAGS) $@ $(JCUPOBJS)

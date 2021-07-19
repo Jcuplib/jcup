@@ -1540,7 +1540,7 @@ subroutine init_send_array(array_info, send_array)
     end if
   end do  
 
-  write(log_str, '("init_send_array, data_buffer allocation start. array size = ",I,I)') e_point, NUM_OF_EXCHANGE_DATA
+  write(log_str, '("init_send_array, data_buffer allocation start. array size = ",I10,I10)') e_point, NUM_OF_EXCHANGE_DATA
   call put_log(trim(log_str))
   send_array%num_of_point = e_point  
   allocate(send_array%data_point(e_point))

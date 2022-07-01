@@ -1011,26 +1011,26 @@ subroutine jcup_set_mapping_table(my_model_name, &
 
    if (jml_isLocalLeader(my_model_id)) then ! 2012/04/12 T.Arakawa [ADD]
       if (minval(send_grid) < get_grid_min_index(send_model_id, send_grid_num)) then
-         write(log_str,'(A, I, A, I, A, I, A)') "min of send_grid_index (val = ", minval(send_grid), &
+         write(log_str,'(A, I10, A, I10, A, I10, A)') "min of send_grid_index (val = ", minval(send_grid), &
               ", location = ", minloc(send_grid), ") < min of defined grid_index (val = ", &
               get_grid_min_index(send_model_id, send_grid_num), "), check index"
         call error("jcup_set_mapping_table", trim(log_str))
       end if
       if (maxval(send_grid) > get_grid_max_index(send_model_id, send_grid_num)) then
-        write(log_str,'(A, I, A, I, A, I, A)') "max of send_grid_index (val = ", maxval(send_grid), &
+        write(log_str,'(A, I10, A, I10, A, I10, A)') "max of send_grid_index (val = ", maxval(send_grid), &
               ", location = ", maxloc(send_grid), ") > max of defined grid_index (val = ", &
               get_grid_max_index(send_model_id, send_grid_num), "), check index"
         call error("jcup_set_mapping_table", trim(log_str))
       end if
 
       if (minval(recv_grid) < get_grid_min_index(recv_model_id, recv_grid_num)) then
-         write(log_str,'(A, I, A, I, A, I, A)') "min of recv_grid_index (val = ", minval(recv_grid), &
+         write(log_str,'(A, I10, A, I10, A, I10, A)') "min of recv_grid_index (val = ", minval(recv_grid), &
               ", location = ", minloc(recv_grid), ") < min of defined grid_index (val = ", &
               get_grid_min_index(recv_model_id, recv_grid_num), "), check index"
         call error("jcup_set_mapping_table", trim(log_str))
       end if
       if (maxval(recv_grid) > get_grid_max_index(recv_model_id, recv_grid_num)) then
-        write(log_str,'(A, I, A, I, A, I, A)') "max of recv_grid_index (val = ", maxval(recv_grid), &
+        write(log_str,'(A, I10, A, I10, A, I10, A)') "max of recv_grid_index (val = ", maxval(recv_grid), &
               ", location = ", maxloc(recv_grid), ") > max of defined grid_index (val = ", &
               get_grid_max_index(recv_model_id, recv_grid_num), "), check index"
         call error("jcup_set_mapping_table", trim(log_str))

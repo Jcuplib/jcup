@@ -1649,10 +1649,10 @@ module jcup_buffer_base
   public :: remove_time
   public :: remove_past_data
 
-  public :: get_recv_data_type
-  public :: buffer_check_write
+  !public :: get_recv_data_type
+  !public :: buffer_check_write
   public :: get_num_of_time     ! integer function (time_buffer_ptr) 2013.06.07 [ADD]
-  public :: get_send_buffer_ptr ! function () result (send_buffer_ptr) 2013.06.07 [ADD]
+  !public :: get_send_buffer_ptr ! function () result (send_buffer_ptr) 2013.06.07 [ADD]
   !public :: write_buffer       ! subroutine (file_id) 2013.05.29 [ADD]
   !public :: read_buffer        ! subroutine (file_id) 2013.05.29 [ADD]
   public :: dump_buffer_base    ! subroutine (self, fid)

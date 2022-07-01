@@ -13,6 +13,7 @@ TOPDIR = $(JCUPDIR)
 #SYSTEM          = Linux-IFC.mpich
 SYSTEM          = Linux-IFC.openmpi
 #SYSTEM          = Linux-GNU.openmpi
+#SYSTEM          = macOS-GNU.openmpi
 
 ################ Directory Specification ###############
 

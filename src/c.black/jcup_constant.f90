@@ -8,13 +8,15 @@ module jcup_constant
 
 !--------------------------------   public  ----------------------------------!
 
-  integer,public :: NUM_OF_EXCHANGE_DATA = 1
+  integer,public :: NUM_OF_EXCHANGE_DATA = 40
+
+  integer,public,parameter :: STR_SHORT = 64 ! 2014/11/12 [MOD] 32 -> 64
+  integer,public,parameter :: STR_MID   = 256
+  integer,public,parameter :: STR_LONG  = 1024
 
   character(len=*), public, parameter :: NO_NAME = "NO_NAME_ASSIGNED"
   integer,public,parameter :: NO_DATA = -999999  
   integer,public,parameter :: NO_GRID = -999999
-  integer,public,parameter :: NAME_LEN = 64 ! 2014/11/12 [MOD] 32 -> 64
-  integer,public,parameter :: STRING_LEN = 256
   integer,public,parameter :: MAX_MODEL  = 8
   integer,public,parameter :: MAX_DOMAIN = 5
   integer,public,parameter :: MAX_GRID   = 8
@@ -26,6 +28,7 @@ module jcup_constant
   integer,public,parameter :: ADVANCE_SEND_RECV = -1   !(my time lag = -1, target time lag =  1)
   integer,public,parameter :: BEHIND_SEND_RECV = 1     !(my time lag =  1, target time lag = -1)
   integer,public,parameter :: IMMEDIATE_SEND_RECV = 2  !(my time lag =  0, target time lag =  0) 
+  integer,public,parameter :: ASSYNC_SEND_RECV  = -99  !(time lag = -99 or present time_intpl_tag)
   integer,public,parameter :: NO_SEND_RECV = 99999999  !
 
   integer,public,parameter :: COMP_PARALLEL = 1
@@ -77,7 +80,6 @@ module jcup_constant
   integer,parameter,public :: DATA_3D = 3
   integer,parameter,public :: DATA_P  = 4
   integer,parameter,public :: END_FLAG = -999
-
 
   integer,parameter,public :: DEBUG_FILE_ID = 800
 

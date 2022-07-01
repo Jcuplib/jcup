@@ -6,32 +6,33 @@
 !All rights reserved.
 !
 module jcup_grid_base
-  use jcup_constant, only : MAX_GRID, MAX_MODEL, NO_GRID, NAME_LEN
+  use jcup_constant, only : MAX_GRID, MAX_MODEL, NO_GRID, STR_SHORT
   private
 
 !--------------------------------   public  ----------------------------------!
 
   public :: init_grid_base
   public :: destruct_grid_base
-  public :: set_my_area_info ! subroutine (grid_index, component_name, grid_name)
-  public :: set_pe_num       ! subroutine (comp_id, grid_name)
+  public :: destruct_index2pe     ! subroutine (comp_id, grid_num)
+  public :: set_my_area_info      ! subroutine (grid_index, component_name, grid_name)
+  public :: set_pe_num            ! subroutine (comp_id, grid_name)
   public :: exchange_grid_info
   public :: global_index_to_local_index ! subroutine (comp_id, grid_num, global_index, local_index)
-  public :: get_num_of_component ! integer function
-  public :: get_num_of_grid ! integer function (component_id)
-  public :: get_num_of_point ! integer function (component_id, grid_num)
+  public :: get_num_of_component  ! integer function
+  public :: get_num_of_grid       ! integer function (component_id)
+  public :: get_num_of_point      ! integer function (component_id, grid_num)
   public :: get_comp_name_from_grid_name ! character function (grid_name)
-  public :: get_grid_num ! integer function (component_name, grid_name)
-  public :: get_num_of_pe ! integer function (component_id)
-  public :: get_pe_num ! integer function (component_id, grid_num, grid_index)
-  public :: get_grid_min_index ! integer function (component_id, grid_num)
-  public :: get_grid_max_index ! integer function (component_id, grid_num)
-  public :: get_my_local_area ! subroutine (component_id, grid_num, is, ie, js, je, ks, ke)
+  public :: get_grid_num          ! integer function (component_name, grid_name)
+  public :: get_num_of_pe         ! integer function (component_id)
+  public :: get_pe_num            ! integer function (component_id, grid_num, grid_index)
+  public :: get_grid_min_index    ! integer function (component_id, grid_num)
+  public :: get_grid_max_index    ! integer function (component_id, grid_num)
+  public :: get_my_local_area     ! subroutine (component_id, grid_num, is, ie, js, je, ks, ke)
   public :: get_my_local_area_ptr ! type(local_area_type), pointer function (component_id, grid_num)
-  public :: send_index2pe ! subroutine (my_comp_id, my_grid_num, dest_comp_id, dest_grid_num)
-  public :: recv_index2pe ! subroutine (source_comp_id, source_grid_num)
-  public :: get_grid_info ! subroutine (comp_name, grid_name, num_of_index, min_index, max_index)
-  public :: get_grid_index ! subroutine (component_id, grid_id, grid_index) ! 2015/05/11
+  public :: send_index2pe         ! subroutine (my_comp_id, my_grid_num, dest_comp_id, dest_grid_num)
+  public :: recv_index2pe         ! subroutine (source_comp_id, source_grid_num)
+  public :: get_grid_info         ! subroutine (comp_name, grid_name, num_of_index, min_index, max_index)
+  public :: get_grid_index        ! subroutine (component_id, grid_id, grid_index) ! 2015/05/11
 
   public :: local_area_type
 
@@ -41,7 +42,7 @@ module jcup_grid_base
     integer :: num_of_point
     integer, pointer :: grid_index(:)
     integer :: min_index, max_index
-    character(len=NAME_LEN) :: grid_name 
+    character(len=STR_SHORT) :: grid_name 
     integer :: grid_num
   end type
 
@@ -50,7 +51,7 @@ module jcup_grid_base
     integer :: num_of_index
     integer :: min_index, max_index
     integer, pointer :: index2pe(:) ! mapping table of grid index to pe number
-    character(len=NAME_LEN) :: grid_name
+    character(len=STR_SHORT) :: grid_name
     integer :: grid_num 
   end type
 
@@ -58,7 +59,7 @@ module jcup_grid_base
     integer :: num_of_grid
     type(local_area_type) :: local_area(MAX_GRID) ! number of grid of the component
     type(global_area_type) :: global_area(MAX_GRID) 
-    character(len=NAME_LEN) :: comp_name
+    character(len=STR_SHORT) :: comp_name
     integer :: comp_num ! component number
     integer :: num_of_pe
   end type
@@ -309,7 +310,7 @@ subroutine exchange_grid_info()
   integer :: local_leader_pe
   integer :: cmp, grd
   integer :: int_buffer(6)
-  character(len=NAME_LEN) :: name_buffer
+  character(len=STR_SHORT) :: name_buffer
 
   do cmp = 1, get_num_of_component()
 
@@ -431,7 +432,7 @@ end function get_num_of_point
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-character(len=NAME_LEN) function get_comp_name_from_grid_name(grid_name)
+character(len=STR_SHORT) function get_comp_name_from_grid_name(grid_name)
   use jcup_utils, only : error
   implicit none
   character(len=*), intent(IN) :: grid_name
@@ -499,6 +500,19 @@ end function get_pe_num
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
+subroutine destruct_index2pe(comp_id, grid_num)
+  use jcup_constant, only : NO_GRID
+  implicit none
+  integer, intent(IN) :: comp_id, grid_num
+
+  if (associated(comp_area(comp_id)%global_area(grid_num)%index2pe)) then
+    deallocate(comp_area(comp_id)%global_area(grid_num)%index2pe)
+  end if
+
+end subroutine destruct_index2pe
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
 integer function get_grid_min_index(comp_id, grid_num)
   implicit none
   integer, intent(IN) :: comp_id, grid_num
@@ -528,6 +542,8 @@ subroutine global_index_to_local_index(comp_id, grid_num, global_area, local_ind
   integer :: i
 
   local_index = NO_GRID
+
+  !!!if (comp_area(comp_id)%local_area(grid_num)%num_of_point <= 0) return !!!! 20200514
 
   do i = 1, comp_area(comp_id)%local_area(grid_num)%num_of_point
     if (global_area == comp_area(comp_id)%local_area(grid_num)%grid_index(i)) then

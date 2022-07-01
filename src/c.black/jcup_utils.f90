@@ -5,40 +5,39 @@
 !All rights reserved.
 !
 module jcup_utils
+  use jcup_constant, only : STR_SHORT, STR_MID, STR_LONG
   implicit none
   private
 
 !--------------------------------   public  ----------------------------------!
 
-  ! public constants
-  integer,public,parameter :: MAX_STRING_LENGTH = 255 
-
   ! public procedures
   public :: init_utils
-  public :: set_log_level ! subroutine (log_level, log_stderr)
-  public :: get_log_level ! integer function ()
-  public :: is_output_stderr ! logical function ()
-  public :: set_log_unit_id
-  public :: init_log
-  public :: finalize_log
-  public :: put_log ! subroutine (log_str, log_level)
-  public :: open_log_file
-  public :: close_log_file
-  public :: error
-  public :: check_argument
-  public :: IntToStr
-  public :: LongIntToStr
-  public :: StrToInt
-  public :: IDate2CDate
-  public :: cdate_2_idate
-  public :: sort_int_1d
-  public :: split_string
-  public :: TrimString
-  public :: startsWith
-  public :: lw2up
-  public :: up2lw
-  public :: is_comment_line
-  public :: cut_comment
+  public :: set_log_level        ! subroutine (log_level, log_stderr)
+  public :: get_log_level        ! integer function ()
+  public :: is_output_stderr     ! logical function ()
+  public :: set_log_unit_id      !
+  public :: init_log             !
+  public :: finalize_log         !  
+  public :: put_log              ! subroutine (log_str, log_level)
+  public :: open_log_file        !
+  public :: close_log_file       !
+  public :: error                !
+  public :: check_argument       !
+  public :: IntToStr             !
+  public :: LongIntToStr         !
+  public :: StrToInt             !
+  public :: IDate2CDate          !
+  public :: cdate_2_idate        !
+  public :: sort_int_1d          ! subroutine (num_of_data, sort_array, sorted_index)
+  public :: binary_search        ! integer function (data_array, key)
+  public :: split_string         !
+  public :: TrimString           !
+  public :: startsWith           !
+  public :: lw2up                !
+  public :: up2lw                !
+  public :: is_comment_line      !
+  public :: cut_comment          !
 
   integer, parameter, public :: NO_OUTPUT_LOG = 0
   integer, parameter, public :: STANDARD_LOG = 1
@@ -57,14 +56,13 @@ module jcup_utils
   integer,private,parameter :: STD_IN=5,STD_OUT=6,STD_ERR=0
   integer,private           :: LogUnitID = STD_ERR ! Log file unit id
   integer,private           :: LogFileID = 690
-  integer,private,parameter :: FILE_STRING_LEN = 127
   integer,private           :: current_record  = 0
   integer,private           :: my_rank_global
   integer,private           :: log_level = NO_OUTPUT_LOG  ! (NO_OUTPUT_LOG or STANDARD_LOG or DETAIL_LOG)
   integer,private           :: max_log_level = NO_OUTPUT_LOG ! (NO_OUTPUT_LOG or STANDARD_LOG or DETAIL_LOG)
   logical,private           :: log_stderr = NO_OUTPUT_STDERR ! (NO_OUTPUT_STDERR or OUTPUT_STDERR)
   character(len=TIME_STR_LEN),private :: timestr ! time string
-  character(len=FILE_STRING_LEN), private :: model_name
+  character(len=STR_MID), private :: model_name
   character(len=2), private :: comment_char ="!#"
 
   ! private procedures
@@ -73,14 +71,43 @@ module jcup_utils
   private :: write_error_message
   private :: is_trim_char
 
+  integer, parameter :: MIN_FID = 10
+  integer, parameter :: MAX_FID = 999
+
 contains
 
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine init_utils()
-  LogUnitID=STD_OUT
+  implicit none
+
 end subroutine init_utils
+
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine set_fid(fid)
+  implicit none
+  integer, intent(INOUT) :: fid
+  logical :: op
+  
+  fid = max(fid, MIN_FID)
+
+  do 
+    if (fid > MAX_FID) then
+      write(0, *) "[set_fid], fid exceeded MAX_FID"
+      stop
+    end if
+    inquire(unit = fid, OPENED = op)
+    if (op) then
+       fid = fid + 1
+    else
+      return
+    end if
+  end do
+
+end subroutine set_fid
 
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
@@ -170,14 +197,14 @@ end subroutine set_date_time_string
 
 subroutine init_log(my_model_name, log_dir)
   use jcup_mpi_lib, only : jml_GetMyrankGlobal
-  use jcup_constant, only : STRING_LEN 
+  use jcup_constant, only : STR_MID
   implicit none
   character(len=*), intent(IN) :: my_model_name
   character(len=*), optional, intent(IN) :: log_dir
 
-  character(len=STRING_LEN) :: file_name
-  character(len=STRING_LEN) :: dir_name
-  character(len=4) :: pe_num
+  character(len=STR_MID) :: file_name
+  character(len=STR_MID) :: dir_name
+  character(len=5) :: pe_num
 
   model_name = my_model_name
 
@@ -185,8 +212,8 @@ subroutine init_log(my_model_name, log_dir)
 
   if (get_log_level() /= NO_OUTPUT_LOG) then
 
-    pe_num = '0000'
-    write(pe_num,'(I4.4)') jml_GetMyrankGlobal()
+    pe_num = '00000'
+    write(pe_num,'(I5.5)') jml_GetMyrankGlobal()
 
     file_name = trim(model_name)//".coupling.log.PE"//pe_num
 
@@ -194,7 +221,7 @@ subroutine init_log(my_model_name, log_dir)
     if (present(log_dir)) dir_name = trim(log_dir)
 
     call open_log_file(trim(dir_name)//"/"//trim(file_name), LogFileID)
-    call open_log_file(trim(dir_name)//"/C."//trim(file_name), LogFileID+1, "DIRECT")
+    !call open_log_file(trim(dir_name)//"/C."//trim(file_name), LogFileID+1, "DIRECT")
 
   end if
 
@@ -203,21 +230,19 @@ end subroutine init_log
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine open_log_file(file_name, log_file_unit, access_mode)
-  use jcup_constant, only : STRING_LEN
   implicit none
   character(len=*), intent(IN) :: file_name
-  integer, intent(IN) :: log_file_unit
+  integer, intent(INOUT) :: log_file_unit
   character(len=*), optional, intent(IN) :: access_mode
 
   logical :: isopened
 
-  inquire(log_file_unit, opened = isopened)
-  if (isopened) close(log_file_unit)
+  call set_fid(log_file_unit)
 
   if (present(access_mode)) then
     if (trim(access_mode)=="DIRECT") then
       open(log_file_unit, file=trim(file_name),form = 'formatted', &
-           access = 'direct', recl=FILE_STRING_LEN, action = 'write', err = 200)
+           access = 'direct', recl=STR_MID, action = 'write', err = 200)
     else
       open(log_file_unit, file=trim(file_name),form = 'formatted', &
            access = 'sequential', action = 'write', err = 200)
@@ -242,7 +267,7 @@ subroutine finalize_log()
 
   if (max_log_level /= NO_OUTPUT_LOG) then
     call close_log_file(LogFileID)
-    call close_log_file(LogFileID+1)
+    !call close_log_file(LogFileID+1)
   end if
 
 end subroutine finalize_log
@@ -317,30 +342,30 @@ subroutine put_log_to_file(log_l, LogStr)
   implicit none
   integer, intent(IN) :: log_l
   character(len=*),intent(IN) :: LogStr ! log string
-  character(len=FILE_STRING_LEN) :: log_str
+  character(len=STR_MID) :: log_str
   integer :: i
 
     call set_date_time_string()
 
 
     if (get_log_level() == DETAIL_LOG) then
-      write(LogFileID,'(A19," :: ",A)') timestr,LogStr ! write message
+      write(LogFileID,'(A19," :: ",A)') timestr,trim(LogStr) ! write message
     else
       if (log_l==1) then
-        write(LogFileID,'(A19," :: ",A)') timestr,LogStr ! write message
+        write(LogFileID,'(A19," :: ",A)') timestr,trim(LogStr) ! write message
       end if
     end if
 
-    write(log_str,'(A19," :: ")') timestr ! write message
-    do i = 24,min(len(LogStr)+23,FILE_STRING_LEN) 
-      log_str(i:i) = LogStr(i-23:i-23)     
-    end do
-    do i=min(FILE_STRING_LEN,min(len(LogStr),FILE_STRING_LEN)+24),FILE_STRING_LEN-1
-      log_str(i:i) = ' '
-    end do
-    log_str(FILE_STRING_LEN:FILE_STRING_LEN) = char(10)
-    write(LogFileID+1,'(A)',rec=current_record+1) log_str ! write message
-    current_record = mod(current_record+1,1000)
+    !write(log_str,'(A19," :: ")') timestr ! write message
+    !do i = 24,min(len_trim(LogStr)+23,STR_MID) 
+    !  log_str(i:i) = LogStr(i-23:i-23)     
+    !end do
+    !do i=min(STR_MID,min(len_trim(LogStr),STR_MID)+24),STR_MID-1
+    !  log_str(i:i) = ' '
+    !end do
+    !log_str(STR_MID:STR_MID) = char(10)
+    !write(LogFileID+1,'(A)',rec=current_record+1) log_str ! write message
+    !current_record = mod(current_record+1,1000)
 
 end subroutine put_log_to_file
 
@@ -368,8 +393,8 @@ subroutine error(routine_name,message)
   implicit none 
   character(len=*),intent(IN) :: routine_name,message
 
-  character(len=MAX_STRING_LENGTH) :: message_str
-  character(len=MAX_STRING_LENGTH) :: istr
+  character(len=STR_MID) :: message_str
+  character(len=STR_MID) :: istr
   integer :: i
 
   write(istr, *) my_rank_global
@@ -382,7 +407,7 @@ subroutine error(routine_name,message)
 
   call write_error_message(trim(message_str))
   call close_log_file(LogFileID)
-  call close_log_file(LogFileID+1)
+  !call close_log_file(LogFileID+1)
   call jml_abort()
   stop
 
@@ -404,11 +429,11 @@ end subroutine check_argument
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 !  2014/10/30 [MOD] IntToStr -> IntegerToStr
-character(len=MAX_STRING_LENGTH) function IntegerToStr(idata) 
+character(len=STR_MID) function IntegerToStr(idata) 
   implicit none
   integer,intent(IN) :: idata
 
-  character(len=MAX_STRING_LENGTH) :: istr
+  character(len=STR_MID) :: istr
 
   write(istr, *, err=100) idata
   IntegerToStr = trim(adjustl(istr))
@@ -423,11 +448,11 @@ end function IntegerToStr
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-character(len=MAX_STRING_LENGTH) function LongIntToStr(idata) 
+character(len=STR_MID) function LongIntToStr(idata) 
   implicit none
   integer(kind=8),intent(IN) :: idata
 
-  character(len=MAX_STRING_LENGTH) :: istr
+  character(len=STR_MID) :: istr
 
   write(istr, *, err=100) idata
   LongIntToStr = trim(adjustl(istr))
@@ -514,31 +539,161 @@ end subroutine cdate_2_idate
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! 2017/01/09 [MOD] radix sort
-subroutine sort_int_1d(num_of_data, data)
+subroutine sort_int_1d(num_of_data, data, data2)
   implicit none
   integer, intent(IN) :: num_of_data
   integer, intent(INOUT) :: data(num_of_data)
+  integer, optional, intent(INOUT) :: data2(num_of_data)
   integer :: sindex(num_of_data)
+  integer :: sindex2(num_of_data)
   integer :: digit
   integer :: i
 
+  if (num_of_data <= 0) return ! 20200514 add
+
   digit = int(log10(float(maxval(data)))) + 1
 
-  do i = 1, digit
-    call radix_sort(i, num_of_data, data, sindex)
-    data(:) = sindex(:)
-  end do
+  if (present(data2)) then
+    do i = 1, digit
+      call radix_sort(i, num_of_data, data, sindex, data2, sindex2)
+      data(:) = sindex(:)
+      data2(:) = sindex2(:)
+    end do
+  else
+    do i = 1, digit
+      call radix_sort(i, num_of_data, data, sindex)
+      data(:) = sindex(:)
+    end do
+  end if
 
 end subroutine sort_int_1d
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-! 2017/01/09 [NEW]
-subroutine radix_sort(fig, num_of_data, num1, num2)
+! 
+subroutine radix_sort(fig, num_of_data, num1, num2, num3, num4)
   implicit none
   integer, intent(IN) :: fig
   integer, intent(IN) :: num_of_data
   integer, intent(IN) :: num1(:)
   integer, intent(INOUT) :: num2(:)
+  integer, optional, intent(IN) :: num3(:)
+  integer, optional, intent(INOUT) :: num4(:)
+  integer :: num_of_radix(0:9) ! 0, 9
+  integer :: offset(0:9)
+  integer :: radix_counter(0:9)
+  integer :: sl ! size of leaves
+  integer :: str_len, char_pos
+  integer :: mod_rad
+  integer :: spos
+  integer :: i
+  character(len=STR_SHORT) :: num_str
+
+  sl = num_of_data
+
+  num_of_radix(:) = 0
+
+  do i = 1, sl
+    write(num_str, *) num1(i)
+    num_str = adjustl(num_str)
+    char_pos = len_trim(num_str) - fig + 1
+    if (char_pos < 1) then
+       mod_rad = 0
+    else 
+      read(num_str(char_pos:char_pos), *) mod_rad
+    end if
+   
+    num_of_radix(mod_rad) = num_of_radix(mod_rad) + 1
+
+  end do
+
+  offset(0) = 0
+  do i = 1, 9
+    offset(i) = offset(i-1) + num_of_radix(i-1)
+  end do
+
+  radix_counter(:) = 0
+
+  do i = 1, sl
+    write(num_str, *) num1(i)
+    num_str = adjustl(num_str)
+    char_pos = len_trim(num_str) - fig + 1
+    if (char_pos < 1) then
+       mod_rad = 0
+    else
+       read(num_str(char_pos:char_pos), *) mod_rad
+    end if
+        
+    radix_counter(mod_rad) = radix_counter(mod_rad) + 1
+    spos = offset(mod_rad) + radix_counter(mod_rad)
+    num2(spos) = num1(i)
+
+    if (present(num3)) then
+      num4(spos) = num3(i)
+    end if
+
+  end do
+
+end subroutine radix_sort
+
+subroutine radix_sort_org(fig, num_of_data, num1, num2, num3, num4)
+  implicit none
+  integer, intent(IN) :: fig
+  integer, intent(IN) :: num_of_data
+  integer, intent(IN) :: num1(:)
+  integer, intent(INOUT) :: num2(:)
+  integer, optional, intent(IN) :: num3(:)
+  integer, optional, intent(INOUT) :: num4(:)
+  integer :: num_of_radix(0:9) ! 0, 9
+  integer :: offset(0:9)
+  integer :: radix_counter(0:9)
+  integer :: sl ! size of leaves
+  integer :: mod_rad
+  integer :: spos
+  integer :: i
+  real(kind=8) :: figinv
+
+  sl = num_of_data
+
+  num_of_radix(:) = 0
+
+  figinv = 1.d0/(10**(fig-1))
+
+  do i = 1, sl
+    mod_rad = int(mod(num1(i),10*(10**(fig-1)))*figinv)
+
+    num_of_radix(mod_rad) = num_of_radix(mod_rad) + 1
+
+  end do
+
+  offset(0) = 0
+  do i = 1, 9
+    offset(i) = offset(i-1) + num_of_radix(i-1)
+  end do
+
+  radix_counter(:) = 0
+
+  do i = 1, sl
+    mod_rad = int(mod(num1(i),10*(10**(fig-1)))*figinv)
+    radix_counter(mod_rad) = radix_counter(mod_rad) + 1
+    spos = offset(mod_rad) + radix_counter(mod_rad)
+    num2(spos) = num1(i)
+
+    if (present(num3)) then
+      num4(spos) = num3(i)
+    end if
+
+  end do
+
+end subroutine radix_sort_org
+
+subroutine radix_sort_org_org(fig, num_of_data, num1, num2, num3, num4)
+  implicit none
+  integer, intent(IN) :: fig
+  integer, intent(IN) :: num_of_data
+  integer, intent(IN) :: num1(:)
+  integer, intent(INOUT) :: num2(:)
+  integer, optional, intent(IN) :: num3(:)
+  integer, optional, intent(INOUT) :: num4(:)
   integer :: num_of_radix(0:9) ! 0, 9
   integer :: offset(0:9)
   integer :: radix_counter(0:9)
@@ -571,9 +726,39 @@ subroutine radix_sort(fig, num_of_data, num1, num2)
     spos = offset(mod_rad) + radix_counter(mod_rad)
     num2(spos) = num1(i)
 
+    if (present(num3)) then
+      num4(spos) = num3(i)
+    end if
+
   end do
 
-end subroutine radix_sort
+end subroutine radix_sort_org_org
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+function binary_search(data, key) result(res)
+  implicit none
+  integer, intent(IN) :: data(:)
+  integer, intent(IN) :: key
+  integer :: middle, low, high
+  integer :: res
+
+  low = 1
+  high = size(data)
+
+  do while (low <= high)
+    middle = (low+high)/2
+    if (key == data(middle)) then
+      res = middle
+      return ;
+    else if (key < data(middle)) then
+      high = middle - 1
+    else
+      low = middle + 1
+    end if
+  end do
+  res = - 1
+end function binary_search
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
@@ -615,7 +800,7 @@ end subroutine split_string
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-character(len=MAX_STRING_LENGTH) function TrimString(source_str, trim_str)
+character(len=STR_MID) function TrimString(source_str, trim_str)
   implicit none
   character(len=*), intent(INOUT) :: source_str
   character(len=*), intent(IN) :: trim_str
@@ -671,11 +856,11 @@ end function startsWith
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-character(len=MAX_STRING_LENGTH) function lw2up(buf)
+character(len=STR_LONG) function lw2up(buf)
   implicit none
   character(len=*), intent(IN) :: buf
   integer :: i
-  character(len=MAX_STRING_LENGTH) :: ret_str
+  character(len=STR_LONG) :: ret_str
 
   do i = 1, len(buf)
     if ((ichar(buf(i:i))>=97).and.(ichar(buf(i:i))<=122)) then
@@ -691,11 +876,11 @@ end function lw2up
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-character(len=MAX_STRING_LENGTH) function up2lw(buf)
+character(len=STR_LONG) function up2lw(buf)
   implicit none
   character(len=*), intent(IN) :: buf
   integer :: i
-  character(len=MAX_STRING_LENGTH) :: ret_str
+  character(len=STR_LONG) :: ret_str
   ret_str=""
 
   do i = 1, len_trim(buf)
@@ -728,7 +913,7 @@ end function is_comment_line
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-character(len=MAX_STRING_LENGTH) function cut_comment(source_str)
+character(len=STR_LONG) function cut_comment(source_str)
   implicit none
   character(len=*), intent(IN) :: source_str
   integer :: i

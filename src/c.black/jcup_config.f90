@@ -3,7 +3,7 @@
 !All rights reserved.
 !
 module jcup_config
-  use jcup_constant, only : MAX_DOMAIN, NAME_LEN, NO_NAME, NO_DATA, DEBUG_FILE_ID, STRING_LEN
+  use jcup_constant, only : MAX_DOMAIN, STR_SHORT, NO_NAME, NO_DATA, DEBUG_FILE_ID, STR_MID
   private
 
 !--------------------------------   public  ----------------------------------!
@@ -51,8 +51,8 @@ module jcup_config
   public :: isOnlyFirstStep
   public :: GetSendModelName
   public :: get_send_data_name
-  public :: get_my_send_data_name ! character(len=NAME_LEN) function (component_name, data_id)
-  public :: get_my_recv_data_name ! character(len=NAME_LEN) function (component_name, data_id)
+  public :: get_my_send_data_name ! character(len=STR_SHORT) function (component_name, data_id)
+  public :: get_my_recv_data_name ! character(len=STR_SHORT) function (component_name, data_id)
   !!!!!!!!public :: write_configure
   public :: get_send_data_conf_ptr_from_id ! type(send_data_conf_type), pointer function (component_id, data_num)
   public :: get_recv_data_conf_ptr_from_id ! type(recv_data_conf_type), pointer function (component_id, data_num)
@@ -67,13 +67,14 @@ module jcup_config
   public :: is_get_step_data
   public :: is_recv_step_data
   public :: get_comp_id_from_comp_name ! integer function (componend_name)
-  public :: get_comp_name_from_comp_id ! character(len=NAME_LEN) function (componend_id)
+  public :: get_comp_name_from_comp_id ! character(len=STR_SHORT) function (componend_id)
   public :: get_comp_exchange_type ! integer function (my_comp_id, target_comp_id) 
   public :: get_send_comp_id_from_data_name   ! integer function (data_name)
   public :: get_recv_comp_id_from_data_name   ! integer function (data_name)
   public :: get_send_data_id_from_data_name   ! integer function (data_name)
   public :: get_recv_data_id_from_data_name   ! integer funciton (data_name)
-
+  public :: get_average_data_name ! character(len=STR_SHORT) function (data_name, recv_model_id, recv_data_name)
+  public :: get_send_data_id ! integer function (recv_comp_id, data_name, is_average)
 
 !--------------------------------   private  ---------------------------------!
 
@@ -81,7 +82,7 @@ module jcup_config
   ! configuration id = component id
   ! configuration number = configuration id
 
-  integer, parameter, private :: WRITE_CONF_UNIT = 200
+  integer, private :: WRITE_CONF_UNIT = 200
 
   interface set_current_conf
     module procedure set_current_conf_name, set_current_conf_id
@@ -134,46 +135,47 @@ module jcup_config
 
 
   type recv_data_conf_type
-    integer                 :: data_id ! data id number
-    integer                 :: model_id ! my model ID (component id)
-    character(len=NAME_LEN) :: name ! recv data name
-    logical                 :: is_recv = .false.
-    logical                 :: is_average = .false.
-    integer                 :: interval ! exchange interval (sec)
-    integer                 :: time_lag ! exchange time lag
-    integer                 :: mapping_tag
-    integer                 :: exchange_tag
-    character(len=NAME_LEN) :: send_model
-    integer                 :: send_model_id
-    character(len=NAME_LEN) :: send_data
-    integer                 :: data_dimension
-    integer(kind=8)         :: recv_tag ! model_id+interval+mode+mapping_tag+exchange_tag
-    integer                 :: grid_id ! id of assigned grid
-    integer                 :: num_of_data = 1! number of multi categoly data or vertical grid
+    integer                  :: data_id ! data id number
+    integer                  :: model_id ! my model ID (component id)
+    character(len=STR_SHORT) :: name ! recv data name
+    logical                  :: is_recv = .false.
+    logical                  :: is_average = .false.
+    integer                  :: interval ! exchange interval (sec)
+    integer                  :: time_lag ! exchange time lag
+    integer                  :: mapping_tag
+    integer                  :: exchange_tag
+    integer                  :: time_intpl_tag ! time interpolation tag 2018/07/25
+    character(len=STR_SHORT) :: send_model
+    integer                  :: send_model_id
+    character(len=STR_SHORT) :: send_data
+    integer                  :: data_dimension
+    integer(kind=8)          :: recv_tag ! model_id+interval+mode+mapping_tag+exchange_tag
+    integer                  :: grid_id ! id of assigned grid
+    integer                  :: num_of_data = 1! number of multi categoly data or vertical grid
   end type
 
   type send_data_conf_type
-    integer                 :: data_id ! data id number
-    integer                 :: model_id ! my model id
-    character(len=NAME_LEN) :: name     
-    logical                 :: is_send  = .false.
-    logical                 :: is_average = .false.
-    integer                 :: data_dimension
-    integer                 :: num_of_my_recv_data
-    integer                 :: grid_id ! id of assigned grid
+    integer                  :: data_id ! data id number
+    integer                  :: model_id ! my model id
+    character(len=STR_SHORT) :: name     
+    logical                  :: is_send  = .false.
+    logical                  :: is_average = .false.
+    integer                  :: data_dimension
+    integer                  :: num_of_my_recv_data
+    integer                  :: grid_id ! id of assigned grid
     type(recv_data_conf_type), pointer :: my_recv_conf(:) ! recv conf information of this send data
-    integer                 :: num_of_data = 1 ! number of multi categoly data or vertical grid
+    integer                  :: num_of_data = 1 ! number of multi categoly data or vertical grid
   end type
 
   type remapping_table_conf_type
     integer :: send_model_id
-    character(len=NAME_LEN) :: grid_put
-    character(len=NAME_LEN) :: grid_get
-    character(len=STRING_LEN) :: table_file_name
+    character(len=STR_SHORT) :: grid_put
+    character(len=STR_SHORT) :: grid_get
+    character(len=STR_MID) :: table_file_name
   end type
 
   type model_data_conf_type
-    character(len=NAME_LEN) :: model_name 
+    character(len=STR_SHORT) :: model_name 
     integer :: model_id ! component id number
     integer :: num_of_remapping_table
     type(remapping_table_conf_type), pointer, dimension(:) :: fl 
@@ -193,7 +195,7 @@ module jcup_config
                                                            ! (num_of_comp x num_of_comp)
   integer, parameter, private :: NO_EXCHANGE=99999999
 
-  character(len=STRING_LEN) :: conf_file_name = "coupling.conf"
+  character(len=STR_MID) :: conf_file_name = "coupling.conf"
 
   character(len=7), parameter :: NO_FILE = "NO_FILE"
 
@@ -210,7 +212,7 @@ subroutine init_conf(num_of_model)
   allocate(mdc(num_of_model))
 
   do m = 1, num_of_model
-    mdc(m)%model_name = get_component_name(m)
+    mdc(m)%model_name = trim(get_component_name(m))
     mdc(m)%model_id   = m
     nullify(mdc(m)%sd)
     nullify(mdc(m)%rd)
@@ -293,7 +295,7 @@ end subroutine init_recv_config
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 subroutine set_recv_config(comp_id, data_num, data_name, grid_id, num_of_data, recv_mode, interval, &
-                           time_lag, mapping_tag, exchange_tag, send_model, send_data_name)
+                           time_lag, mapping_tag, exchange_tag, time_intpl_tag, send_model, send_data_name)
   use jcup_comp, only : get_comp_id_from_name
   implicit none
   integer, intent(IN) :: comp_id, data_num
@@ -304,7 +306,8 @@ subroutine set_recv_config(comp_id, data_num, data_name, grid_id, num_of_data, r
   integer, intent(IN) :: interval ! exchange interval
   integer, intent(IN) :: time_lag ! -1, 0, 1
   integer, intent(IN) :: mapping_tag ! id number of mapping table
-  integer, intent(IN) :: exchange_tag ! tag for interpolation 
+  integer, intent(IN) :: exchange_tag ! tag for interpolation
+  integer, intent(IN) :: time_intpl_tag ! time interpolation tag 2018/07/25
   character(len=*), intent(IN) :: send_model ! send component name
   character(len=*), intent(IN) :: send_data_name ! send data name
 
@@ -317,6 +320,8 @@ subroutine set_recv_config(comp_id, data_num, data_name, grid_id, num_of_data, r
   mdc(comp_id)%rd(data_num)%time_lag = time_lag
   mdc(comp_id)%rd(data_num)%mapping_tag = mapping_tag
   mdc(comp_id)%rd(data_num)%exchange_tag = exchange_tag
+  mdc(comp_id)%rd(data_num)%time_intpl_tag = time_intpl_tag
+
   mdc(comp_id)%rd(data_num)%send_model = send_model
   mdc(comp_id)%rd(data_num)%send_data  = send_data_name
   mdc(comp_id)%rd(data_num)%send_model_id = get_comp_id_from_name(send_model)
@@ -332,7 +337,7 @@ subroutine exchange_send_config_info(comp_id)
   integer, intent(IN) :: comp_id
   integer :: num_of_data  
   integer :: data_buffer(1)
-  character(len=NAME_LEN), pointer :: data_name(:)
+  character(len=STR_SHORT), pointer :: data_name(:)
   integer :: leader_rank
   integer :: i
 
@@ -349,7 +354,7 @@ subroutine exchange_send_config_info(comp_id)
     do i = 1, data_buffer(1)
       data_name(i) = trim(mdc(comp_id)%sd(i)%name)
     end do 
-    call jml_BcastGlobal(data_name, NAME_LEN, leader_rank)
+    call jml_BcastGlobal(data_name, STR_SHORT, leader_rank)
   else
     call jml_BcastGlobal(data_buffer, 1, 1, leader_rank)
     if (.not.is_my_component(comp_id)) then
@@ -357,7 +362,7 @@ subroutine exchange_send_config_info(comp_id)
     end if
 
     allocate(data_name(data_buffer(1)))
-    call jml_BcastGlobal(data_name, NAME_LEN, leader_rank)  
+    call jml_BcastGlobal(data_name, STR_SHORT, leader_rank)  
     if (.not.is_my_component(comp_id)) then
       do i = 1, data_buffer(1)
         mdc(comp_id)%sd(i)%name = trim(data_name(i))
@@ -380,7 +385,7 @@ subroutine exchange_recv_config_info(comp_id)
   integer :: num_of_data  
   integer :: data_buffer(1)
   integer, pointer :: int_buffer(:)
-  character(len=NAME_LEN), pointer :: name_buffer(:)
+  character(len=STR_SHORT), pointer :: name_buffer(:)
   integer :: leader_rank
   integer :: i, is
 
@@ -413,7 +418,7 @@ subroutine exchange_recv_config_info(comp_id)
       int_buffer(is+6) = mdc(comp_id)%rd(i)%num_of_data ! 2014/07/16 [ADD]
     end do
 
-    call jml_BcastGlobal(name_buffer, NAME_LEN, leader_rank)
+    call jml_BcastGlobal(name_buffer, STR_SHORT, leader_rank)
     call jml_BcastGlobal(int_buffer, 1, size(int_buffer), leader_rank)
 
   else
@@ -425,7 +430,7 @@ subroutine exchange_recv_config_info(comp_id)
     allocate(name_buffer(data_buffer(1)*3))
     allocate(int_buffer(6*data_buffer(1)))
 
-    call jml_BcastGlobal(name_buffer, NAME_LEN, leader_rank)
+    call jml_BcastGlobal(name_buffer, STR_SHORT, leader_rank)
     call jml_BcastGlobal(int_buffer, 1, size(int_buffer), leader_rank)
 
     if (.not.is_my_component(comp_id)) then
@@ -482,9 +487,9 @@ subroutine set_configuration()
      !if (is_my_component(i)) then
         call set_current_conf(i)
         !if (jml_isLocalLeader(i)) then
-          call open_log_file("./"//trim(get_comp_name_from_comp_id(i))//".conf.log", WRITE_CONF_UNIT+i)
-          call write_configure(current_conf, WRITE_CONF_UNIT+i)
-          call close_log_file(WRITE_CONF_UNIT+i)
+          call open_log_file("./"//trim(get_comp_name_from_comp_id(i))//".conf.log", WRITE_CONF_UNIT)
+          call write_configure(current_conf, WRITE_CONF_UNIT)
+          call close_log_file(WRITE_CONF_UNIT)
         !end if
       !end if
     end do
@@ -724,7 +729,8 @@ end subroutine cal_exchange_interval
 ! 2015/07/03 [MOD]
 ! 2015/11/24 [MOD]
 subroutine set_model_exchange_type()
-  use jcup_constant, only : CONCURRENT_SEND_RECV, ADVANCE_SEND_RECV, BEHIND_SEND_RECV, IMMEDIATE_SEND_RECV, NO_SEND_RECV
+  use jcup_constant, only : CONCURRENT_SEND_RECV, ADVANCE_SEND_RECV, BEHIND_SEND_RECV, &
+                            IMMEDIATE_SEND_RECV, ASSYNC_SEND_RECV, NO_SEND_RECV
   use jcup_utils, only : error
   implicit none
   integer :: send_model_id
@@ -781,6 +787,8 @@ subroutine set_model_exchange_type()
         end do
       case(0)
         !!!comp_exchange_type(ii,mdc(ii)%rd(i)%send_model_id) = IMMEDIATE_SEND_RECV ! 2015/07/03 comment out
+      case(ASSYNC_SEND_RECV)
+        comp_exchange_type(ii, mdc(ii)%rd(i)%send_model_id) = ASSYNC_SEND_RECV
       case default
         call error("set_model_exchange_type", "time_lag setting error")
       end select
@@ -1262,13 +1270,13 @@ end function isRecvData2
 
 logical function is_mean_data_name(model_name, data_name)
   use jcup_utils, only : error
-  use jcup_constant, only : NAME_LEN
+  use jcup_constant, only : STR_SHORT
   implicit none
   character(len=*), optional, intent(IN) :: model_name
   character(len=*), intent(IN) :: data_name
   type(send_data_conf_type), pointer :: sd
   integer :: mdl, i
-  character(len=NAME_LEN) :: d_name
+  character(len=STR_SHORT) :: d_name
   d_name = trim(data_name)
 
   if (present(model_name)) then
@@ -1293,7 +1301,7 @@ end function is_mean_data_name
 
 logical function is_mean_data(send_comp_id, data_name)
   use jcup_utils, only : error
-  use jcup_constant, only : NAME_LEN
+  use jcup_constant, only : STR_SHORT
   implicit none
   integer, intent(IN) :: send_comp_id
   character(len=*), intent(IN) :: data_name
@@ -1315,7 +1323,7 @@ end function is_mean_data
 
 logical function is_average_data(recv_comp_id, data_name)
   use jcup_utils, only : error
-  use jcup_constant, only : NAME_LEN
+  use jcup_constant, only : STR_SHORT
   implicit none
   integer, intent(IN) :: recv_comp_id
   character(len=*), intent(IN) :: data_name
@@ -1416,12 +1424,12 @@ end function GetExchangeTag
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 integer function GetTimeStepInterval(model_name, data_name)
-  use jcup_constant, only : NAME_LEN
+  use jcup_constant, only : STR_SHORT
   use jcup_utils, only : error
   implicit none
   character(len=*), optional, intent(IN) :: model_name
   character(len=*), intent(IN) :: data_name
-  character(len=NAME_LEN) :: d_name
+  character(len=STR_SHORT) :: d_name
   integer :: mdl, i
 
   mdl = current_conf_id
@@ -1464,13 +1472,13 @@ end function isOnlyFirstStep
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-character(len=NAME_LEN) function GetSendModelName1(data_name)
+character(len=STR_SHORT) function GetSendModelName1(data_name)
   use jcup_utils, only : error
   implicit none
   character(len=*), intent(IN) :: data_name
   type(recv_data_conf_type), pointer :: rd
   integer :: mdl, i
-  character(len=NAME_LEN) :: d_name
+  character(len=STR_SHORT) :: d_name
 
   d_name = trim(data_name)
 
@@ -1490,7 +1498,7 @@ end function GetSendModelName1
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-character(len=NAME_LEN) function GetSendModelName2(data_index)
+character(len=STR_SHORT) function GetSendModelName2(data_index)
   use jcup_utils, only : error
   implicit none
   integer, intent(IN) :: data_index
@@ -1503,13 +1511,13 @@ end function GetSendModelName2
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-character(len=NAME_LEN) function GetSendDataName1(data_name)
+character(len=STR_SHORT) function GetSendDataName1(data_name)
   use jcup_utils, only : error
   implicit none
   character(len=*), intent(IN) :: data_name
   type(recv_data_conf_type), pointer :: rd
   integer :: mdl, i
-  character(len=NAME_LEN) :: d_name
+  character(len=STR_SHORT) :: d_name
 
   d_name = trim(data_name)
 
@@ -1529,7 +1537,7 @@ end function GetSendDataName1
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-character(len=NAME_LEN) function GetSendDataName2(data_index)
+character(len=STR_SHORT) function GetSendDataName2(data_index)
   use jcup_utils, only : error
   implicit none
   integer, intent(IN) :: data_index
@@ -1542,7 +1550,7 @@ end function GetSendDataName2
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-character(len=NAME_LEN) function GetSendDataName3(mdl,data_index)
+character(len=STR_SHORT) function GetSendDataName3(mdl,data_index)
   use jcup_utils, only : error
   implicit none
   integer, intent(IN) :: mdl,data_index
@@ -1555,7 +1563,7 @@ end function GetSendDataName3
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-character(len=NAME_LEN) function get_my_send_data_name(model_name, data_index)
+character(len=STR_SHORT) function get_my_send_data_name(model_name, data_index)
   use jcup_utils, only : error
   implicit none
   character(len=*), intent(IN) :: model_name
@@ -1577,7 +1585,7 @@ end function get_my_send_data_name
   
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-character(len=NAME_LEN) function get_my_recv_data_name(model_name, data_index)
+character(len=STR_SHORT) function get_my_recv_data_name(model_name, data_index)
   use jcup_utils, only : error
   implicit none
   character(len=*), intent(IN) :: model_name
@@ -1906,7 +1914,7 @@ end function get_comp_id_from_comp_name
   
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-character(len=NAME_LEN) function get_comp_name_from_comp_id(comp_id)
+character(len=STR_SHORT) function get_comp_name_from_comp_id(comp_id)
   use jcup_utils, only : error, IntToStr
   implicit none
   integer, intent(IN) :: comp_id
@@ -2149,10 +2157,12 @@ subroutine check_time_lag(target_conf, my_model_id, my_time_lag)
         case(0)
           cycle ! skip if time lag == 0
           if (my_time_lag == 0) cycle
+        case(-99)
+          if (my_time_lag == -99) cycle
         end select
         call error("check_time_lag", "time_lag setting error between " &
-                   //trim(get_component_name(my_model_id))//trim(IntTostr(my_time_lag))// &
-                   " and "//trim(get_component_name(target_conf%model_id))//trim(IntToStr(target_conf%rd(i)%time_lag)))
+             //trim(get_component_name(my_model_id))//trim(IntTostr(my_time_lag))//" and "&
+             //trim(get_component_name(target_conf%model_id))//trim(IntToStr(target_conf%rd(i)%time_lag)))
       end if
     end if
   end do
@@ -2231,6 +2241,40 @@ subroutine cal_recv_tag(rd)
 end subroutine cal_recv_tag
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
+
+character(len=STR_SHORT) function get_average_data_name(data_name, recv_model_id, recv_data_name)
+  use jcup_utils, only : IntToStr
+  character(len=*), intent(IN) :: data_name
+  integer, intent(IN) :: recv_model_id
+  character(len=*), intent(IN) :: recv_data_name
+
+  get_average_data_name = trim(data_name)//"__"//trim(IntToStr(recv_model_id)) &
+                          //"_"//trim(recv_data_name)
+  
+end function get_average_data_name
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+integer function get_send_data_id(recv_comp_id, data_name, is_average)
+  implicit none
+  integer, intent(IN) :: recv_comp_id
+  character(len=*), intent(IN) :: data_name
+  logical, intent(IN) :: is_average
+  integer :: send_comp_id
+
+  send_comp_id = get_send_comp_id_from_data_name(data_name)
+
+  !if (is_mean_data(send_comp_id, data_name)) then
+  if (is_average) then
+    get_send_data_id = recv_comp_id*1000000+get_send_data_id_from_data_name(data_name)
+  else
+    get_send_data_id = get_send_data_id_from_data_name(data_name)
+  end if
+
+
+end function get_send_data_id
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
 !=======+=========+=========+=========+=========+=========+=========+=========+
 !=======+=========+=========+=========+=========+=========+=========+=========+
 !=======+=========+=========+=========+=========+=========+=========+=========+
@@ -2249,23 +2293,27 @@ subroutine write_configure(my_conf, out_unit)
 
   integer :: i
 
-    write(out_unit,*) "======================================================="
+    write(out_unit,*) "============================================================"
     write(out_unit,*) "my name : ", trim(my_conf%model_name)
-    write(out_unit,*) "  exchange interval "
-    write(out_unit,'(8A12)') "   ", (trim(mdc(i)%model_name), i = 1, size(mdc))
-    write(out_unit,*) "           ", (my_conf%exchange_interval(i), i = 1, size(mdc))
-    write(out_unit,*) "           ", (comp_exchange_type(current_conf_id, i), i = 1, size(mdc))
+    write(out_unit,'(8A15)') "                  ", (trim(mdc(i)%model_name), i = 1, size(mdc))
+    write(out_unit,'(A15,8I15)')        "exchange interval ", (my_conf%exchange_interval(i), i = 1, size(mdc))
+    write(out_unit,'(A15,8I15)')        "exchange type     ", (comp_exchange_type(current_conf_id, i), i = 1, size(mdc))
 
-    write(out_unit,*) "-------------------------------------------------------"
+    write(out_unit,*) 
+    write(out_unit,*) "============================================================"
+    write(out_unit,*) "send data config"
     do i = 1, my_conf%num_of_send_data
       call write_send_conf(my_conf%sd(i), out_unit)
     end do
 
-    write(out_unit,*) "-------------------------------------------------------"
+    write(out_unit,*) 
+    write(out_unit,*) "============================================================"
+    write(out_unit,*) "recv data config"
     do i = 1, my_conf%num_of_recv_data
       call write_recv_conf(my_conf%rd(i), out_unit)
     end do
 
+    write(out_unit,*) 
     do i = 1, size(mdc)
       call write_model_conf(mdc(i),out_unit)
     end do
@@ -2280,15 +2328,17 @@ subroutine write_model_conf(mc, out_unit)
   integer, intent(IN) :: out_unit
   integer :: i
 
-  write(out_unit,*) "======================================================="
-  write(out_unit, '(A12,I3,I3)') mc%model_name, mc%num_of_send_data, mc%num_of_recv_data
+  write(out_unit,*) 
+  write(out_unit,*) "============================================================"
+  write(out_unit, '(A12,A17,A17)') "comp name    ", "num of send data", "num of recv data"
+  write(out_unit, '(A12,I17,I17)') mc%model_name, mc%num_of_send_data, mc%num_of_recv_data
 
-  write(out_unit,*) "-------------------------------------------------------"
+  write(out_unit,*) "------------------------------------------------------------"
   do i = 1, mc%num_of_send_data
     call write_send_conf(mc%sd(i), out_unit)
   end do
 
-  write(out_unit,*) "-------------------------------------------------------"
+  write(out_unit,*) "------------------------------------------------------------"
   do i = 1, mc%num_of_recv_data
     call write_recv_conf(mc%rd(i), out_unit)
   end do
@@ -2304,7 +2354,8 @@ subroutine write_send_conf(sd, out_unit)
   integer, intent(IN) :: out_unit
   integer :: i
 
-  write(out_unit, '(A12,L3,L3)') sd%name, sd%is_send, sd%is_average!, sd%interval
+  write(out_unit, '(A12,A12,A12)') "data name  ", "is send    ", "is average   "
+  write(out_unit, '(A12,L12,L12)') sd%name, sd%is_send, sd%is_average!, sd%interval
   write(out_unit,'(A12,A12,A8,A12)') "recv model", "recv data","intrvl","is average"
   do i = 1, sd%num_of_my_recv_data
     write(out_unit, '(A12,A12,I8,L12)') trim(get_component_name(sd%my_recv_conf(i)%model_id)), &
@@ -2322,7 +2373,8 @@ subroutine write_recv_conf(rd, out_unit)
   type(recv_data_conf_type), intent(IN) :: rd
   integer, intent(IN) :: out_unit
 
-  write(out_unit, '(A12,L3,L3,I6,I3,I5," ",A12,A12)') rd%name, rd%is_recv, rd%is_average, rd%interval, &
+  write(out_unit, *) "data name,   is recv, is average, intvl, mapp tag, exch tag, s model, s data"
+  write(out_unit, '(A12,L10,L10,I8,I10,I10," ",A12,A12)') rd%name, rd%is_recv, rd%is_average, rd%interval, &
                    rd%mapping_tag, rd%exchange_tag, rd%send_model, rd%send_data
 
 end subroutine write_recv_conf
@@ -2334,13 +2386,13 @@ subroutine write_configure_2(my_conf, out_unit)
   type(model_data_conf_type), intent(IN) :: my_conf
   integer, intent(IN) :: out_unit
 
-  character(len=NAME_LEN) :: name
-  character(len=NAME_LEN) :: data_name
+  character(len=STR_SHORT) :: name
+  character(len=STR_SHORT) :: data_name
   integer :: send_flag 
   integer :: recv_flag
   character(len=3) :: recv_mode
   integer :: num_of_vgrid, interval, time_lag, mapping_tag, exchange_tag
-  character(len=NAME_LEN) :: send_model, send_data
+  character(len=STR_SHORT) :: send_model, send_data
   namelist /model/ name
   namelist /senddata/ data_name, num_of_vgrid,send_flag 
   namelist /recvdata/ data_name, recv_flag, recv_mode, num_of_vgrid, interval, time_lag, mapping_tag, exchange_tag, &
@@ -2397,13 +2449,13 @@ subroutine read_model_name(file_name, model_name)
   use jcup_utils, only : error, startsWith, up2lw, is_comment_line, open_log_file, close_log_file
   implicit none
   character(len=*), intent(IN) :: file_name
-  character(len=NAME_LEN), pointer :: model_name(:)
+  character(len=STR_SHORT), pointer :: model_name(:)
 
   integer,parameter :: FILE_ID = 111
-  character(len=NAME_LEN) :: data_str, lw_str
+  character(len=STR_SHORT) :: data_str, lw_str
   integer :: model_counter
   integer :: m
-  character(len=NAME_LEN) :: name
+  character(len=STR_SHORT) :: name
   namelist /model/ name
 
 
@@ -2451,7 +2503,7 @@ subroutine read_conf_file_1()
   integer,parameter :: FILE_ID = 110
   integer :: model_counter
   integer :: send_counter, recv_counter
-  character(len=NAME_LEN) :: data_str, lw_str
+  character(len=STR_SHORT) :: data_str, lw_str
   integer :: m,i,j
 
 
@@ -2480,7 +2532,7 @@ subroutine read_conf_file_2()
   integer :: model_counter
   integer :: table_counter
   integer :: send_counter, recv_counter
-  character(len=NAME_LEN) :: data_str, lw_str
+  character(len=STR_SHORT) :: data_str, lw_str
   integer :: m,i,j
 
   open(FILE_ID, file = trim(conf_file_name), status = "OLD", action = "READ", err = 500)
@@ -2623,9 +2675,9 @@ subroutine read_conf_file_2()
      !if (is_my_component(i)) then
         call set_current_conf(i)
         !if (jml_isLocalLeader(i)) then
-          call open_log_file("./"//trim(get_comp_name_from_comp_id(i))//".conf.log", WRITE_CONF_UNIT+i)
-          call write_configure(current_conf, WRITE_CONF_UNIT+i)
-          call close_log_file(WRITE_CONF_UNIT+i)
+          call open_log_file("./"//trim(get_comp_name_from_comp_id(i))//".conf.log", WRITE_CONF_UNIT)
+          call write_configure(current_conf, WRITE_CONF_UNIT)
+          call close_log_file(WRITE_CONF_UNIT)
         !end if
       !end if
     end do
@@ -2667,7 +2719,7 @@ subroutine read_model_namelist(FILE_ID, md)
   type(model_data_conf_type), intent(INOUT) :: md
 
   integer :: status
-  character(len=NAME_LEN) :: name
+  character(len=STR_SHORT) :: name
   namelist /model/ name
 
   read(FILE_ID, nml = model, IOSTAT = status)
@@ -2687,8 +2739,8 @@ subroutine read_remapping_namelist(FILE_ID, fl)
   integer, intent(IN) :: FILE_ID
   type(remapping_table_conf_type), intent(INOUT) :: fl
   integer :: status
-  character(len=NAME_LEN) :: model_put, model_get, grid_put, grid_get
-  character(len=STRING_LEN) :: fl_remap
+  character(len=STR_SHORT) :: model_put, model_get, grid_put, grid_get
+  character(len=STR_MID) :: fl_remap
   namelist /remap/ model_put, model_get, grid_put, grid_get, fl_remap
 
   model_put="NO_MODEL" ; model_get="" ; grid_put="" ; grid_get=""
@@ -2713,7 +2765,7 @@ subroutine read_send_namelist(FILE_ID, sd)
   implicit none
   integer, intent(IN) :: FILE_ID
   type(send_data_conf_type), intent(INOUT) :: sd
-  character(len=NAME_LEN) :: data_name
+  character(len=STR_SHORT) :: data_name
   integer :: status
   integer :: send_flag, interval
   namelist /senddata/ data_name, send_flag
@@ -2735,12 +2787,12 @@ subroutine read_recv_namelist(FILE_ID, rd)
   integer, intent(IN) :: FILE_ID
   type(recv_data_conf_type), intent(INOUT) :: rd
   integer :: status
-  character(len=NAME_LEN) :: data_name
+  character(len=STR_SHORT) :: data_name
   integer :: recv_flag
-  character(len=NAME_LEN) :: recv_mode
+  character(len=STR_SHORT) :: recv_mode
   integer :: interval, time_lag
   integer :: mapping_tag, exchange_tag
-  character(len=NAME_LEN) :: send_model, send_data
+  character(len=STR_SHORT) :: send_model, send_data
   namelist /recvdata/ data_name, recv_flag, recv_mode, interval, time_lag, &
                       mapping_tag, exchange_tag, send_model, send_data
 

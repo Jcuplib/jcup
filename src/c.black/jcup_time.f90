@@ -27,30 +27,32 @@ module jcup_time
   public :: operator(>)     ! logical function (t1, t2)
   public :: operator(<=)    ! logical function (t1, t2)
   public :: operator(<)     ! logical function (t1, t2)
-  public :: TimeToSecond ! integer(kind=8) function (time)
+  public :: TimeToSecond    ! integer(kind=8) function (time)
   public :: DateToTimeStr
-  public :: inc_calendar ! subroutine (now_time, delta_t) ! 2014/10/29 [ADD]
-  public :: inc_time     ! subroutine (now_time, delta_t) ! 2014/07/04 [ADD] now_time%ss = now_time%ss + delta_t
-  public :: cal_time_diff ! subroutine (time1, time2, diff_sec, diff_mil, diff_mcr) ! 2014/07/10 [ADD]
+  public :: inc_calendar    ! subroutine (now_time, delta_t) ! 2014/10/29 [ADD]
+  public :: inc_time        ! subroutine (now_time, delta_t) ! 2014/07/04 [ADD] now_time%ss = now_time%ss + delta_t
+  public :: cal_time_diff   ! subroutine (time1, time2, diff_sec, diff_mil, diff_mcr) ! 2014/07/10 [ADD]
 
-  public :: init_all_time   ! subroutine (comp_id)
-  public :: init_each_time  ! subroutine (comp_id, domain_id)
-  public :: set_start_time ! subroutine (component_id, domain_id, time)
-  public :: get_start_time ! subroutine (component_id, domain_id, time)
-  public :: set_current_time ! subroutine (component_id, domain_id, time, delta_t)
-  public :: get_current_time ! subroutine (component_id, domain_id, time)
-  public :: get_before_time  ! subroutine (component_id, domain_id, time)
-  public :: get_delta_t      ! subroutine (component_id, domain_id, delta_t)
-  public :: is_before_exchange_step ! logical function (component_id, domain_id, interval)
-  public :: is_exchange_step ! logical functiuon (component_id, domain_id, interval)
+  public :: init_all_time                ! subroutine (comp_id)
+  public :: init_each_time               ! subroutine (comp_id, domain_id)
+  public :: set_start_time               ! subroutine (component_id, domain_id, time)
+  public :: get_start_time               ! subroutine (component_id, domain_id, time)
+  public :: set_current_time             ! subroutine (component_id, domain_id, time, delta_t)
+  public :: get_current_time             ! subroutine (component_id, domain_id, time)
+  public :: get_before_time              ! subroutine (component_id, domain_id, time)
+  public :: get_delta_t                  ! subroutine (component_id, domain_id, delta_t)
+  public :: is_before_exchange_step      ! logical function (component_id, domain_id, interval)
+  public :: is_exchange_step             ! logical functiuon (component_id, domain_id, interval)
   public :: is_exchange_step_from_c_time ! logical function (component_id, domain_id, intervar, current_time)
   public :: is_next_exchange_step
-  public :: cal_next_exchange_time ! subroutine (component_id, domain_id, interval, time)
+  public :: cal_next_exchange_time       ! subroutine (component_id, domain_id, interval, time)
   public :: destruct_all_time
-  public :: write_time ! subroutine (file_id, comp_id) 2013.06.10 [ADD]
-  public :: read_time  ! subroutine (file_id, comp_id) 2013.06.11 [ADD]
+  public :: write_time                   ! subroutine (file_id, comp_id) 2013.06.10 [ADD]
+  public :: read_time                    ! subroutine (file_id, comp_id) 2013.06.11 [ADD]
+  public :: dump_time                    ! subroutine (fid)
+  public :: restore_time                 ! subroutine (fid)
 
-!--------------------------------   private  ---------------------------------!
+  !--------------------------------   private  ---------------------------------!
 
   interface set_start_time
     module procedure set_start_time_str, set_start_time_date
@@ -1321,6 +1323,56 @@ subroutine read_time(fid, comp_id)
   end if
 
 end subroutine read_time
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! 2020/06/16 [NEW}
+subroutine dump_time(fid)
+  implicit none
+  integer, intent(IN) :: fid
+  integer :: i, j
+  
+  do i = 1, size(time)
+    do j = 1, size(time(i)%tm)
+      write(fid) time(i)%tm(j)%start_time
+      write(fid) time(i)%tm(j)%end_time
+      write(fid) time(i)%tm(j)%current_time
+      write(fid) time(i)%tm(j)%before_time
+    end do
+  end do
+
+end subroutine dump_time
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! 2020/06/16 [NEW}
+subroutine restore_time(fid)
+  use jcup_constant, only : STR_MID
+  use jcup_utils, only : put_log
+  implicit none
+  integer, intent(IN) :: fid
+  integer :: i, j
+  character(len=STR_MID) :: log_str
+
+  call put_log("------------------------------   restore time     ----------------------------------")
+  do i = 1, size(time)
+    do j = 1, size(time(i)%tm)
+      read(fid) time(i)%tm(j)%start_time
+      read(fid) time(i)%tm(j)%end_time
+      read(fid) time(i)%tm(j)%current_time
+      read(fid) time(i)%tm(j)%before_time
+
+      write(log_str, *) "   start   time = ", time(i)%tm(j)%start_time%ss
+      call put_log(trim(log_str))
+      write(log_str, *) "   end     time = ", time(i)%tm(j)%end_time%ss
+      call put_log(trim(log_str))
+      write(log_str, *) "   current time = ", time(i)%tm(j)%current_time%ss
+      call put_log(trim(log_str))
+      write(log_str, *) "   before  time = ", time(i)%tm(j)%before_time%ss
+      call put_log(trim(log_str))
+
+    end do
+  end do
+
+end subroutine restore_time
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 ! mod 2014/07/03

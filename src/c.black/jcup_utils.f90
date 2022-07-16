@@ -215,7 +215,7 @@ subroutine init_log(my_model_name, log_dir)
     pe_num = '00000'
     write(pe_num,'(I5.5)') jml_GetMyrankGlobal()
 
-    file_name = trim(model_name)//".coupling.log.PE"//pe_num
+    file_name = 'jcup.'//trim(model_name)//".coupling.log.PE"//pe_num
 
     dir_name = "."
     if (present(log_dir)) dir_name = trim(log_dir)

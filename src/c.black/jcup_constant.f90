@@ -21,7 +21,7 @@ module jcup_constant
   integer,public,parameter :: MAX_DOMAIN = 5
   integer,public,parameter :: MAX_GRID   = 8
   integer,public,parameter :: NO_MODEL = -999
-  integer,public,parameter :: NUM_OF_EXCHANGE_GRID = 3
+  integer,public,parameter :: NUM_OF_EXCHANGE_GRID = 8
   integer,public,parameter :: FINE_NUM  = 99
 
   integer,public,parameter :: CONCURRENT_SEND_RECV = 0 !(my time lag = -1, target time lag = -1)

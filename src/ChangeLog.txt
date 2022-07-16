@@ -1701,3 +1701,209 @@ Detail
  デフォルトで送信しないようにjcup_coupling_endにルーチンコールを追加。
  この修正はILS結合に対応するためのad hocな処置である。
 
+-----------------------------------------------------------------
+
+Version:4.080700
+Date:2021/05/24
+
+Files:jcup_zlib.f90, jcup_mpi_lib.f90, jcup_grid.f90
+
+Routines
+ compress_array                : [add]
+ uncompress_array              : [add]
+ jml_ISendModel_compress       : [add]
+ jml_IRecvModel_compress       : [add]
+ exchange_data_comp_compress   : [add]
+
+Detail
+ データ送受信時にデータを圧縮するコードを追加。
+ ただしこのコードはデフォルトでは用いられない。
+ デフォルトで送信しないようにjcup_coupling_endにルーチンコールを追加。
+ この修正はILS結合に対応するためのad hocな処置である。
+
+-----------------------------------------------------------------
+
+Version:4.080701
+Date:2021/05/25
+
+Files:jcup_mpi_lib.f90
+
+Routines
+ jml_ISendModel_compress       : [mod]
+
+Detail
+ 圧縮データサイズに関するエラーを修正。
+
+-----------------------------------------------------------------
+
+Version:4.090000
+Date:2021/06/21
+
+Files:jcup_exchange.f90 jcup_interface.f90
+
+Routines
+ get_fill_value                : [add]
+ jcup_get_fill_value           : [add]
+
+Detail
+ Jcup内部の欠損値を取得する関数を追加。
+
+-----------------------------------------------------------------
+
+Version:4.090100
+Date:2021/07/26
+
+Files:jcup_grid_base.f90 jcup_grid.f90
+
+Routines
+
+Detail
+ jcup_grid.f90で定義されてたモジュールjcup_pe_arrayとjcup_exchange_gridを削除し、
+ 中身をjcup_grid_base.f90に移動。
+
+-----------------------------------------------------------------
+
+Version:4.090200
+Date:2021/10/01
+
+Files:jcup_utils.f90 jcup_config.f90
+
+Routines
+ init_log                      : [mod]
+ set_configuration             : [mod]
+
+Detail
+ ログファイルのファイル名を先頭にjcup.がつくよう変更。
+
+-----------------------------------------------------------------
+
+Version:4.090201
+Date:2021/10/01
+
+Files:jcup_zlib.f90 
+
+Routines
+ compress_array_double         : [mod]
+ uncompress_array_double       : [mod]
+
+Detail
+ 引数の配列を形状引き継ぎ配列から明示配列に変更。
+
+-----------------------------------------------------------------
+
+Version:4.090202
+Date:2021/12/09
+
+Files:jcup_grid.f90 jcup_exchange.f90, jcup_interface.f	90
+
+Routines
+ init_send_array               : [mod]
+ put_data_25d_double           : [mod]
+ jcup_set_mapping_table        : [mod]
+
+Detail
+ gnuコンパイラでのコンパイルエラーを修正。
+
+-----------------------------------------------------------------
+
+Version:4.090203
+Date:2022/02/27
+
+Files:jcup_mpi_lib.f90
+
+Routines
+ jml_recv_string_leader        : [mod]
+
+Detail
+ jml_recv_string_leaderのデータ型がMPI_INTEGERになっていたのを修正。
+
+-----------------------------------------------------------------
+
+Version:4.100000
+Date:2022/02/27
+
+Files:jcup_interface.f90
+
+Routines
+ jcup_initialize               : [mod]
+ jcup_coupling_end             : [mod]
+ jcup_set_time_date_int        : [mod]
+ jcup_put_data_1d              : [mod]
+ jcup_put_data_25d             : [mod]
+ jcup_get_data_1d              : [mod]
+ jcup_get_data_25d             : [mod]
+
+Detail
+ JALのルーチンコールをコンパイルオプションで切り替えるように変更。
+
+-----------------------------------------------------------------
+
+Version:4.100100
+Date:2022/07/01
+
+Files:jcup_exchange.f90
+
+Routines
+ jcup_isPutOK                  : [mod]
+ jcup_put_data_1d_double       : [mod]
+ jcup_put_data_25d_double      : [mod]
+
+Detail
+ jcup_isPutOKで文字列サーチをしないように変更。
+
+-----------------------------------------------------------------
+
+Version:4.100200
+Date:2022/07/06
+
+Files:jcup_config.f90
+
+Routines
+ get_send_data_id              : [mod]
+
+Detail
+ get_send_data_idでsend_comp_idの取得を削除。
+
+-----------------------------------------------------------------
+
+Version:4.100300
+Date:2022/07/06
+
+Files:jcup_exchange.f90
+
+Routines
+ jcup_put_data_1d_double       : [mod]
+ jcup_put_data_25d_double      : [mod]
+
+Detail
+ 関数で取得していた情報をdata_type%sdから取得するよう変更。
+
+-----------------------------------------------------------------
+
+Version:4.100400
+Date:2022/07/06
+
+Files:jcup_config.f90, jcup_exchange.f90
+
+Routines
+ get_send_data_id_mod          : [add]
+ jcup_put_data_1d_double       : [mod]
+ jcup_put_data_25d_double      : [mod]
+
+Detail
+ get_send_data_id_mdfを作成し、jcup_put_data_1d, 25dからはこちらを使うよう変更。
+
+-----------------------------------------------------------------
+
+Version:4.100500
+Date:2022/07/06
+
+Files:jcup_config.f90, jcup_exchange.f90
+
+Routines
+ is_put_step_data              : [add]
+ jcup_put_data_1d_double       : [mod]
+ jcup_put_data_25d_double      : [mod]
+
+Detail
+ is_put_step_dataをdata_nameではなくsend_data_conf_typeを引数とするよう変更。

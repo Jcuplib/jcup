@@ -18,7 +18,7 @@ module jcup_data
   public :: def_varp ! subroutine (data_type_ptr, comp_name, data_name, grid_index, num_of_data)
   public :: end_def_varp ! subroutine (comp_id)
   public :: def_varg ! subroutine (data_type_ptr, comp_name, data_name, grid_index, num_of_data, 
-                     ! send_model_name, send_data_name, recv_mode, interval, time_lag, mapping_tag, exchange_tag)
+  ! send_model_name, send_data_name, recv_mode, interval, time_lag, mapping_tag, exchange_tag)
   public :: end_def_varg ! subroutine (comp_id)
   public :: set_exchange_type ! subroutine (comp_id) 2018/07/31 [ADD] 
   public :: check_data_definition
@@ -60,8 +60,8 @@ module jcup_data
     integer :: data_dimension_type
     integer :: num_of_data ! number of data (for 2.5D)
     type(time_type) :: current_time
-    logical :: is_sync_exchange    ! 2018/07/31
-    logical :: is_assync_exchange  ! 2018/07/31
+    logical :: is_sync_exchange     ! 2018/07/31
+    logical :: is_assync_exchange   ! 2018/07/31
  end type varp_type
 
   type(varp_type), pointer :: sd_ptr(:) ! (num_of_total_component)

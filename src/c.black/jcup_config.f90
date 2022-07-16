@@ -35,7 +35,7 @@ module jcup_config
   public :: is_source_model
   public :: is_my_send_data ! logical function (data_name)
   public :: is_my_recv_data ! logical function (data_name)
-  public :: isSendData
+  public :: isSendData      ! logical function (model_name, data_name)
   public :: isRecvData
   public :: isRecvData2
   public :: is_mean_data    ! logical function (send_comp_id, data_name)
@@ -66,15 +66,16 @@ module jcup_config
   public :: is_send_step_data
   public :: is_get_step_data
   public :: is_recv_step_data
-  public :: get_comp_id_from_comp_name ! integer function (componend_name)
-  public :: get_comp_name_from_comp_id ! character(len=STR_SHORT) function (componend_id)
-  public :: get_comp_exchange_type ! integer function (my_comp_id, target_comp_id) 
+  public :: get_comp_id_from_comp_name        ! integer function (componend_name)
+  public :: get_comp_name_from_comp_id        ! character(len=STR_SHORT) function (componend_id)
+  public :: get_comp_exchange_type            ! integer function (my_comp_id, target_comp_id) 
   public :: get_send_comp_id_from_data_name   ! integer function (data_name)
   public :: get_recv_comp_id_from_data_name   ! integer function (data_name)
   public :: get_send_data_id_from_data_name   ! integer function (data_name)
   public :: get_recv_data_id_from_data_name   ! integer funciton (data_name)
-  public :: get_average_data_name ! character(len=STR_SHORT) function (data_name, recv_model_id, recv_data_name)
-  public :: get_send_data_id ! integer function (recv_comp_id, data_name, is_average)
+  public :: get_average_data_name             ! character(len=STR_SHORT) function (data_name, recv_model_id, recv_data_name)
+  public :: get_send_data_id                  ! integer function (recv_comp_id, data_name, is_average)
+  public :: get_send_data_id_mdf              ! integer function (recv_comp_id, data_id, is_average)
 
 !--------------------------------   private  ---------------------------------!
 
@@ -487,14 +488,14 @@ subroutine set_configuration()
      !if (is_my_component(i)) then
         call set_current_conf(i)
         !if (jml_isLocalLeader(i)) then
-          call open_log_file("./"//trim(get_comp_name_from_comp_id(i))//".conf.log", WRITE_CONF_UNIT)
+          call open_log_file("./jcup."//trim(get_comp_name_from_comp_id(i))//".conf.log", WRITE_CONF_UNIT)
           call write_configure(current_conf, WRITE_CONF_UNIT)
           call close_log_file(WRITE_CONF_UNIT)
         !end if
       !end if
     end do
 
-    call open_log_file("./"//trim(conf_file_name)//".log", WRITE_CONF_UNIT)
+    call open_log_file("./jcup."//trim(conf_file_name)//".log", WRITE_CONF_UNIT)
     do i = 1, get_num_of_total_component()
       call set_current_conf(i)
       call write_configure_2(current_conf, WRITE_CONF_UNIT)
@@ -1804,23 +1805,19 @@ logical function is_exchange_step_send_recv_model(my_comp_id, target_comp_id, c_
 end function is_exchange_step_send_recv_model
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
-! 2014/10/22 [MOD] is_next_exchange_step -> is_exchange_step
-logical function is_put_step_data(data_name)
+!
+logical function is_put_step_data(sd)
   use jcup_time, only : is_exchange_step
   implicit none
-  character(len=*), intent(IN) :: data_name
+  type(send_data_conf_type), pointer :: sd
   integer :: i, j
   
-  do i = 1, current_conf%num_of_send_data
-    if (trim(data_name)==trim(current_conf%sd(i)%name)) then
-      do j = 1, current_conf%sd(i)%num_of_my_recv_data
-        if (is_exchange_step(current_conf_id, 1, current_conf%sd(i)%my_recv_conf(j)%interval)) then
+      do j = 1, sd%num_of_my_recv_data
+        if (is_exchange_step(current_conf_id, 1, sd%my_recv_conf(j)%interval)) then
           is_put_step_data = .true.
           return
         end if
       end do
-    end if
-  end do
 
   is_put_step_data = .false.
 
@@ -2260,19 +2257,31 @@ integer function get_send_data_id(recv_comp_id, data_name, is_average)
   integer, intent(IN) :: recv_comp_id
   character(len=*), intent(IN) :: data_name
   logical, intent(IN) :: is_average
-  integer :: send_comp_id
 
-  send_comp_id = get_send_comp_id_from_data_name(data_name)
-
-  !if (is_mean_data(send_comp_id, data_name)) then
   if (is_average) then
     get_send_data_id = recv_comp_id*1000000+get_send_data_id_from_data_name(data_name)
   else
     get_send_data_id = get_send_data_id_from_data_name(data_name)
   end if
 
-
 end function get_send_data_id
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+integer function get_send_data_id_mdf(recv_comp_id, data_id, is_average)
+  implicit none
+  integer, intent(IN) :: recv_comp_id
+  integer, intent(IN) :: data_id
+  logical, intent(IN) :: is_average
+
+  if (is_average) then
+    get_send_data_id_mdf = recv_comp_id * 1000000 + data_id
+  else
+    get_send_data_id_mdf = data_id
+  end if
+
+
+end function get_send_data_id_mdf
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 !=======+=========+=========+=========+=========+=========+=========+=========+
@@ -2675,7 +2684,7 @@ subroutine read_conf_file_2()
      !if (is_my_component(i)) then
         call set_current_conf(i)
         !if (jml_isLocalLeader(i)) then
-          call open_log_file("./"//trim(get_comp_name_from_comp_id(i))//".conf.log", WRITE_CONF_UNIT)
+          call open_log_file("./jcup."//trim(get_comp_name_from_comp_id(i))//".conf.log", WRITE_CONF_UNIT)
           call write_configure(current_conf, WRITE_CONF_UNIT)
           call close_log_file(WRITE_CONF_UNIT)
         !end if

@@ -26,6 +26,7 @@ module jcup_exchange
   public :: set_recv_grid_tag           ! subroutine (recv_comp_id, send_comp_id, map_num, grid_tag)
   public :: send_final_step_data        ! subroutine ()
   public :: set_fill_value              ! subroutine (fill_value)
+  public :: get_fill_value              ! real(kind=89 function ()
   public :: set_restart_flag            ! subroutine (restart_flag) 
   public :: jcup_exchange_data_parallel
   public :: jcup_exchange_data_serial
@@ -200,7 +201,7 @@ subroutine set_send_mapping_table(send_comp_id, recv_comp_id, grid_num)
   use jcup_utils, only : error, IntToStr
   implicit none
   integer, intent(IN) :: send_comp_id, recv_comp_id, grid_num
-  
+
   if (grid_num>NUM_OF_EXCHANGE_GRID) then
     call error("set_send_mapping_table", "grid_tag must be <= " &
                             //trim(IntToStr(NUM_OF_EXCHANGE_GRID)))
@@ -222,7 +223,7 @@ subroutine set_recv_mapping_table(recv_comp_id, send_comp_id, grid_num)
   use jcup_utils, only : IntToStr, error
   implicit none
   integer, intent(IN) :: recv_comp_id, send_comp_id, grid_num
-  
+
   if (grid_num>NUM_OF_EXCHANGE_GRID) then
      call error("set_recv_mapping_table", "grid_tag must be <= " &
                             //trim(IntToStr(NUM_OF_EXCHANGE_GRID)))
@@ -1657,6 +1658,16 @@ subroutine set_fill_value(fill_v)
 end subroutine set_fill_value
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
+
+function get_fill_value() result(res)
+  implicit none
+  real(kind=8) :: res
+
+  res = fill_value
+
+end function get_fill_value
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
 ! 2020/06/16 [NEW]
 subroutine set_restart_flag(restart_flag)
   implicit none
@@ -1851,7 +1862,44 @@ end subroutine set_current_mapping_tag
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
-logical function jcup_isPutOK(data_type, time)
+function jcup_isPutOK(data_type, comp_id) result(res)
+  use jcup_config, only : is_put_step_data
+  use jcup_utils, only  :  put_log
+  use jcup_data, only : varp_type, get_time, get_data_name
+  use jcup_time, only : operator(==), is_exchange_step
+  implicit none
+  type(varp_type), pointer :: data_type
+  integer, intent(IN)      :: comp_id
+  integer :: j
+  logical :: res
+  
+  res = .true.
+
+  if (.not.data_type%sd%is_send) then
+    call put_log("Data : "//trim(data_type%name)//", send_flag /= 1, put data skip", 1)
+    res = .false.
+    return
+  end if
+
+  if (data_type%sd%is_average) return 
+
+  if (is_first_step()) return
+
+  do j = 1, data_type%sd%num_of_my_recv_data
+      if (is_exchange_step(comp_id, 1, data_type%sd%my_recv_conf(j)%interval)) then
+          res = .true.
+          return
+       end if
+  end do
+
+  call put_log("Current time is not send step, put data skipped, data : "//trim(data_type%name), 1)
+  res = .false.
+
+end function jcup_isPutOK
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+logical function jcup_isPutOK_org(data_type, time)
   use jcup_config, only : isSendData, get_send_comp_id_from_data_name, is_mean_data, is_put_step_data
   use jcup_utils, only  :  put_log
   use jcup_data, only : varp_type, get_time, get_data_name
@@ -1863,11 +1911,11 @@ logical function jcup_isPutOK(data_type, time)
  
   name = get_data_name(data_type)
 
-  jcup_isPutOK = .true.
+  jcup_isPutOK_org = .true.
 
   if (.not.isSendData(DATA_NAME = name)) then
     call put_log("Data : "//trim(name)//", send_flag /= 1, put data skip", 1)
-    jcup_isPutOK = .false.
+    jcup_isPutOK_org = .false.
     return
   end if
 
@@ -1876,21 +1924,21 @@ logical function jcup_isPutOK(data_type, time)
 
   if (is_first_step()) return
 
-  jcup_isPutOK = .false.
+  jcup_isPutOK_org = .false.
 
   !!!if (time == get_time(data_type)) then
   !!!!  call put_log("This data has been put, get data skipped, data : "//trim(name), 1)
   !!!!  return
   !!!!end if
 
-  if (.not.is_put_step_data(name)) then
+  if (.not.is_put_step_data(data_type%sd)) then
     call put_log("Current time is not send step, put data skipped, data : "//trim(name), 1)
     return
   end if
 
-  jcup_isPutOK = .true.
+  jcup_isPutOK_org = .true.
 
-end function jcup_isPutOK
+end function jcup_isPutOK_org
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 !> @breaf
@@ -1907,7 +1955,7 @@ subroutine jcup_put_data_1d_double(data_type, data, data_vector)
   use jcup_buffer, only : put_send_data
   use jcup_config, only : is_mean_data, send_data_conf_type, get_send_data_conf_ptr, is_put_step_data, &
                           get_send_comp_id_from_data_name, set_current_conf, get_comp_exchange_type, &
-                          get_average_data_name, get_send_data_id
+                          get_average_data_name, get_send_data_id_mdf
   use jcup_time, only : time_type, get_before_time, cal_next_exchange_time, get_delta_t
   use jcup_data, only : varp_type, get_comp_id, &
                         get_data_name, &
@@ -1942,12 +1990,12 @@ subroutine jcup_put_data_1d_double(data_type, data, data_vector)
 
   data_name = get_data_name(data_type)
 
-  if (.not.is_data_defined(my_comp_id, data_name)) then
-    call error("jcup_put_data_2d_double", "data : "//trim(data_name) &
-                           //" is not defined (subroutine jcup_def_data is not called ")
-  end if
+  !!!if (.not.is_data_defined(my_comp_id, data_name)) then
+  !!!  call error("jcup_put_data_2d_double", "data : "//trim(data_name) &
+  !!!                         //" is not defined (subroutine jcup_def_data is not called ")
+  !!!end if
 
-  sd => get_send_data_conf_ptr(DATA_NAME = data_name)
+  sd => data_type%sd !get_send_data_conf_ptr(DATA_NAME = data_name)
 
   do i = 1, sd%num_of_my_recv_data
 
@@ -1958,12 +2006,12 @@ subroutine jcup_put_data_1d_double(data_type, data, data_vector)
     end if
   end do
 
-  if (.not.jcup_isPutOK(data_type, time)) return
+  if (.not.jcup_isPutOK(data_type, my_comp_id)) return
 
   allocate(averaging_weight(size(data)))
   averaging_weight(:) = 1.d0
 
-  if (is_mean_data(my_comp_id, data_name)) then
+  if (data_type%sd%is_average) then !if (is_mean_data(my_comp_id, data_name)) then
     do i = 1, sd%num_of_my_recv_data
       if (get_comp_exchange_type(my_comp_id, sd%my_recv_conf(i)%model_id) == IMMEDIATE_SEND_RECV) cycle ! skip immediate_send_recv
 
@@ -1982,26 +2030,32 @@ subroutine jcup_put_data_1d_double(data_type, data, data_vector)
           end do
 
           call cal_next_exchange_time(my_comp_id, 1, sd%my_recv_conf(i)%interval, next_time)
+          
           call put_send_data(data, next_time, my_comp_id, &
-                             get_send_data_id(sd%my_recv_conf(i)%model_id, data_name, is_average), &
+                             !get_send_data_id(sd%my_recv_conf(i)%model_id, data_name, is_average), &
+                             get_send_data_id_mdf(sd%my_recv_conf(i)%model_id, sd%data_id, is_average), &
                              average_data_name, .true., fill_value, averaging_weight)
 
         else ! first step of average data
           call put_send_data(data, time, my_comp_id, &
-                             get_send_data_id(sd%my_recv_conf(i)%model_id, data_name, is_average), &
+                             !get_send_data_id(sd%my_recv_conf(i)%model_id, data_name, is_average), &
+                             get_send_data_id_mdf(sd%my_recv_conf(i)%model_id, sd%data_id, is_average), &
                              data_name, .false., fill_value, averaging_weight)
         end if
       else  ! non average data
-        if ((is_first_step()).or.(is_put_step_data(data_name))) then
+        if ((is_first_step()).or.(is_put_step_data(sd))) then
            call put_send_data(data, time, my_comp_id, &
-                              get_send_data_id(sd%my_recv_conf(i)%model_id, data_name, is_average), &
+                              !get_send_data_id(sd%my_recv_conf(i)%model_id, data_name, is_average), &
+                              get_send_data_id_mdf(sd%my_recv_conf(i)%model_id, sd%data_id, is_average), &
                               data_name, .false., fill_value, averaging_weight)
         end if
       end if
     end do
   else
     call put_send_data(data, time, my_comp_id, &
-                       get_send_data_id(0, data_name, .false.), data_name, .false., fill_value, averaging_weight)
+                       !get_send_data_id(0, data_name, .false.), &
+                       get_send_data_id_mdf(0, sd%data_id, .false.), &
+                       data_name, .false., fill_value, averaging_weight)
     !!!!!call put_send_data(data, time, current_comp_id, &
     !!!!!                   get_send_data_id(0, data_name, .false.), data_name, .false., 1.d0)
   end if
@@ -2033,7 +2087,7 @@ subroutine jcup_put_data_25d_double(data_type, data, data_vector)
   use jcup_buffer, only : put_send_data
   use jcup_config, only : is_mean_data, send_data_conf_type, get_send_data_conf_ptr, is_put_step_data, &
                           get_send_comp_id_from_data_name, set_current_conf, get_comp_exchange_type, &
-                          get_average_data_name, get_send_data_id
+                          get_average_data_name, get_send_data_id_mdf
   use jcup_time, only : time_type, get_before_time, cal_next_exchange_time, get_delta_t
   use jcup_data, only : varp_type, is_data_defined, get_comp_id, get_data_name, set_time
   implicit none
@@ -2062,14 +2116,14 @@ subroutine jcup_put_data_25d_double(data_type, data, data_vector)
 
   data_name = get_data_name(data_type)
 
-  if (.not.jcup_isPutOK(data_type, time)) return
+  if (.not.jcup_isPutOK(data_type, my_comp_id)) return
 
-  if (.not.is_data_defined(my_comp_id, data_name)) then
-    call error("jcup_put_data_2d_double", "data : "//trim(data_name) &
-                          //" is not defined (subroutine jcup_def_data is not called) ")
-  end if
+  !!!if (.not.is_data_defined(my_comp_id, data_name)) then
+  !!!  call error("jcup_put_data_2d_double", "data : "//trim(data_name) &
+  !!!                        //" is not defined (subroutine jcup_def_data is not called) ")
+  !!!end if
 
-  sd => get_send_data_conf_ptr(DATA_NAME = data_name)
+  sd => data_type%sd !get_send_data_conf_ptr(DATA_NAME = data_name)
 
   do i = 1, sd%num_of_my_recv_data
     if ((get_comp_exchange_type(my_comp_id, sd%my_recv_conf(i)%model_id) == IMMEDIATE_SEND_RECV).or. &
@@ -2082,7 +2136,7 @@ subroutine jcup_put_data_25d_double(data_type, data, data_vector)
   allocate(averaging_weight(size(data,1), size(data,2)))
   averaging_weight(:,:) = 1.d0
 
-  if (is_mean_data(my_comp_id, data_name)) then
+  if (data_type%sd%is_average) then  !if (is_mean_data(my_comp_id, data_name)) then
     do i = 1, sd%num_of_my_recv_data
 
       is_average = sd%my_recv_conf(i)%is_average
@@ -2106,24 +2160,30 @@ subroutine jcup_put_data_25d_double(data_type, data, data_vector)
 
           call cal_next_exchange_time(my_comp_id, 1, sd%my_recv_conf(i)%interval, next_time)
           call put_send_data(data, next_time, my_comp_id, & ! 2014/11/19 [MOD] current_comp_id -> my_comp_id
-                             get_send_data_id(sd%my_recv_conf(i)%model_id, data_name, is_average), &
+                             !get_send_data_id(sd%my_recv_conf(i)%model_id, data_name, is_average), &
+                             get_send_data_id_mdf(sd%my_recv_conf(i)%model_id, sd%data_id, is_average), &
                              average_data_name, .true., fill_value, averaging_weight)
 
         else ! first step of average data
           call put_send_data(data, time, my_comp_id, &
-                             get_send_data_id(sd%my_recv_conf(i)%model_id, data_name, is_average), &
+                             !get_send_data_id(sd%my_recv_conf(i)%model_id, data_name, is_average), &
+                             get_send_data_id_mdf(sd%my_recv_conf(i)%model_id, sd%data_id, is_average), &
                              data_name, .false., fill_value, averaging_weight)
         end if
       else ! non average data
-        if (is_put_step_data(data_name)) then
+        if (is_put_step_data(sd)) then
            call put_send_data(data, time, my_comp_id, &
-                              get_send_data_id(sd%my_recv_conf(i)%model_id, data_name, is_average), &
+                              !get_send_data_id(sd%my_recv_conf(i)%model_id, data_name, is_average), &
+                              get_send_data_id_mdf(sd%my_recv_conf(i)%model_id, sd%data_id, is_average), &
                               data_name, .false., fill_value, averaging_weight)
         end if
       end if
     end do
   else
-    call put_send_data(data, time, my_comp_id, get_send_data_id(0, data_name, .false.), data_name, .false., fill_value, averaging_weight)
+     call put_send_data(data, time, my_comp_id, &
+                        !get_send_data_id(0, data_name, .false.), &
+                        get_send_data_id_mdf(0, sd%data_id, .false.), &
+                        data_name, .false., fill_value, averaging_weight)
   end if
 
   deallocate(averaging_weight)

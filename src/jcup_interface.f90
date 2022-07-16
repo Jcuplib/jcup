@@ -31,7 +31,8 @@ module jcup_interface
   use jcup_exchange, only : jcup_send_data_immediately, jcup_recv_data_immediately, &
                             jcup_put_data_1d_double, jcup_put_data_25d_double, &
                             jcup_get_data_1d_double, jcup_get_data_25d_double, &
-                            jcup_set_fill_value => set_fill_value
+                            jcup_set_fill_value => set_fill_value, &
+                            jcup_get_fill_value => get_fill_value
   use jcup_interpolation, only : interpolate_data
   use jcup_interpolation_interface, only : jcup_get_local_operation_index  => get_local_operation_index
   use jcup_interpolation_interface, only : jcup_get_send_grid_index => get_send_grid_index 
@@ -80,6 +81,7 @@ module jcup_interface
                                       ! send_model_name, send_data_name, recv_mode, interval, time_lag, mapping_tag, exchange_tag)
   public :: jcup_end_var_def          ! subroutine ()
   public :: jcup_set_fill_value       ! subroutine (fill_value) 
+  public :: jcup_get_fill_value       ! real(kind=8) function ()
   public :: jcup_init_time            ! subroutine (time_array) :: integer time_array(6)
   public :: jcup_set_time             ! subroutine (component_name, time_array, delta_t, is_exchange)
                                       ! subroutine (component_name, time_real, delta_t)  ! 2013.0910 [ADD]
@@ -212,7 +214,9 @@ subroutine jcup_initialize(model_name, default_time_unit, log_level, log_stderr,
   use jcup_grid_checker, only : init_checker
   use jcup_mpi_lib, only : jml_abort, jml_AllreduceMin, jml_AllreduceMax, jml_AllreduceMaxLocal
   use jcup_exchange, only : init_exchange
+#ifdef ENABLE_JAL
   use jal_api, only : jal_init
+#endif
   implicit none
   character(len=*),intent(IN) :: model_name ! main component name of my task 
   character(len=3), optional, intent(IN) :: default_time_unit ! 2014/07/03 [ADD]
@@ -352,8 +356,10 @@ subroutine jcup_initialize(model_name, default_time_unit, log_level, log_stderr,
   !!!return   !!!!! 20200514
   !!!!!!
 
+#ifdef ENABLE_JAL
   call jal_init(my_model_name)
-  
+#endif
+
 end subroutine jcup_initialize
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
@@ -376,7 +382,9 @@ subroutine jcup_coupling_end(time_array, isCallFinalize)
 #ifdef EXCHANGE_BY_MPI_RMA
   use jcup_grid, only : finalize_mpi_rma
 #endif
+#ifdef ENABLE_JAL
   use jal_api, only : jal_set_final_exchange_flag, jal_finish
+#endif
   implicit none
   integer, optional, intent(IN) :: time_array(:) ! 2014/07/08
   logical, optional, intent(IN) :: isCallFinalize
@@ -390,10 +398,12 @@ subroutine jcup_coupling_end(time_array, isCallFinalize)
   
   call send_final_step_data()
 
+#ifdef ENABLE_JAL
   if (is_assync_exchange) then
     call jal_set_final_exchange_flag(.false.) ! ad hoc call, for ILS coupling
     call jal_finish()
   end if
+#endif
  
   call put_log("!!!!!!!!!!!!!!!!   FINALIZE  STEP 1  !!!!!!!!!!!!!!! ", 1)
 
@@ -831,7 +841,7 @@ subroutine jcup_end_var_def()
         end do
      end if
   end do
-  
+
 #ifdef EXCHANGE_BY_MPI_RMA
   call init_mpi_rma()
 #endif
@@ -1011,26 +1021,26 @@ subroutine jcup_set_mapping_table(my_model_name, &
 
    if (jml_isLocalLeader(my_model_id)) then ! 2012/04/12 T.Arakawa [ADD]
       if (minval(send_grid) < get_grid_min_index(send_model_id, send_grid_num)) then
-         write(log_str,'(A, I10, A, I10, A, I10, A)') "min of send_grid_index (val = ", minval(send_grid), &
+         write(log_str,'(A, I8, A, I8, A, I8, A)') "min of send_grid_index (val = ", minval(send_grid), &
               ", location = ", minloc(send_grid), ") < min of defined grid_index (val = ", &
               get_grid_min_index(send_model_id, send_grid_num), "), check index"
         call error("jcup_set_mapping_table", trim(log_str))
       end if
       if (maxval(send_grid) > get_grid_max_index(send_model_id, send_grid_num)) then
-        write(log_str,'(A, I10, A, I10, A, I10, A)') "max of send_grid_index (val = ", maxval(send_grid), &
+        write(log_str,'(A, I8, A, I8, A, I8, A)') "max of send_grid_index (val = ", maxval(send_grid), &
               ", location = ", maxloc(send_grid), ") > max of defined grid_index (val = ", &
               get_grid_max_index(send_model_id, send_grid_num), "), check index"
         call error("jcup_set_mapping_table", trim(log_str))
       end if
 
       if (minval(recv_grid) < get_grid_min_index(recv_model_id, recv_grid_num)) then
-         write(log_str,'(A, I10, A, I10, A, I10, A)') "min of recv_grid_index (val = ", minval(recv_grid), &
+         write(log_str,'(A, I8, A, I8, A, I8, A)') "min of recv_grid_index (val = ", minval(recv_grid), &
               ", location = ", minloc(recv_grid), ") < min of defined grid_index (val = ", &
               get_grid_min_index(recv_model_id, recv_grid_num), "), check index"
         call error("jcup_set_mapping_table", trim(log_str))
       end if
       if (maxval(recv_grid) > get_grid_max_index(recv_model_id, recv_grid_num)) then
-        write(log_str,'(A, I10, A, I10, A, I10, A)') "max of recv_grid_index (val = ", maxval(recv_grid), &
+        write(log_str,'(A, I8, A, I8, A, I8, A)') "max of recv_grid_index (val = ", maxval(recv_grid), &
               ", location = ", maxloc(recv_grid), ") > max of defined grid_index (val = ", &
               get_grid_max_index(recv_model_id, recv_grid_num), "), check index"
         call error("jcup_set_mapping_table", trim(log_str))
@@ -1524,7 +1534,9 @@ subroutine jcup_set_date_time_int(component_name, time_array, delta_t, is_exchan
   use jcup_grid_checker, only : finalize_checker
   use jcup_mpi_lib, only : jml_GetMyrankGlobal
   use jcup_exchange, only : set_exchange_comp_id, jcup_exchange_data_parallel, jcup_exchange_data_serial
+#ifdef ENABLE_JAL
   use jal_api, only : jal_set_time
+#endif
   implicit none
   character(len=*), intent(IN) :: component_name
   integer, intent(IN) :: time_array(:) ! 2014/07/03 [MOD]
@@ -1552,6 +1564,7 @@ subroutine jcup_set_date_time_int(component_name, time_array, delta_t, is_exchan
   call put_log("--------------------------------- jcup_set_time ------------------------------------")
   call put_log("------------------------------------------------------------------------------------")
 
+#ifdef ENABLE_JAL
   if (is_assync_exchange) then        ! if my binary has sync exchange
     delta_t_jal = delta_t
     if (delta_t_jal <= 0) then
@@ -1560,6 +1573,7 @@ subroutine jcup_set_date_time_int(component_name, time_array, delta_t, is_exchan
     call jal_set_time(delta_t_jal)
     if (.not.is_sync_exchange) return ! if my binary has no sync exchange
   end if
+#endif
   
   ! check time array and time unit
   if ((get_time_unit() == TU_SEC).and.(size(time_array) < 6)) then
@@ -1800,7 +1814,7 @@ subroutine jcup_inc_calendar(itime, del_t)
   time%hh   = itime(4)
   time%mm   = itime(5)
   time%ss   = itime(6)
-  
+
   select case(get_time_unit())
   case(TU_SEC)
   case(TU_MIL)
@@ -1869,15 +1883,19 @@ end subroutine jcup_terminate_send_recv
 subroutine jcup_put_data_1d(data_type, data, data_vector)
   use jcup_data, only : varp_type
   use jcup_exchange, only : jcup_put_data_1d_double
+#ifdef ENABLE_JAL
   use jal_api, only : jal_put_data
+#endif
   implicit none
   type(varp_type), pointer :: data_type
   real(kind=8), intent(IN) :: data(:)
   real(kind=8), optional, intent(IN) :: data_vector(:)
 
+#ifdef ENABLE_JAL
   if (data_type%is_assync_exchange) then
      call jal_put_data(data_type, data)
   end if
+#endif
 
   if (data_type%is_sync_exchange) then
      call jcup_put_data_1d_double(data_type, data, data_vector)
@@ -1891,16 +1909,19 @@ end subroutine jcup_put_data_1d
 subroutine jcup_put_data_25d(data_type, data, data_vector)
   use jcup_data, only : varp_type
   use jcup_exchange, only : jcup_put_data_25d_double
+#ifdef ENABLE_JAL
   use jal_api, only : jal_put_data
+#endif
   implicit none
   type(varp_type), pointer :: data_type
   real(kind=8), intent(IN) :: data(:,:)
   real(kind=8), optional, intent(IN) :: data_vector(:)
 
+#ifdef ENABLE_JAL
   if (data_type%is_assync_exchange) then
      call jal_put_data(data_type, data)
   end if
-
+#endif
   if (data_type%is_sync_exchange) then
      call jcup_put_data_25d_double(data_type, data, data_vector)
   end if
@@ -1914,18 +1935,24 @@ end subroutine jcup_put_data_25d
 subroutine jcup_get_data_1d(data_type, data, data_vector, is_recv_ok)
   use jcup_constant, only : ASSYNC_SEND_RECV
   use jcup_data, only : varg_type
+#ifdef ENABLE_JAL
   use jal_api, only : jal_get_data
+#endif
   implicit none
   type(varg_type), pointer :: data_type
   real(kind=8), intent(INOUT) :: data(:)
   real(kind=8), intent(OUT), optional :: data_vector(:)
   logical, intent(OUT), optional :: is_recv_ok
 
+#ifdef ENABLE_JAL
   if (data_type%time_lag == ASSYNC_SEND_RECV) then
      call jal_get_data(data_type, data)
   else
+#endif
      call jcup_get_data_1d_double(data_type, data, data_vector, is_recv_ok)
+#ifdef ENABLE_JAL
   end if
+#endif
   
 end subroutine jcup_get_data_1d
 
@@ -1935,18 +1962,24 @@ end subroutine jcup_get_data_1d
 subroutine jcup_get_data_25d(data_type, data, data_vector, is_recv_ok)
   use jcup_constant, only : ASSYNC_SEND_RECV
   use jcup_data, only : varg_type
+#ifdef ENABLE_JAL
   use jal_api, only : jal_get_data
+#endif
   implicit none
   type(varg_type), pointer :: data_type
   real(kind=8), intent(INOUT) :: data(:,:)
   real(kind=8), intent(OUT), optional :: data_vector(:)
   logical, intent(OUT), optional :: is_recv_ok
 
+#ifdef ENABLE_JAL
   if (data_type%time_lag == ASSYNC_SEND_RECV) then
      call jal_get_data(data_type, data)
   else
+#endif
      call jcup_get_data_25d_double(data_type, data, data_vector, is_recv_ok)
+#ifdef ENABLE_JAL
   end if
+#endif
   
 end subroutine jcup_get_data_25d
 

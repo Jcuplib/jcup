@@ -36,6 +36,17 @@ module jcup_grid_base
 
   public :: local_area_type
 
+  ! pe array 
+  public :: single_pe_array_type
+  public :: pe_array_type
+  public :: init_pe_array
+  public :: write_pe_array_info
+  
+  ! exchange_grid
+  public :: exchange_grid_type
+  public :: init_exchange_grid
+
+
 !--------------------------------   private ----------------------------------!
 
   type local_area_type
@@ -68,6 +79,49 @@ module jcup_grid_base
   type(component_area_type), pointer :: comp_area(:) ! number of total component
 
   type(component_area_type), pointer :: current_area
+
+  type single_pe_array_type
+    integer :: pe_num ! pe number of local component
+    integer :: s_point, e_point
+#ifdef EXCHANGE_BY_MPI_RMA
+    integer :: s_point_send
+    integer :: e_point_send
+#endif
+  end type
+
+  type pe_array_type
+    integer :: num_of_pe
+    integer :: num_of_point
+    integer :: num_of_data ! number of send, recv data
+    type(single_pe_array_type), pointer :: pa(:)
+    integer, pointer :: data_point(:)
+    integer, pointer :: data_index(:)
+    real(kind=8), pointer :: data_buffer(:) ! num_of_send_recv_data_point x num_of_data
+#ifdef EXCHANGE_BY_MPI_RMA
+    integer :: send_buffer_size
+#endif
+  end type
+
+
+  type exchange_grid_type
+    real(kind=8), pointer :: send_double_buffer_1d(:,:)
+
+    integer          :: num_of_my_send_point             ! array size of my send point
+    integer          :: num_of_my_recv_point             ! array size of my recv point
+    integer, pointer :: global_index_of_my_send_point(:) ! global index of my local send point
+    integer, pointer :: global_index_of_my_recv_point(:) ! global index of my local recv point
+    integer, pointer :: local_operation_index(:)         ! global operation index of my local operation
+    integer, pointer :: local_send_grid_index(:)         ! global send point index of my local operation
+    integer, pointer :: local_recv_grid_index(:)         ! global recv point index of my local operation
+    integer, pointer :: send_index_converter(:)          ! mapping table from operation index to send grid index
+    integer, pointer :: recv_index_converter(:)          ! mapping table from operation index to recv grid index
+    integer, pointer :: remapped_send_index(:)           ! remapped send index table from send index converter
+ 
+    integer, pointer :: local_index(:) ! local grid index of my local operation
+    integer, pointer :: local_send_index(:)
+
+  end type
+
 
 contains
 
@@ -717,6 +771,63 @@ subroutine get_grid_index(comp_id, grid_id, grid_index)
   grid_index => comp_area(comp_id)%local_area(grid_id)%grid_index
 
 end subroutine get_grid_index
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine init_pe_array(pe_array)
+  implicit none
+  type(pe_array_type), intent(INOUT) :: pe_array
+
+  pe_array%num_of_pe = 0 
+  pe_array%num_of_point = 0
+  pe_array%num_of_data = 0
+
+  pe_array%pa => NULL()
+  pe_array%data_point => NULL()
+  pe_array%data_index => NULL()
+  pe_array%data_buffer => NULL()
+
+end subroutine init_pe_array
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine write_pe_array_info(unit, pe_array)
+  implicit none
+  integer, intent(in) :: unit
+  type(pe_array_type), intent(IN) :: pe_array
+  integer :: i
+
+  write(unit, '("NUM of PE = ",I2,", NUM of POINT = ",I4,", NUM of DATA = ",I4)') &
+                                  pe_array%num_of_pe, pe_array%num_of_point, pe_array%num_of_data
+  write(unit, '(A7,A9,A9)') "PE NUM",", S POINT",", E POINT " 
+
+  do i = 1, pe_array%num_of_pe
+    write(unit, '(I7,I9,I9)') pe_array%pa(i)%pe_num, pe_array%pa(i)%s_point, pe_array%pa(i)%e_point
+  end do
+
+end subroutine write_pe_array_info
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine init_exchange_grid(e_grid)
+  implicit none
+  type(exchange_grid_type), intent(INOUT) :: e_grid
+  
+  e_grid%num_of_my_send_point = 0
+  e_grid%num_of_my_recv_point = 0
+  e_grid%send_double_buffer_1d => NULL()
+  e_grid%global_index_of_my_send_point => NULL()
+  e_grid%global_index_of_my_recv_point => NULL()
+  e_grid%local_operation_index => NULL()
+  e_grid%local_send_grid_index => NULL()
+  e_grid%local_recv_grid_index => NULL()
+  e_grid%send_index_converter => NULL()
+  e_grid%recv_index_converter => NULL()
+  e_grid%remapped_send_index => NULL()
+  e_grid%local_index => NULL()
+  e_grid%local_send_index => NULL()
+
+end subroutine init_exchange_grid
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 

@@ -1,5 +1,5 @@
-TOPDIR = ../..
-include ${TOPDIR}/Mkinclude
+TOPDIR = ../../../../../..
+include ${TOPDIR}/src/Mkinclude
 include files.mk
 
 include files.mk
@@ -22,7 +22,7 @@ clean:
 .SUFFIXES: .o .f90 .mod
 
 .f90.o:
-	$(FC) $(FFLAGS) -c $< -I../c.black
+	$(FC) $(filter-out -heap-arrays, $(FFLAGS)) -c $< -I../c.black 
 
 %.mod: %.f90
 	make $(patsubst %.f90,%.o,$<)

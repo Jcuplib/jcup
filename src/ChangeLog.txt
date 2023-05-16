@@ -1907,3 +1907,18 @@ Routines
 
 Detail
  is_put_step_dataをdata_nameではなくsend_data_conf_typeを引数とするよう変更。
+
+-----------------------------------------------------------------
+
+Version:4.100600
+Date:2023/04/05
+
+Files:jcup_exchange.f90, jcup_exchange.f90
+
+Routines
+ jcup_interpolate_data_1d_double  : [mod]
+ jcup_interpolate_data_25d_double : [mod]
+
+Detail
+ buffer_double1d, buffer_double25dにfill_valueを代入するコードで
+ 2次元目の大きさを明示するよう変更。

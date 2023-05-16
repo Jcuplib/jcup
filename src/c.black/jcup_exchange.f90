@@ -1732,7 +1732,7 @@ subroutine jcup_interpolate_data_1d_double(source_model_name, data_name, num_of_
   call interpolate_data_1d(current_comp_id, source_comp_id, recv_mapping_tag(current_comp_id, source_comp_id), &
                            DOUBLE_DATA, num_of_data, exchange_tag)
 
-  buffer_double1d = fill_value
+  buffer_double1d(:,1:num_of_data) = fill_value
 
   call get_data(current_comp_id, source_comp_id, recv_mapping_tag(current_comp_id, source_comp_id), &
                 buffer_double1d(:,:), num_of_data)
@@ -1797,7 +1797,7 @@ subroutine jcup_interpolate_data_25d_double(source_model_name, data_name, num_of
   call interpolate_data_1d(current_comp_id, source_comp_id, recv_mapping_tag(current_comp_id, source_comp_id), &
                            DOUBLE_DATA, num_of_data, exchange_tag)
 
-  buffer_double25d = fill_value
+  buffer_double25d(:,1:num_of_data) = fill_value
 
   call get_data(current_comp_id, source_comp_id, recv_mapping_tag(current_comp_id, source_comp_id), &
                 buffer_double25d(:,:), num_of_data)

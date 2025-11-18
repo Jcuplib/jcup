@@ -46,11 +46,19 @@ module jcup_grid_base
   public :: exchange_grid_type
   public :: init_exchange_grid
 
+  ! 2023/11/19 to skip mapping table setting
+  public :: write_comp_area       ! subroutine (fid)
+  public :: read_comp_area        ! subroutine (fid)
+  public :: write_pe_array        ! subroutine (fid, pe_array)
+  public :: read_pe_array         ! subroutine (fid, pe_array)
+  public :: write_exchange_grid   ! subroutine (fid, exchange_grid)
+  public :: read_exchange_grid    ! subroutine (fid, exchange_grid)
+  
 
 !--------------------------------   private ----------------------------------!
 
   type local_area_type
-    integer :: num_of_point
+    integer :: num_of_point = 0
     integer, pointer :: grid_index(:)
     integer :: min_index, max_index
     character(len=STR_SHORT) :: grid_name 
@@ -67,7 +75,7 @@ module jcup_grid_base
   end type
 
   type component_area_type
-    integer :: num_of_grid
+    integer :: num_of_grid = 0
     type(local_area_type) :: local_area(MAX_GRID) ! number of grid of the component
     type(global_area_type) :: global_area(MAX_GRID) 
     character(len=STR_SHORT) :: comp_name
@@ -90,12 +98,12 @@ module jcup_grid_base
   end type
 
   type pe_array_type
-    integer :: num_of_pe
-    integer :: num_of_point
-    integer :: num_of_data ! number of send, recv data
-    type(single_pe_array_type), pointer :: pa(:)
-    integer, pointer :: data_point(:)
-    integer, pointer :: data_index(:)
+    integer :: num_of_pe    = 0
+    integer :: num_of_point = 0
+    integer :: num_of_data  = 0 ! number of send, recv data
+    type(single_pe_array_type), pointer :: pa(:) ! size = num_of_pe
+    integer, pointer :: data_point(:)            ! size = num_of_point
+    integer, pointer :: data_index(:)            ! size = num_of_point
     real(kind=8), pointer :: data_buffer(:) ! num_of_send_recv_data_point x num_of_data
 #ifdef EXCHANGE_BY_MPI_RMA
     integer :: send_buffer_size
@@ -106,8 +114,8 @@ module jcup_grid_base
   type exchange_grid_type
     real(kind=8), pointer :: send_double_buffer_1d(:,:)
 
-    integer          :: num_of_my_send_point             ! array size of my send point
-    integer          :: num_of_my_recv_point             ! array size of my recv point
+    integer          :: num_of_my_send_point = 0         ! array size of my send point
+    integer          :: num_of_my_recv_point = 0         ! array size of my recv point
     integer, pointer :: global_index_of_my_send_point(:) ! global index of my local send point
     integer, pointer :: global_index_of_my_recv_point(:) ! global index of my local recv point
     integer, pointer :: local_operation_index(:)         ! global operation index of my local operation
@@ -828,6 +836,261 @@ subroutine init_exchange_grid(e_grid)
   e_grid%local_send_index => NULL()
 
 end subroutine init_exchange_grid
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine write_comp_area(fid) ! write local_area info only
+  implicit none
+  integer, intent(IN) :: fid
+  integer :: i, j
+
+  do i = 1, size(comp_area)
+     do j = 1, size(comp_area(i)%local_area)
+        write(fid) comp_area(i)%local_area(j)%num_of_point
+        if (comp_area(i)%local_area(j)%num_of_point > 0) then
+           write(fid) comp_area(i)%local_area(j)%grid_index
+           write(fid) comp_area(i)%local_area(j)%min_index
+           write(fid) comp_area(i)%local_area(j)%max_index
+           write(fid) comp_area(i)%local_area(j)%grid_name
+           write(fid) comp_area(i)%local_area(j)%grid_num
+        end if
+     end do
+  end do
+  
+end subroutine write_comp_area
+
+  
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine read_comp_area(fid) ! read local_area info only
+  implicit none
+  integer, intent(IN) :: fid
+  integer :: i, j
+
+  do i = 1, size(comp_area)
+     do j = 1, size(comp_area(i)%local_area)
+        read(fid) comp_area(i)%local_area(j)%num_of_point
+        if (comp_area(i)%local_area(j)%num_of_point > 0) then
+           allocate(comp_area(i)%local_area(j)%grid_index(comp_area(i)%local_area(j)%num_of_point))
+           read(fid) comp_area(i)%local_area(j)%grid_index
+           read(fid) comp_area(i)%local_area(j)%min_index
+           read(fid) comp_area(i)%local_area(j)%max_index
+           read(fid) comp_area(i)%local_area(j)%grid_name
+           read(fid) comp_area(i)%local_area(j)%grid_num
+        end if
+     end do
+  end do
+  
+end subroutine read_comp_area
+
+  
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine write_pe_array(fid, pe_array)
+  implicit none
+  integer, intent(IN) :: fid
+  type(pe_array_type), intent(IN) :: pe_array
+  integer :: i
+  integer :: array_size
+  
+  write(fid) pe_array%num_of_pe
+  write(fid) pe_array%num_of_point
+  write(fid) pe_array%num_of_data
+
+  array_size = 0
+  if (associated(pe_array%data_point)) array_size = size(pe_array%data_point)
+  write(fid) array_size
+  if (array_size > 0) write(fid) pe_array%data_point
+
+  array_size = 0
+  if (associated(pe_array%data_index)) array_size = size(pe_array%data_index)
+  write(fid) array_size
+  if (array_size > 0) write(fid) pe_array%data_index
+
+  ! size of data_buffer = pe_array%num_of_point X NUM_OF_EXCHANGE_DATA
+#ifdef EXCHANGE_BY_MPI_RMA
+  write(fid) pe_array%send_buffer_size
+#endif
+
+  ! size of pe_array%pa = pe_array%num_of_pe
+  do i = 1, pe_array%num_of_pe
+     write(fid) pe_array%pa(i)%pe_num
+     write(fid) pe_array%pa(i)%s_point
+     write(fid) pe_array%pa(i)%e_point
+#ifdef EXCHANGE_BY_MPI_RMA
+     write(fid) pe_array%pa(i)%s_point_send
+     write(fid) pe_array%pa(i)%e_point_send
+#endif
+  end do
+  
+end subroutine write_pe_array
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine read_pe_array(fid, pe_array)
+  use jcup_constant, only : NUM_OF_EXCHANGE_DATA
+  implicit none
+  integer, intent(IN) :: fid
+  type(pe_array_type), intent(INOUT) :: pe_array
+  integer :: i
+  integer :: array_size
+  
+  read(fid) pe_array%num_of_pe
+  read(fid) pe_array%num_of_point
+  read(fid) pe_array%num_of_data
+
+  if (pe_array%num_of_point > 0) then
+     allocate(pe_array%data_buffer(pe_array%num_of_point * NUM_OF_EXCHANGE_DATA))
+  end if
+  
+  read(fid) array_size
+
+  if (array_size > 0) then
+    allocate(pe_array%data_point(array_size))
+    read(fid) pe_array%data_point
+  end if
+ 
+  read(fid) array_size
+
+  if (array_size > 0) then
+     allocate(pe_array%data_index(array_size))
+     read(fid) pe_array%data_index
+  end if
+  
+#ifdef EXCHANGE_BY_MPI_RMA
+  read(fid) pe_array%send_buffer_size
+#endif
+
+  ! size of pe_array%pa = pe_array%num_of_pe
+
+  if (pe_array%num_of_pe > 0) allocate(pe_array%pa(pe_array%num_of_pe))
+  
+  do i = 1, pe_array%num_of_pe
+     read(fid) pe_array%pa(i)%pe_num
+     read(fid) pe_array%pa(i)%s_point
+     read(fid) pe_array%pa(i)%e_point
+#ifdef EXCHANGE_BY_MPI_RMA
+     read(fid) pe_array%pa(i)%s_point_send
+     read(fid) pe_array%pa(i)%e_point_send
+#endif
+  end do
+  
+end subroutine read_pe_array
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine write_exchange_grid(fid, exchange_grid)
+  implicit none
+  integer, intent(IN) :: fid
+  type(exchange_grid_type), intent(IN) :: exchange_grid
+  integer :: array_size
+
+  array_size = 0
+  if (associated(exchange_grid%local_operation_index)) array_size = size(exchange_grid%local_operation_index)
+  
+  write(fid) array_size
+  if (array_size > 0) then
+    write(fid) exchange_grid%local_operation_index
+    write(fid) exchange_grid%local_send_grid_index
+    write(fid) exchange_grid%local_recv_grid_index
+    write(fid) exchange_grid%send_index_converter
+    write(fid) exchange_grid%recv_index_converter
+    write(fid) exchange_grid%remapped_send_index
+  end if
+
+  if (associated(exchange_grid%send_double_buffer_1d)) then    
+    write(fid) size(exchange_grid%send_double_buffer_1d, 1)
+    write(fid) size(exchange_grid%send_double_buffer_1d, 2)
+  else
+     array_size = 0
+     write(fid) array_size
+     write(fid) array_size
+  end if
+  
+  write(fid) exchange_grid%num_of_my_send_point
+  if (exchange_grid%num_of_my_send_point > 0) then
+     write(fid) exchange_grid%global_index_of_my_send_point
+  end if
+  
+  write(fid) exchange_grid%num_of_my_recv_point
+  if (exchange_grid%num_of_my_recv_point > 0) then
+     write(fid) exchange_grid%global_index_of_my_recv_point
+  end if
+
+  array_size = 0
+  if (associated(exchange_grid%local_index)) array_size = size(exchange_grid%local_index)
+  write(fid) array_size
+  if (array_size > 0) then
+     write(fid) exchange_grid%local_index
+  end if
+
+  array_size = 0
+  if (associated(exchange_grid%local_send_index)) array_size = size(exchange_grid%local_send_index)
+  write(fid) array_size
+  if (array_size > 0) then
+    write(fid) exchange_grid%local_send_index
+ end if
+ 
+end subroutine write_exchange_grid
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine read_exchange_grid(fid, exchange_grid)
+  implicit none
+  integer, intent(IN) :: fid
+  type(exchange_grid_type), intent(INOUT) :: exchange_grid
+  integer :: num_of_my_operation
+  integer :: send_buffer_size_1, send_buffer_size_2
+  integer :: local_index_size, local_send_index_size
+  
+  read(fid) num_of_my_operation
+  if (num_of_my_operation > 0) then
+    allocate(exchange_grid%local_operation_index(num_of_my_operation))
+    allocate(exchange_grid%local_send_grid_index(num_of_my_operation))
+    allocate(exchange_grid%local_recv_grid_index(num_of_my_operation))
+    allocate(exchange_grid%send_index_converter(num_of_my_operation))
+    allocate(exchange_grid%recv_index_converter(num_of_my_operation))
+    allocate(exchange_grid%remapped_send_index(num_of_my_operation))
+  
+    read(fid) exchange_grid%local_operation_index
+    read(fid) exchange_grid%local_send_grid_index
+    read(fid) exchange_grid%local_recv_grid_index
+    read(fid) exchange_grid%send_index_converter
+    read(fid) exchange_grid%recv_index_converter
+    read(fid) exchange_grid%remapped_send_index
+ end if
+ 
+  read(fid) send_buffer_size_1
+  read(fid) send_buffer_size_2
+  if (send_buffer_size_1 > 0) then
+    allocate(exchange_grid%send_double_buffer_1d(send_buffer_size_1, send_buffer_size_2))
+  end if
+ 
+  read(fid) exchange_grid%num_of_my_send_point
+  if (exchange_grid%num_of_my_send_point > 0) then
+    allocate(exchange_grid%global_index_of_my_send_point(exchange_grid%num_of_my_send_point))
+    read(fid) exchange_grid%global_index_of_my_send_point
+  end if
+ 
+  read(fid) exchange_grid%num_of_my_recv_point
+  if (exchange_grid%num_of_my_recv_point > 0) then
+    allocate(exchange_grid%global_index_of_my_recv_point(exchange_grid%num_of_my_recv_point))
+    read(fid) exchange_grid%global_index_of_my_recv_point
+  end if
+ 
+  read(fid) local_index_size
+  if (local_index_size > 0) then
+    allocate(exchange_grid%local_index(local_index_size))
+    read(fid) exchange_grid%local_index
+  end if
+ 
+  read(fid) local_send_index_size
+  if (local_send_index_size > 0) then
+    allocate(exchange_grid%local_send_index(local_send_index_size))
+    read(fid) exchange_grid%local_send_index
+ end if
+ 
+end subroutine read_exchange_grid
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 

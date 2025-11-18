@@ -39,6 +39,9 @@ module jcup_exchange
   public :: write_all_scalar_data       ! subroutine(fid, comp_id)
   public :: recv_all_scalar_data        ! subroutine()
 
+  public :: read_grid_tag               ! subroutine (fid) 2023/11/27
+  public :: write_grid_tag              ! subroutine (fid) 2023/11/27
+
 !--------------------------------   private  ---------------------------------!
 
   real(kind=8), private :: fill_value = HUGE(kind(1.d0))
@@ -283,6 +286,28 @@ subroutine set_recv_grid_tag(recv_comp_id, send_comp_id, map_num, grid_tag)
 
 end subroutine set_recv_grid_tag
   
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! 2023/11/27
+subroutine write_grid_tag(fid)
+  implicit none
+  integer, intent(IN) :: fid
+
+  write(fid) my_send_grid_tag
+  write(fid) my_recv_grid_tag
+
+end subroutine write_grid_tag
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+! 2023/11/27 
+subroutine read_grid_tag(fid)
+  implicit none
+  integer, intent(IN) :: fid
+
+  read(fid) my_send_grid_tag
+  read(fid) my_recv_grid_tag
+
+end subroutine read_grid_tag
+
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
 logical function jcup_isSendOK(name)
@@ -2949,7 +2974,7 @@ subroutine jcup_recv_get_data_25d_double(send_comp_id, rd, data)
   call get_my_local_area(current_comp_id, current_grid_tag, is, ie, js, je, ks, ke)
   ni = ie-is+1
 
-  data(1:ni,:) = buffer_double1d(1:ni,:)
+  data(1:ni,:) = buffer_double1d(1:ni,1:num_of_data)
 
 
 end subroutine jcup_recv_get_data_25d_double

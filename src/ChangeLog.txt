@@ -1922,3 +1922,55 @@ Routines
 Detail
  buffer_double1d, buffer_double25dにfill_valueを代入するコードで
  2次元目の大きさを明示するよう変更。
+
+-----------------------------------------------------------------
+
+Version:4.200000
+Date:2023/11/27
+
+Files: jcup_grid_base.f90, jcup_grid.f90, jcup_exchange.f90 jcup_interface.f90
+
+Routines
+ write_pe_array                   : [add]
+ read_pe_array                    : [add]
+ write_grid_mapping               : [add]
+ read_grid_mapping                : [add]
+ read_grid_tag                    : [add]
+ write_grid_tag                   : [add]
+ jcup_write_mapping_table         : [add]
+ jcup_read_mapping_table          : [add]
+
+Detail
+ マッピングテーブルの設定をスキップするため、テーブル情報をファイルに出力、入力する
+ ルーチン群を追加。
+
+
+-----------------------------------------------------------------
+
+Version:4.200001
+Date:2024/11/16
+
+Files:jcup_exchange.f90
+
+Routines
+ jcup_recv_get_data_25d_double    : [mod]
+
+Detail
+ data = bufferでbufferの2次元目の大きさを明示するように変更
+
+-----------------------------------------------------------------
+
+Version:4.200100
+Date:2024/11/18
+
+Files:jcup_utils.f90
+
+Routines
+ quicksort_int                    : [add]
+ sort_int_1d_quick                : [add]
+ mergesort_int                    : [add]
+ sort_int_1d_merge                : [add]
+ sort_int_1d_radix                : [add]
+
+Detail
+ ソートアルゴリズムにquick sortとmerge sortを追加し、quick sortをデフォルトに変更

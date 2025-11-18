@@ -1,4 +1,4 @@
-TOPDIR = ../
+TOPDIR = ../../../
 include ${TOPDIR}Mkinclude
 
 LIBJCUP = libjcup.a
@@ -9,21 +9,22 @@ VPATH = c.black:c.white
 
 MODS = $(JCUPOBJS:.o=.mod)
 
-all: makedir
-	$(MAKE) $(JCUPLIBDIR)/$(LIBJCUP)
+all: 
+	#$(MAKE) $(JCUPLIBDIR)/$(LIBJCUP)
+	$(MAKE) $(JCUPLIB)
 	$(MAKE) modules
 	@echo "Complete making $(LIBJCUP)."
 
 makedir:
-	mkdir -p $(JCUPLIBDIR)
-	mkdir -p $(JCUPINCDIR)
+	mkdir  $(JCUPLIBDIR)
+	mkdir  $(JCUPINCDIR)
 
-$(JCUPLIBDIR)/$(LIBJCUP): $(JCUPOBJS)
+$(JCUPLIB): $(JCUPOBJS)
 	$(AR) $(ARFLAGS) $@ $^
 	$(RANLIB) $@
 
 modules: $(JCUPOBJS)
-	$(INSTALL) $(MODS) $(JCUPINCDIR)
+	$(INSTALL) $(MODS) $(MODDIR)
 
 
 allclean: clean

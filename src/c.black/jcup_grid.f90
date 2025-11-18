@@ -15,31 +15,31 @@ module jcup_grid
   public :: def_grid
   public :: end_def
   public :: GetNumOfMyGrid
-  public :: get_my_grid_num ! integer function (grid_name)
+  public :: get_my_grid_num            ! integer function (grid_name)
   public :: set_grid
-  public :: is_my_grid ! logical function (grid_name)
-  public :: get_operation_index ! subroutine (my_comp_name, send_comp_name, mapping_tag, num_of_operation, operation_index)
+  public :: is_my_grid                 ! logical function (grid_name)
+  public :: get_operation_index        ! subroutine (my_comp_name, send_comp_name, mapping_tag, num_of_operation, operation_index)
   public :: get_send_grid_index 
   ! subroutine (my_comp_name, send_comp_name, mapping_tag, num_of_send_grid_point, send_grid_index) 
   public :: get_recv_grid_index
   ! subroutine (my_comp_name, send_comp_name, mapping_tag, num_of_recv_grid_point, recv_grid_index) 
   public :: get_interpolation_index
   public :: set_grid_mapping_1d
-  public :: set_grid_mapping_1d_local ! subroutine ! 2016/12/27 [NEW]
-  public :: exchange_grid_mapping  ! subroutine (send_comp_id, recv_comp_id, mapping_tag)
-  public :: send_grid_mapping      ! subroutine (send_comp_id, recv_comp_id, mapping_tag)
-  public :: recv_grid_mapping      ! subroutine (send_comp_id, recv_comp_id, mapping_tag)
+  public :: set_grid_mapping_1d_local  ! subroutine ! 2016/12/27 [NEW]
+  public :: exchange_grid_mapping      ! subroutine (send_comp_id, recv_comp_id, mapping_tag)
+  public :: send_grid_mapping          ! subroutine (send_comp_id, recv_comp_id, mapping_tag)
+  public :: recv_grid_mapping          ! subroutine (send_comp_id, recv_comp_id, mapping_tag)
   public :: finish_grid_mapping
   public :: write_grid_mapping_info
   public :: set_data
-  public :: get_data     ! subroutine (recv_comp_id, send_comp_id, mapping_tag, data, num_of_data)
-  public :: send_data_1d ! subroutine (send_comp_id, recv_comp_id, mapping_tag, data_type, num_of_data)
-  public :: recv_data_1d ! subroutine (recv_comp_id, send_comp_id, mapping_tag, data_type, num_of_data)
-  public :: get_send_data_buffer_size ! integer function(send_comp_id, recv_comp_id, mapping_tag) ! 2018/07/23 for jpl nowait send
-  public :: send_data_1d_nowait ! subroutine (send_comp_id, recv_comp_id, mapping_tag, data_type, num_of_data) ! 2018/07/05 for jpl
-  public :: recv_data    ! subroutine (recv_comp_id, send_comp_id, mapping_tag, data_type, num_of_data)
-  public :: recv_data_nowait    ! subroutine (recv_comp_id, send_comp_id, mapping_tag, data_type, num_of_data) ! 2018/07/05 for jpl
-  public :: send_recv_waitall   ! subroutine ()  ! 20180705 for jpl
+  public :: get_data                   ! subroutine (recv_comp_id, send_comp_id, mapping_tag, data, num_of_data)
+  public :: send_data_1d               ! subroutine (send_comp_id, recv_comp_id, mapping_tag, data_type, num_of_data)
+  public :: recv_data_1d               ! subroutine (recv_comp_id, send_comp_id, mapping_tag, data_type, num_of_data)
+  public :: get_send_data_buffer_size  ! integer function(send_comp_id, recv_comp_id, mapping_tag) ! 2018/07/23 for jpl nowait send
+  public :: send_data_1d_nowait        ! subroutine (send_comp_id, recv_comp_id, mapping_tag, data_type, num_of_data) ! 2018/07/05 for jpl
+  public :: recv_data                  ! subroutine (recv_comp_id, send_comp_id, mapping_tag, data_type, num_of_data)
+  public :: recv_data_nowait           ! subroutine (recv_comp_id, send_comp_id, mapping_tag, data_type, num_of_data) ! 2018/07/05 for jpl
+  public :: send_recv_waitall          ! subroutine ()  ! 20180705 for jpl
   public :: exchange_data_comp
 
   public :: interpolate_data_1d
@@ -50,6 +50,10 @@ module jcup_grid
   public :: finalize_mpi_rma
 #endif
 
+  ! 2023/11/19 to skip mapping table setting
+  public :: write_grid_mapping         ! subroutine (fid)
+  public :: read_grid_mapping          ! subroutine (fid)
+  
 !--------------------------------   private  ---------------------------------!
 
 
@@ -383,6 +387,79 @@ subroutine get_interpolation_index(my_comp_name, send_comp_name, mapping_tag, nu
 
 end subroutine get_interpolation_index
 
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine write_grid_mapping(fid)
+  use jcup_grid_base, only : write_comp_area, write_pe_array, write_exchange_grid
+  implicit none
+  integer, intent(IN) :: fid
+  integer :: i, j, k
+  integer :: ounit
+
+  call write_comp_area(fid)
+
+  do j = 1, size(send_array, 2)
+     do i = 1, size(send_array, 1)
+        do k = 1, size(send_array(i, j)%pe_array)
+           call write_pe_array(fid, send_array(i, j)%pe_array(k))
+        end do
+     end do
+  end do
+
+  do j = 1, size(recv_array, 2)
+     do i = 1, size(recv_array, 1)
+        do k = 1, size(recv_array(i, j)%pe_array)
+           call write_pe_array(fid, recv_array(i, j)%pe_array(k))
+        end do
+     end do
+  end do
+
+  do j = 1, size(a_grid, 2)
+     do i = 1, size(a_grid, 1)
+        do k = 1, size(a_grid(i, j)%ex_grid)
+           call write_exchange_grid(fid, a_grid(i, j)%ex_grid(k))
+        end do
+     end do
+  end do
+  
+end subroutine write_grid_mapping
+
+!=======+=========+=========+=========+=========+=========+=========+=========+
+
+subroutine read_grid_mapping(fid)
+  use jcup_grid_base, only : read_comp_area, read_pe_array, read_exchange_grid
+  implicit none
+  integer, intent(IN) :: fid
+  integer :: i, j, k
+
+  call read_comp_area(fid)
+  
+  do j = 1, size(send_array, 2)
+     do i = 1, size(send_array, 1)
+        do k = 1, size(send_array(i, j)%pe_array)
+           call read_pe_array(fid, send_array(i, j)%pe_array(k))
+        end do
+     end do
+  end do
+
+  do j = 1, size(recv_array, 2)
+     do i = 1, size(recv_array, 1)
+        do k = 1, size(recv_array(i, j)%pe_array)
+           call read_pe_array(fid, recv_array(i, j)%pe_array(k))
+        end do
+     end do
+  end do
+
+  do j = 1, size(a_grid, 2)
+     do i = 1, size(a_grid, 1)
+        do k = 1, size(a_grid(i, j)%ex_grid)
+           call read_exchange_grid(fid, a_grid(i, j)%ex_grid(k))
+        end do
+     end do
+  end do
+  
+end subroutine read_grid_mapping
 
 !=======+=========+=========+=========+=========+=========+=========+=========+
 
